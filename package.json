@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test:contract": "node ../tests/contract.test.js",
+    "test:backend": "node ../tests/backend_smoke.test.js"
   },
   "dependencies": {
     "next": "15.5.21",
