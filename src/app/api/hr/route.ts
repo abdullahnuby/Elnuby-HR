@@ -12,8 +12,13 @@ if (!url || !serviceRoleKey) {
 }
 
 const db = createClient(url, serviceRoleKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
-  db: { schema: 'hr' },
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  },
+  db: {
+    schema: 'public',
+  },
 });
 
 const authDb = createClient(url, serviceRoleKey, {
