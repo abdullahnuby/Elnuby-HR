@@ -8,14 +8,17 @@ export async function GET() {
   return NextResponse.json(data);
 }
 
-// 2. دالة إرسال البيانات (POST)
 export async function POST(request: Request) {
   try {
     const body = await request.json();
 
+    // 1. استبعاد حقل 'action' (وأي حقول واجهة أخرى) من البيانات قبل الحفظ
+    const { action, ...employeeData } = body;
+
+    // 2. إرسال البيانات النظيفة فقط إلى Supabase
     const { data, error } = await supabase
       .from('employees') 
-      .insert([body])
+      .insert([employeeData])
       .select();
 
     if (error) {
