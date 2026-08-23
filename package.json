@@ -10,6 +10,7 @@
     "test:backend": "node ../tests/backend_smoke.test.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.112.3",
     "next": "15.5.21",
     "react": "19.1.1",
     "react-dom": "19.1.1"
