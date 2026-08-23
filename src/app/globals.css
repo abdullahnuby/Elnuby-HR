@@ -128,3 +128,5 @@
   .kpi strong{font-size:18px}
 }
 .tiny{padding:6px 9px;border-radius:7px;font-size:9px;font-weight:800;margin:0 2px}.approve{background:#e9faf3;color:#08744f}.reject{background:#fff0f0;color:#b42318}
+
+.request-card p{color:#667085;margin-top:-4px;margin-bottom:14px}.secondary{background:#fff;border:1px solid #d0d5dd;color:#1d2939;border-radius:12px;padding:11px 18px;font-weight:700}.secondary:disabled{opacity:.5}.project-card span{font-size:12px;color:#667085;display:block;margin-top:6px}.formgrid input,.formgrid select{min-width:0}
