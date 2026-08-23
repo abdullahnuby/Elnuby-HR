@@ -957,83 +957,59 @@ async function getProjectManagerDashboard(
 async function listEmployees(
   session: SessionContext
 ) {
-  if (
-    session.user.role ===
-    "PROJECT_MANAGER"
-  ) {
-    const projectIds =
-      await getManagedProjectIds(
-        session.user
-      );
+  let employeeIds: string[] | null = null;
+
+  if (session.user.role === "PROJECT_MANAGER") {
+    const projectIds = await getManagedProjectIds(session.user);
 
     if (!projectIds.length) {
       return success([]);
     }
 
-    const { data: assignments } =
+    const { data: assignments, error: assignmentError } =
       await supabase
         .from("project_assignments")
-        .select("*")
-        .in(
-          "project_id",
-          projectIds
-        )
-        .eq(
-          "is_current",
-          true
-        );
+        .select("employee_id")
+        .in("project_id", projectIds)
+        .eq("is_current", true);
 
-    const employeeIds = [
+    if (assignmentError) {
+      console.error("employees assignments:", assignmentError);
+      return errorResponse("تعذر تحميل ربط الموظفين بالمشروعات", 500);
+    }
+
+    employeeIds = [
       ...new Set(
-        (assignments || []).map(
-          (row: any) =>
-            row.employee_id
-        )
+        (assignments || [])
+          .map((row: any) => row.employee_id)
+          .filter(Boolean)
       ),
     ];
+  }
 
+  let employeeQuery = supabase
+    .from("employees")
+    .select("*")
+    .order("name");
+
+  if (employeeIds !== null) {
     if (!employeeIds.length) {
       return success([]);
     }
 
-    const { data: employees, error } =
-      await supabase
-        .from("employees")
-        .select("*")
-        .in(
-          "employee_id",
-          employeeIds
-        )
-        .order("name");
-
-    if (error) {
-      console.error(
-        "employees:",
-        error
-      );
-
-      return errorResponse(
-        "تعذر تحميل الموظفين",
-        500
-      );
-    }
-
-    return success(
-      employees || []
+    employeeQuery = employeeQuery.in(
+      "employee_id",
+      employeeIds
     );
   }
 
-  const { data, error } =
-    await supabase
-      .from("employees")
-      .select("*")
-      .order("name");
+  const {
+    data: employees,
+    error: employeeError,
+  } = await employeeQuery;
 
-  if (error) {
-    console.error(
-      "employees:",
-      error
-    );
+  if (employeeError) {
+    console.error("employees:", employeeError);
 
     return errorResponse(
       "تعذر تحميل الموظفين",
@@ -1041,7 +1017,256 @@ async function listEmployees(
     );
   }
 
-  return success(data || []);
+  if (!employees?.length) {
+    return success([]);
+  }
+
+  const ids = employees
+    .map((employee: any) => employee.employee_id)
+    .filter(Boolean);
+
+  const today = riyadhDate();
+
+  const [
+    assignmentsResult,
+    shiftsResult,
+  ] = await Promise.all([
+    supabase
+      .from("project_assignments")
+      .select(
+        "assignment_id,employee_id,project_id,start_date,end_date,is_current"
+      )
+      .in("employee_id", ids)
+      .eq("is_current", true),
+
+    supabase
+      .from("employee_shifts")
+      .select(
+        `
+        assignment_id,
+        employee_id,
+        project_id,
+        shift_id,
+        start_date,
+        end_date,
+        shifts(*)
+        `
+      )
+      .in("employee_id", ids)
+      .lte("start_date", today)
+      .or(
+        `end_date.is.null,end_date.gte.${today}`
+      )
+      .order("start_date", {
+        ascending: false,
+      }),
+  ]);
+
+  if (assignmentsResult.error) {
+    console.error(
+      "employee project assignments:",
+      assignmentsResult.error
+    );
+
+    return errorResponse(
+      "تعذر تحميل مشروعات الموظفين",
+      500
+    );
+  }
+
+  if (shiftsResult.error) {
+    console.error(
+      "employee shifts:",
+      shiftsResult.error
+    );
+
+    return errorResponse(
+      "تعذر تحميل ورديات الموظفين",
+      500
+    );
+  }
+
+  const assignments =
+    assignmentsResult.data || [];
+
+  const shifts =
+    shiftsResult.data || [];
+
+  const projectIds = [
+    ...new Set(
+      assignments
+        .map((row: any) => row.project_id)
+        .filter(Boolean)
+    ),
+  ];
+
+  let projects: any[] = [];
+
+  if (projectIds.length) {
+    const {
+      data: projectData,
+      error: projectError,
+    } = await supabase
+      .from("projects")
+      .select(
+        `
+        project_id,
+        name,
+        client,
+        location_name,
+        latitude,
+        longitude,
+        geofence_radius_m,
+        status
+        `
+      )
+      .in("project_id", projectIds);
+
+    if (projectError) {
+      console.error(
+        "employee projects:",
+        projectError
+      );
+
+      return errorResponse(
+        "تعذر تحميل بيانات المشروعات",
+        500
+      );
+    }
+
+    projects = projectData || [];
+  }
+
+  const assignmentMap = new Map<
+    string,
+    any
+  >();
+
+  for (const assignment of assignments) {
+    if (
+      !assignmentMap.has(
+        assignment.employee_id
+      )
+    ) {
+      assignmentMap.set(
+        assignment.employee_id,
+        assignment
+      );
+    }
+  }
+
+  const shiftMap = new Map<
+    string,
+    any
+  >();
+
+  for (const employeeShift of shifts) {
+    if (
+      !shiftMap.has(
+        employeeShift.employee_id
+      )
+    ) {
+      shiftMap.set(
+        employeeShift.employee_id,
+        employeeShift
+      );
+    }
+  }
+
+  const projectMap = new Map<
+    string,
+    any
+  >();
+
+  for (const project of projects) {
+    projectMap.set(
+      project.project_id,
+      project
+    );
+  }
+
+  const result = employees.map(
+    (employee: any) => {
+      const assignment =
+        assignmentMap.get(
+          employee.employee_id
+        ) || null;
+
+      const project =
+        assignment
+          ? projectMap.get(
+              assignment.project_id
+            ) || null
+          : null;
+
+      const employeeShift =
+        shiftMap.get(
+          employee.employee_id
+        ) || null;
+
+      const shift =
+        employeeShift?.shifts ||
+        null;
+
+      return {
+        ...employee,
+
+        project_id:
+          assignment?.project_id ??
+          null,
+
+        project_name:
+          project?.name ??
+          null,
+
+        current_project_name:
+          project?.name ??
+          null,
+
+        assignment_start:
+          assignment?.start_date ??
+          null,
+
+        assignment_id:
+          assignment?.assignment_id ??
+          null,
+
+        shift_id:
+          employeeShift?.shift_id ??
+          null,
+
+        shift_name:
+          shift?.name ??
+          null,
+
+        shift_start:
+          shift?.start_time ??
+          null,
+
+        attendance_open:
+          shift?.attendance_open ??
+          null,
+
+        attendance_close:
+          shift?.attendance_close ??
+          null,
+
+        checkout_open:
+          shift?.checkout_open ??
+          null,
+
+        checkout_close:
+          shift?.checkout_close ??
+          null,
+
+        auto_checkout_time:
+          shift?.auto_checkout_time ??
+          null,
+      };
+    }
+  );
+
+  return success(result);
 }
 
 /* =========================================================
@@ -1565,6 +1790,24 @@ async function assignEmployeeShift(
     );
   }
 
+  // Validate employee
+  const { data: employee } =
+    await supabase
+      .from("employees")
+      .select("employee_id")
+      .eq(
+        "employee_id",
+        employeeId
+      )
+      .maybeSingle();
+
+  if (!employee) {
+    return errorResponse(
+      "الموظف غير موجود"
+    );
+  }
+
+  // Validate project
   const { data: project } =
     await supabase
       .from("projects")
@@ -1581,6 +1824,7 @@ async function assignEmployeeShift(
     );
   }
 
+  // Validate shift
   const { data: shift } =
     await supabase
       .from("shifts")
@@ -1597,7 +1841,144 @@ async function assignEmployeeShift(
     );
   }
 
-  await supabase
+  /*
+   * IMPORTANT:
+   * Employee must have a current project assignment.
+   */
+
+  const {
+    data: currentProject,
+    error: currentProjectError,
+  } = await supabase
+    .from("project_assignments")
+    .select(
+      "assignment_id,project_id"
+    )
+    .eq(
+      "employee_id",
+      employeeId
+    )
+    .eq(
+      "is_current",
+      true
+    )
+    .maybeSingle();
+
+  if (currentProjectError) {
+    console.error(
+      "current project assignment:",
+      currentProjectError
+    );
+
+    return errorResponse(
+      currentProjectError.message,
+      500
+    );
+  }
+
+  /*
+   * If employee is currently assigned
+   * to another project, close it.
+   */
+  if (
+    currentProject &&
+    currentProject.project_id !==
+      projectId
+  ) {
+    const { error } =
+      await supabase
+        .from("project_assignments")
+        .update({
+          is_current: false,
+          end_date: riyadhDate(),
+        })
+        .eq(
+          "assignment_id",
+          currentProject.assignment_id
+        );
+
+    if (error) {
+      console.error(
+        "close old project assignment:",
+        error
+      );
+
+      return errorResponse(
+        error.message,
+        500
+      );
+    }
+  }
+
+  /*
+   * Create project assignment if
+   * employee doesn't already have the
+   * requested project as current.
+   */
+  if (
+    !currentProject ||
+    currentProject.project_id !==
+      projectId
+  ) {
+    const {
+      data: projectAssignment,
+      error: projectAssignmentError,
+    } = await supabase
+      .from("project_assignments")
+      .insert({
+        assignment_id:
+          generateId("ASN"),
+
+        employee_id:
+          employeeId,
+
+        project_id:
+          projectId,
+
+        start_date:
+          String(
+            body.start_date ||
+              riyadhDate()
+          ),
+
+        end_date:
+          body.end_date ||
+          null,
+
+        is_current:
+          true,
+
+        created_by:
+          session.user.user_id,
+
+        created_at:
+          nowISO(),
+      })
+      .select("*")
+      .single();
+
+    if (projectAssignmentError) {
+      console.error(
+        "create project assignment:",
+        projectAssignmentError
+      );
+
+      return errorResponse(
+        projectAssignmentError.message,
+        500
+      );
+    }
+
+    currentProject = projectAssignment;
+  }
+
+  /*
+   * Close previous active shifts
+   * for this employee.
+   */
+  const {
+    error: closeShiftError,
+  } = await supabase
     .from("employee_shifts")
     .update({
       end_date:
@@ -1607,51 +1988,82 @@ async function assignEmployeeShift(
       "employee_id",
       employeeId
     )
-    .eq(
-      "project_id",
-      projectId
-    )
     .is(
       "end_date",
       null
     );
 
-  const { data, error } =
-    await supabase
-      .from("employee_shifts")
-      .insert({
-        assignment_id:
-          generateId("ESH"),
-        employee_id:
-          employeeId,
-        project_id:
-          projectId,
-        shift_id:
-          shiftId,
-        start_date:
-          String(
-            body.start_date ||
-              riyadhDate()
-          ),
-        end_date:
-          body.end_date ||
-          null,
-        created_by:
-          session.user.user_id,
-        created_at:
-          nowISO(),
-      })
-      .select("*")
-      .single();
+  if (closeShiftError) {
+    console.error(
+      "close employee shifts:",
+      closeShiftError
+    );
+
+    return errorResponse(
+      closeShiftError.message,
+      500
+    );
+  }
+
+  /*
+   * Create the new active shift.
+   */
+  const {
+    data,
+    error,
+  } = await supabase
+    .from("employee_shifts")
+    .insert({
+      assignment_id:
+        generateId("ESH"),
+
+      employee_id:
+        employeeId,
+
+      project_id:
+        projectId,
+
+      shift_id:
+        shiftId,
+
+      start_date:
+        String(
+          body.start_date ||
+            riyadhDate()
+        ),
+
+      end_date:
+        body.end_date ||
+        null,
+
+      created_by:
+        session.user.user_id,
+
+      created_at:
+        nowISO(),
+    })
+    .select("*")
+    .single();
 
   if (error) {
+    console.error(
+      "assign employee shift:",
+      error
+    );
+
     return errorResponse(
       error.message,
       500
     );
   }
 
-  return success(data);
+  return success({
+    project_assignment:
+      currentProject,
+
+    shift_assignment:
+      data,
+  });
 }
 
 /* =========================================================
