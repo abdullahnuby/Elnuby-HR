@@ -29,7 +29,38 @@ export default function Home(){
  const [leaveType,setLeaveType]=useState('Annual'); const [leaveFrom,setLeaveFrom]=useState(''); const [leaveTo,setLeaveTo]=useState(''); const [leaveReason,setLeaveReason]=useState('');
  const [permissionType,setPermissionType]=useState('Permission'); const [permissionStart,setPermissionStart]=useState(''); const [permissionEnd,setPermissionEnd]=useState(''); const [permissionReason,setPermissionReason]=useState('');
  useEffect(()=>{if(localStorage.getItem('hr_token'))load();},[]);
- async function load(){try{const m:any=await api('me');setMe(m);setDash(await api('dashboard')); if(['SUPER_ADMIN','HR_MANAGER','PROJECT_MANAGER'].includes(m.user?.role)){setEmployees(await api('employees'));setProjects(await api('projects'));} if(m.user?.role==='SUPER_ADMIN')setUsers(await api('users'));}catch{localStorage.removeItem('hr_token');setMe(null);}}
+ async function load(){
+  const token=localStorage.getItem('hr_token');
+  if(!token){setMe(null);return;}
+  setError('');
+  try{
+    const m:any=await api('me');
+    setMe(m);
+    try{setDash(await api('dashboard'));}catch(e:any){setError(e.message||'تعذر تحميل لوحة التحكم');}
+    if(['SUPER_ADMIN','HR_MANAGER','PROJECT_MANAGER'].includes(m.user?.role)){
+      try{setEmployees(await api('employees'));}catch(e:any){setError(e.message||'تعذر تحميل الموظفين');}
+      try{setProjects(await api('projects'));}catch(e:any){setError(e.message||'تعذر تحميل المشاريع');}
+    }
+    if(m.user?.role==='SUPER_ADMIN'){
+      try{setUsers(await api('users'));}catch(e:any){setError(e.message||'تعذر تحميل المستخدمين');}
+    }
+  }catch(e:any){
+    const message=String(e?.message||'');
+    const authError=/Authentication required|Invalid session|Session expired|User inactive/i.test(message);
+    if(authError){
+      localStorage.removeItem('hr_token');
+      setMe(null);
+      setDash(null);
+      setUsers([]);
+      setEmployees([]);
+      setProjects([]);
+      setError('انتهت جلسة الدخول، برجاء تسجيل الدخول مرة أخرى.');
+    }else{
+      // Do not log the employee out because of a temporary network/API error.
+      setError(message||'تعذر الاتصال بالخادم، حاول مرة أخرى.');
+    }
+  }
+}
  async function login(){setBusy(true);setError('');try{const r:any=await api('login',{username,password});localStorage.setItem('hr_token',r.token);await load();}catch(e:any){setError(e.message)}finally{setBusy(false)}}
  async function locate(action:string){setError('');if(!navigator.geolocation)return setError('المتصفح لا يدعم GPS');setBusy(true);navigator.geolocation.getCurrentPosition(async p=>{try{await api(action,{latitude:p.coords.latitude,longitude:p.coords.longitude});setNotice(action==='check_in'?'تم تسجيل الحضور بنجاح':'تم تسجيل الانصراف بنجاح');await load()}catch(e:any){setError(e.message)}finally{setBusy(false)}},()=>{setError('يجب السماح بالموقع لتسجيل الحضور/الانصراف');setBusy(false)},{enableHighAccuracy:true,timeout:10000});}
  async function refreshSection(id:string){setError('');try{if(id==='attendance')setRows(await api('attendance_list',{})); if(id==='leaves')setRows(await api('leave_list',{})); if(id==='permissions')setRows(await api('permission_list',{})); if(id==='deductions')setRows(await api('deductions',{})); if(id==='users')setUsers(await api('users')); if(id==='employees')setEmployees(await api('employees')); if(id==='projects')setProjects(await api('projects'));}catch(e:any){setError(e.message)}}
