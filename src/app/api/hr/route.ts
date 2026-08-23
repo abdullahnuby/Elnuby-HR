@@ -16,6 +16,11 @@ const db = createClient(url, serviceRoleKey, {
   db: { schema: 'hr' },
 });
 
+const authDb = createClient(url, serviceRoleKey, {
+  auth: { autoRefreshToken: false, persistSession: false },
+  db: { schema: 'public' },
+});
+
 type User = {
   id: string;
   legacy_user_id?: string | null;
@@ -46,23 +51,42 @@ async function sessionFromToken(token: string): Promise<Session | null> {
   if (!token) return null;
 
   // Supports the application session table used by the migration.
-  const { data: s, error } = await db
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+  const { data: s, error } = await authDb
     .from('app_sessions')
-    .select('token,user_id,expires_at')
-    .eq('token', token)
+    .select('session_id,user_id,expires_at,revoked_at')
+    .eq('token_hash', tokenHash)
+    .is('revoked_at', null)
     .maybeSingle();
 
   if (error || !s) return null;
   if (s.expires_at && new Date(s.expires_at).getTime() < Date.now()) return null;
 
-  const { data: user } = await db
+  const { data: user } = await authDb
     .from('users')
-    .select('id,legacy_user_id,employee_id,username,role,status')
-    .eq('id', s.user_id)
+    .select('user_id,employee_id,username,role,status,last_login')
+    .eq('user_id', s.user_id)
     .maybeSingle();
 
   if (!user || user.status !== 'ACTIVE') return null;
-  return { token, user };
+
+  await authDb
+    .from('app_sessions')
+    .update({ last_used_at: new Date().toISOString() })
+    .eq('session_id', s.session_id);
+
+  return {
+    token,
+    user: {
+      id: user.user_id,
+      legacy_user_id: user.user_id,
+      employee_id: user.employee_id,
+      username: user.username,
+      role: user.role,
+      status: user.status,
+    },
+  };
 }
 
 function requireRole(session: Session | null, roles: string[]) {
@@ -142,7 +166,7 @@ async function login(body: Record<string, unknown>) {
 
   // Passwords created by the legacy Google Apps Script are not Supabase Auth
   // passwords. This endpoint expects the migration to expose password_hash.
-  const { data: user, error } = await db
+  const { data: user, error } = await authDb
     .from('users')
     .select('*')
     .eq('username', username)
@@ -161,18 +185,26 @@ async function login(body: Record<string, unknown>) {
   if (actual !== expected) return fail('اسم المستخدم أو كلمة المرور غير صحيحة', 401);
 
   const token = crypto.randomUUID();
-  await db.from('app_sessions').insert({
-    token,
-    user_id: user.id,
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+  const { error: sessionError } = await authDb.from('app_sessions').insert({
+    session_id: uid('SES'),
+    token_hash: tokenHash,
+    user_id: user.user_id,
     expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString(),
+    last_used_at: new Date().toISOString(),
   });
 
-  await db.from('users').update({ last_login: new Date().toISOString(), failed_attempts: 0 }).eq('id', user.id);
+  if (sessionError) return fail(sessionError.message, 500);
+
+  await authDb.from('users')
+    .update({ last_login: new Date().toISOString(), failed_attempts: 0 })
+    .eq('user_id', user.user_id);
 
   return json({
     token,
     user: {
-      user_id: user.legacy_user_id || user.id,
+      user_id: user.user_id,
       username: user.username,
       role: user.role,
       employee_id: user.employee_id,
@@ -186,7 +218,13 @@ async function handle(action: string, body: Record<string, unknown>, session: Se
       return login(body);
 
     case 'logout': {
-      if (session) await db.from('app_sessions').delete().eq('token', session.token);
+      if (session) {
+        const tokenHash = crypto.createHash('sha256').update(session.token).digest('hex');
+        await authDb.from('app_sessions')
+          .update({ revoked_at: new Date().toISOString() })
+          .eq('token_hash', tokenHash)
+          .is('revoked_at', null);
+      }
       return json({ logged_out: true });
     }
 
