@@ -1,0 +1,13 @@
+'use client';
+import {useEffect,useState} from 'react';
+import {api} from '@/lib/api';
+
+export default function Home(){
+ const [username,setUsername]=useState(''); const [password,setPassword]=useState(''); const [busy,setBusy]=useState(false); const [error,setError]=useState(''); const [me,setMe]=useState<any>(null); const [dash,setDash]=useState<any>(null);
+ useEffect(()=>{if(localStorage.getItem('hr_token')) load();},[]);
+ async function load(){try{const m=await api('me');setMe(m);setDash(await api('dashboard'));}catch{localStorage.removeItem('hr_token');}}
+ async function login(){setBusy(true);setError('');try{const r:any=await api('login',{username,password});localStorage.setItem('hr_token',r.token);setMe(r.user);setDash(await api('dashboard'));}catch(e:any){setError(e.message)}finally{setBusy(false)}}
+ async function locate(action:string){setError('');if(!navigator.geolocation)return setError('المتصفح لا يدعم GPS');setBusy(true);navigator.geolocation.getCurrentPosition(async p=>{try{await api(action,{latitude:p.coords.latitude,longitude:p.coords.longitude});await load()}catch(e:any){setError(e.message)}finally{setBusy(false)}},()=>{setError('يجب السماح بالموقع لتسجيل الحضور/الانصراف');setBusy(false)},{enableHighAccuracy:true,timeout:10000});}
+ if(!me)return <main className="center"><section className="card login"><h1>Site HR</h1><p>إدارة موظفي ومشاريع شركة المقاولات</p><input placeholder="اسم المستخدم" value={username} onChange={e=>setUsername(e.target.value)}/><input type="password" placeholder="كلمة المرور" value={password} onChange={e=>setPassword(e.target.value)}/><button disabled={busy} onClick={login}>{busy?'جاري الدخول…':'تسجيل الدخول'}</button>{error&&<div className="error">{error}</div>}</section></main>;
+ return <main className="page"><header><div><h1>مرحباً {me.employee?.name||''}</h1><span>{me.user?.role}</span></div><button className="ghost" onClick={()=>{localStorage.removeItem('hr_token');location.reload()}}>خروج</button></header><section className="grid">{[['الموظفون',dash?.employees],['حضور اليوم',dash?.present],['متأخرون',dash?.late],['بدون انصراف',dash?.missingCheckout]].map(([t,v])=><div className="stat card" key={t as string}><small>{t}</small><strong>{v??'-'}</strong></div>)}</section><section className="card attendance"><h2>الحضور والانصراف</h2><div className="actions"><button disabled={busy} onClick={()=>locate('check_in')}>تسجيل الحضور</button><button disabled={busy} onClick={()=>locate('check_out')}>تسجيل الانصراف</button><button className="secondary">طلب إذن</button><button className="secondary">طلب إجازة</button></div>{error&&<div className="error">{error}</div>}</section></main>
+}
