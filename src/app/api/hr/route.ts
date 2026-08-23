@@ -695,6 +695,119 @@ case 'assign_employee_shift': {
       if (error) return fail(error.message);
       return json(data, 201);
     }
+    case 'deductions': {
+      const err = requireRole(session, [
+        'SUPER_ADMIN',
+        'HR_MANAGER',
+        'PROJECT_MANAGER',
+      ]);
+
+      if (err) {
+        return fail(err, err === 'FORBIDDEN' ? 403 : 401);
+      }
+
+      let query = db
+        .from('deductions')
+        .select('*')
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (session!.user.role === 'PROJECT_MANAGER') {
+        const projects = await managedProjects(session!.user);
+        const projectIds = projects.map((p: any) => p.project_id);
+
+        if (!projectIds.length) {
+          return json([]);
+        }
+
+        const { data: assignments, error: assignmentError } = await db
+          .from('project_assignments')
+          .select('employee_id')
+          .in('project_id', projectIds)
+          .eq('is_current', true);
+
+        if (assignmentError) {
+          return fail(assignmentError.message, 500);
+        }
+
+        const employeeIds = (assignments || []).map(
+          (x: any) => x.employee_id
+        );
+
+        if (!employeeIds.length) {
+          return json([]);
+        }
+
+        query = query.in('employee_id', employeeIds);
+      }
+
+      const { data, error } = await query.limit(1000);
+
+      if (error) {
+        return fail(error.message, 500);
+      }
+
+      return json(data || []);
+    }
+
+    case 'create_deduction': {
+      const err = requireRole(session, [
+        'SUPER_ADMIN',
+        'HR_MANAGER',
+      ]);
+
+      if (err) {
+        return fail(err, err === 'FORBIDDEN' ? 403 : 401);
+      }
+
+      const employee_id = String(body.employee_id || '').trim();
+      const type = String(body.type || '').trim();
+      const amount = Number(body.amount);
+
+      if (!employee_id) {
+        return fail('اختر الموظف');
+      }
+
+      if (!type) {
+        return fail('نوع الخصم مطلوب');
+      }
+
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return fail('قيمة الخصم غير صحيحة');
+      }
+
+      const { data: employee } = await db
+        .from('employees')
+        .select('employee_id')
+        .eq('employee_id', employee_id)
+        .maybeSingle();
+
+      if (!employee) {
+        return fail('الموظف غير موجود');
+      }
+
+      const { data, error } = await db
+        .from('deductions')
+        .insert({
+          deduction_id: uid('DED'),
+          employee_id,
+          date: body.date || new Date().toISOString().slice(0, 10),
+          type,
+          amount,
+          reason: body.reason || null,
+          status: body.status || 'ACTIVE',
+          created_by: session!.user.id,
+          created_at: new Date().toISOString(),
+        })
+        .select('*')
+        .single();
+
+      if (error) {
+        return fail(error.message, 500);
+      }
+
+      return json(data, 201);
+    }
 
     case 'decide_permission': {
       if (!session || session.user.role !== 'PROJECT_MANAGER') return fail('غير مصرح', 403);
