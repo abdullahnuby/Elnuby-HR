@@ -219,6 +219,93 @@ async function login(body: Record<string, unknown>) {
 
 async function handle(action: string, body: Record<string, unknown>, session: Session | null) {
   switch (action) {
+    case 'employee_shifts': {
+  const err = requireRole(session, [
+    'SUPER_ADMIN',
+    'HR_MANAGER',
+    'PROJECT_MANAGER',
+  ]);
+
+  if (err) {
+    return fail(err, err === 'FORBIDDEN' ? 403 : 401);
+  }
+
+  let query = db
+    .from('employee_shifts_view')
+    .select('*')
+    .order('start_date', { ascending: false });
+
+  if (session!.user.role === 'PROJECT_MANAGER') {
+    const projects = await managedProjects(session!.user);
+    const projectIds = projects.map((p: any) => p.project_id);
+
+    if (!projectIds.length) {
+      return json([]);
+    }
+
+    query = query.in('project_id', projectIds);
+  }
+
+  const { data, error } = await query.limit(1000);
+
+  if (error) {
+    return fail(error.message, 500);
+  }
+
+  return json(data || []);
+}
+
+case 'assign_employee_shift': {
+  const err = requireRole(session, [
+    'SUPER_ADMIN',
+    'HR_MANAGER',
+  ]);
+
+  if (err) {
+    return fail(err, err === 'FORBIDDEN' ? 403 : 401);
+  }
+
+  const employee_id = String(body.employee_id || '').trim();
+  const project_id = String(body.project_id || '').trim();
+  const shift_id = String(body.shift_id || '').trim();
+
+  if (!employee_id || !project_id || !shift_id) {
+    return fail('الموظف والمشروع والوردية مطلوبة');
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Close the current assignment for this employee/project.
+  await db
+    .from('employee_shifts')
+    .update({
+      end_date: today,
+    })
+    .eq('employee_id', employee_id)
+    .eq('project_id', project_id)
+    .is('end_date', null);
+
+  const { data, error } = await db
+    .from('employee_shifts')
+    .insert({
+      assignment_id: uid('ESH'),
+      employee_id,
+      project_id,
+      shift_id,
+      start_date: today,
+      end_date: null,
+      created_by: session!.user.id,
+      created_at: new Date().toISOString(),
+    })
+    .select('*')
+    .single();
+
+  if (error) {
+    return fail(error.message, 500);
+  }
+
+  return json(data);
+}
     case 'login':
       return login(body);
 
@@ -627,11 +714,165 @@ async function handle(action: string, body: Record<string, unknown>, session: Se
       return json(data);
     }
 
+    case 'create_user': {
+  const err = requireRole(session, ['SUPER_ADMIN']);
+
+  if (err) {
+    return fail(err, err === 'FORBIDDEN' ? 403 : 401);
+  }
+
+  const username = String(body.username || '').trim();
+  const password = String(body.password || '');
+  const role = String(body.role || 'EMPLOYEE').trim().toUpperCase();
+  const status = String(body.status || 'ACTIVE').trim().toUpperCase();
+  const employee_id = String(body.employee_id || '').trim();
+  const project_id = String(body.project_id || '').trim();
+
+  if (username.length < 3) {
+    return fail('اسم المستخدم يجب أن يكون 3 أحرف على الأقل');
+  }
+
+  if (password.length < 8) {
+    return fail('كلمة المرور يجب أن تكون 8 أحرف على الأقل');
+  }
+
+  const allowedRoles = [
+    'SUPER_ADMIN',
+    'HR_MANAGER',
+    'PROJECT_MANAGER',
+    'EMPLOYEE',
+  ];
+
+  if (!allowedRoles.includes(role)) {
+    return fail('صلاحية المستخدم غير صحيحة');
+  }
+
+  if (['EMPLOYEE', 'PROJECT_MANAGER'].includes(role) && !employee_id) {
+    return fail('يجب اختيار الموظف المرتبط بالحساب');
+  }
+
+  if (role === 'PROJECT_MANAGER' && !project_id) {
+    return fail('يجب اختيار مشروع مدير المشروع');
+  }
+
+  const { data: existing } = await db
+    .from('users')
+    .select('user_id')
+    .ilike('username', username)
+    .maybeSingle();
+
+  if (existing) {
+    return fail('اسم المستخدم موجود بالفعل');
+  }
+
+  if (employee_id) {
+    const { data: employee } = await db
+      .from('employees')
+      .select('employee_id')
+      .eq('employee_id', employee_id)
+      .maybeSingle();
+
+    if (!employee) {
+      return fail('الموظف المرتبط غير موجود');
+    }
+  }
+
+  if (project_id) {
+    const { data: project } = await db
+      .from('projects')
+      .select('project_id')
+      .eq('project_id', project_id)
+      .maybeSingle();
+
+    if (!project) {
+      return fail('المشروع غير موجود');
+    }
+  }
+
+  const salt = crypto.randomUUID();
+  const passwordHash = crypto
+    .createHash('sha256')
+    .update(salt + password)
+    .digest('base64');
+
+  const user_id = uid('USR');
+
+  const { data: created, error } = await db
+    .from('users')
+    .insert({
+      user_id,
+      employee_id:
+        role === 'EMPLOYEE' || role === 'PROJECT_MANAGER'
+          ? employee_id
+          : null,
+      username,
+      password_hash: `${salt}$${passwordHash}`,
+      role,
+      status,
+      last_login: null,
+      failed_attempts: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .select(`
+      user_id,
+      employee_id,
+      username,
+      role,
+      status,
+      last_login,
+      created_at
+    `)
+    .single();
+
+  if (error) {
+    return fail(error.message, 500);
+  }
+
+  if (role === 'PROJECT_MANAGER' && project_id) {
+    const { error: pmError } = await db
+      .from('project_managers')
+      .insert({
+        id: uid('PM'),
+        user_id,
+        project_id,
+        start_date: new Date().toISOString().slice(0, 10),
+        end_date: null,
+        created_at: new Date().toISOString(),
+      });
+
+    if (pmError) {
+      return fail(`تم إنشاء الحساب لكن فشل ربط مدير المشروع: ${pmError.message}`, 500);
+    }
+  }
+
+  return json(created, 201);
+}
+
     case 'users': {
-      const err = requireRole(session, ['SUPER_ADMIN', 'HR_MANAGER']);
-      if (err) return fail(err, err === 'FORBIDDEN' ? 403 : 401);
-      const { data, error } = await db.from('users').select('id,legacy_user_id,employee_id,username,role,status,last_login,created_at').order('username');
-      if (error) return fail(error.message, 500);
+      const err = requireRole(session, ['SUPER_ADMIN']);
+      if (err) {
+        return fail(err, err === 'FORBIDDEN' ? 403 : 401);
+      }
+
+      const { data, error } = await db
+        .from('users')
+        .select(`
+          user_id,
+          employee_id,
+          username,
+          role,
+          status,
+          last_login,
+          created_at,
+          updated_at
+        `)
+        .order('username');
+
+      if (error) {
+        return fail(error.message, 500);
+      }
+
       return json(data || []);
     }
 
