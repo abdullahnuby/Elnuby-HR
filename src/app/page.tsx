@@ -116,7 +116,20 @@ export default function Home(){
  }
  async function createShift(){setBusy(true);setError('');setNotice('');try{await api('create_shift',shiftForm);setNotice('تم إنشاء الوردية بنجاح');setShiftForm({name:'',start_time:'08:00',attendance_open:'06:00',attendance_close:'09:30',checkout_open:'15:00',checkout_close:'23:59',auto_checkout_time:'18:00'});setShifts(await api('shifts'));}catch(e:any){setError(e.message)}finally{setBusy(false)}}
  async function assignShift(){if(!selectedEmployee||!selectedProject||!selectedShift)return setError('اختر الموظف والمشروع والوردية');setBusy(true);setError('');try{await api('assign_employee_shift',{employee_id:selectedEmployee,project_id:selectedProject,shift_id:selectedShift});setNotice('تم تعيين الوردية بنجاح');setRows(await api('employee_shifts',{}));setEmployees(await api('employees'));}catch(e:any){setError(e.message)}finally{setBusy(false)}}
- async function createAccount(){setNotice('');setError('');if(!newUsername||!newPassword)return setError('أدخل اسم المستخدم وكلمة المرور');if(newRole!=='SUPER_ADMIN'&&!newEmployee)return setError('اختر الموظف المرتبط بالحساب');if(newRole==='PROJECT_MANAGER'&&!newProject)return setError('اختر المشروع الذي سيتولى مدير المشروع إدارته');setBusy(true);try{await api('create_user',{username:newUsername,password:newPassword,role:newRole,employee_id:newEmployee,project_id:newProject,status:'ACTIVE'});setNotice(newRole==='PROJECT_MANAGER'?'تم إنشاء الحساب وربطه بالمشروع ومنحه صلاحيات مدير المشروع':'تم إنشاء الحساب بنجاح');setNewUsername('');setNewPassword('');setNewEmployee('');setNewProject('');setNewRole('EMPLOYEE');setUsers(await api('users'));setProjects(await api('projects'));}catch(e:any){setError(e.message)}finally{setBusy(false)}}
+ async function createAccount(){
+  setNotice('');setError('');
+  if(!newUsername||!newPassword)return setError('أدخل اسم المستخدم وكلمة المرور');
+  if((newRole==='EMPLOYEE'||newRole==='PROJECT_MANAGER')&&!newEmployee)return setError('اختر الموظف المرتبط بالحساب');
+  if(newRole==='PROJECT_MANAGER'&&!newProject)return setError('اختر مشروع مدير المشروع *');
+  setBusy(true);
+  try{
+    const result:any=await api('create_user',{username:newUsername,password:newPassword,role:newRole,employee_id:(newRole==='EMPLOYEE'||newRole==='PROJECT_MANAGER')?newEmployee:'',project_id:newRole==='PROJECT_MANAGER'?newProject:'',status:'ACTIVE'});
+    setNotice(newRole==='PROJECT_MANAGER'?'تم إنشاء الحساب وربطه بالمشروع وتسجيله كمدير للمشروع ومنحه الصلاحيات تلقائياً':newRole==='HR_MANAGER'?'تم إنشاء حساب HR بدون ربطه بموظف أو مشروع':'تم إنشاء الحساب بنجاح');
+    setNewUsername('');setNewPassword('');setNewEmployee('');setNewProject('');setNewRole('EMPLOYEE');
+    const [freshUsers,freshEmployees,freshProjects]=await Promise.all([api<User[]>('users'),api<Employee[]>('employees'),api<Project[]>('projects')]);
+    setUsers(freshUsers||[]);setEmployees(freshEmployees||[]);setProjects(freshProjects||[]);
+  }catch(e:any){setError(e.message)}finally{setBusy(false)}
+ }
  async function createLeave(){setBusy(true);setError('');try{await api('create_leave',{leave_type_id:leaveType,from_date:leaveFrom,to_date:leaveTo,reason:leaveReason});setNotice('تم إرسال طلب الإجازة');setLeaveFrom('');setLeaveTo('');setLeaveReason('');}catch(e:any){setError(e.message)}finally{setBusy(false)}}
  async function createPermission(){setBusy(true);setError('');try{await api('create_permission',{date:permissionStart.slice(0,10),start_time:permissionStart,end_time:permissionEnd,reason:permissionReason});setNotice('تم إرسال طلب الإذن');setPermissionStart('');setPermissionEnd('');setPermissionReason('');}catch(e:any){setError(e.message)}finally{setBusy(false)}}
  const nav=useMemo(()=>navByRole(me?.user?.role||'EMPLOYEE'),[me?.user?.role]);
@@ -202,14 +215,16 @@ function Users({users,employees,projects,newUsername,setNewUsername,newPassword,
         <select value={newRole} onChange={e=>setNewRole(e.target.value)}>
           <option value="EMPLOYEE">موظف</option><option value="PROJECT_MANAGER">مدير مشروع</option><option value="HR_MANAGER">مدير HR</option><option value="SUPER_ADMIN">مدير النظام</option>
         </select>
-        <select value={newEmployee} onChange={e=>setNewEmployee(e.target.value)}>
-          <option value="">اختر الموظف المرتبط بالحساب</option>
+        {(newRole==='EMPLOYEE'||newRole==='PROJECT_MANAGER')&&<select value={newEmployee} onChange={e=>setNewEmployee(e.target.value)}>
+          <option value="">اختر الموظف المرتبط بالحساب *</option>
           {employees.map((e:Employee)=><option key={e.employee_id} value={e.employee_id}>{e.name} — {e.employee_id}</option>)}
-        </select>
+        </select>}
         {newRole==='PROJECT_MANAGER'&&<select value={newProject} onChange={e=>setNewProject(e.target.value)}><option value="">اختر مشروع مدير المشروع *</option>{projects.map((p:Project)=><option key={p.project_id} value={p.project_id}>{p.name} — {p.project_id}</option>)}</select>}
+        {newRole==='HR_MANAGER'&&<div className="empty-note">حساب HR إداري مركزي: لا يحتاج موظفاً مرتبطاً ولا يتم تعيينه على مشروع.</div>}
+        {newRole==='SUPER_ADMIN'&&<div className="empty-note">حساب مدير النظام إداري مركزي: لا يحتاج موظفاً ولا مشروعاً.</div>}
       </div>
       {!employees.length&&<div className="empty-note">لا توجد سجلات موظفين محملة. اضغط «تحديث الموظفين» وتأكد أن الموظف موجود في جدول EMPLOYEES.</div>}
-      <button className="primary" disabled={busy||!employees.length} onClick={createAccount}>إنشاء الحساب</button>
+      <button className="primary" disabled={busy||((newRole==='EMPLOYEE'||newRole==='PROJECT_MANAGER')&&!employees.length)} onClick={createAccount}>إنشاء الحساب</button>
     </div>
     <div className="request-card"><h3>ربط مدير مشروع بمشروع</h3><p>يمكنك هنا إصلاح أو تغيير ربط حساب مدير المشروع بالمشروع، وسيتم تسجيله في PROJECT_MANAGERS فوراً.</p><div className="formgrid"><select value={selectedManager} onChange={e=>setSelectedManager(e.target.value)}><option value="">اختر مدير المشروع</option>{users.filter((u:User)=>u.role==='PROJECT_MANAGER'&&u.status==='ACTIVE').map((u:User)=><option key={u.user_id} value={u.user_id}>{u.username} — {u.employee_id||'بدون موظف'}</option>)}</select><select value={selectedProject} onChange={e=>setSelectedProject(e.target.value)}><option value="">اختر المشروع</option>{projects.map((p:Project)=><option key={p.project_id} value={p.project_id}>{p.name} — {p.project_id}</option>)}</select></div><button className="secondary" disabled={busy||!selectedManager||!selectedProject} onClick={assignManager}>حفظ صلاحية مدير المشروع</button></div>
     <Table headers={['اسم المستخدم','الصلاحية','الموظف','المشروع','الحالة','آخر دخول']} rows={users.map((u:User)=>{const mp=projects.find((p:Project)=>(p.managers||[]).some((m:any)=>String(m.user_id)===String(u.user_id)));return [u.username,roleLabels[u.role]||u.role,u.employee_id||'—',mp?.name||'—',u.status,u.last_login||'—']})}/>
