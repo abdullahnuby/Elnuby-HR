@@ -35,7 +35,7 @@ export default function Home(){
  const [shiftForm,setShiftForm]=useState<any>({name:'',start_time:'08:00',attendance_open:'06:00',attendance_close:'09:30',checkout_open:'15:00',checkout_close:'23:59',auto_checkout_time:'18:00'});
  const [permissionType,setPermissionType]=useState('Permission'); const [permissionStart,setPermissionStart]=useState(''); const [permissionEnd,setPermissionEnd]=useState(''); const [permissionReason,setPermissionReason]=useState('');
  useEffect(()=>{if(localStorage.getItem('hr_token'))load();},[]);
- useEffect(()=>{if(!me||section!=='dashboard')return; const t=setInterval(async()=>{try{setDash(await api('dashboard'));}catch(e:any){/* keep session on transient dashboard refresh errors */}},30000); return ()=>clearInterval(t);},[me,section]);
+ useEffect(()=>{if(!me)return; const refresh=async()=>{try{setDash(await api('dashboard'));}catch(e:any){/* keep session on transient dashboard refresh errors */}}; refresh(); const t=setInterval(refresh,15000); return ()=>clearInterval(t);},[me]);
  async function load(){
   const token=localStorage.getItem('hr_token');
   if(!token){setMe(null);return;}
@@ -94,7 +94,7 @@ export default function Home(){
     setError(e.message||'تعذر تحديث البيانات');
   }
 }
- async function openSection(id:string){setSection(id);setNotice(''); setSidebar(false); if(id==='dashboard'){try{setDash(await api('dashboard'));}catch(e:any){setError(e.message||'تعذر تحديث لوحة التحكم');}} else refreshSection(id)}
+ async function openSection(id:string){setSection(id);setNotice(''); setSidebar(false); try{setDash(await api('dashboard'));}catch(e:any){setError(e.message||'تعذر تحديث لوحة التحكم');} if(id!=='dashboard') refreshSection(id)}
  async function createEmployee(){
   setBusy(true);setError('');setNotice('');
   try{const e:any=await api('create_employee',employeeForm);setNotice(`تم تسجيل الموظف ${e.name} وتعيينه على المشروع والوردية بنجاح`);setEmployeeForm({name:'',job_title:'',department:'',phone:'',national_id:'',birth_date:'',hire_date:'',project_id:'',shift_id:''});setEmployees(await api('employees'));setProjects(await api('projects'));}catch(e:any){setError(e.message)}finally{setBusy(false)}
@@ -195,7 +195,7 @@ function Users({users,employees,newUsername,setNewUsername,newPassword,setNewPas
     <Table headers={['اسم المستخدم','الصلاحية','الموظف','الحالة','آخر دخول']} rows={users.map((u:User)=>[u.username,roleLabels[u.role]||u.role,u.employee_id||'—',u.status,u.last_login||'—'])}/>
   </section>
 }
-function Reports({dash}:any){return <section className="panel page-panel"><div className="panel-head"><div><h2>التقارير</h2><p>ملخصات جاهزة للنموذج الأول من النظام.</p></div></div><div className="report-grid"><div><span>إجمالي الموظفين</span><b>{dash?.employees??0}</b></div><div><span>حضور اليوم</span><b>{dash?.present??0}</b></div><div><span>التأخير</span><b>{dash?.late??0}</b></div><div><span>حالات بدون انصراف</span><b>{dash?.missingCheckout??0}</b></div></div><div className="empty-note">سنضيف تصدير Excel/PDF وتقارير شهرية حسب المشروع والموظف في المرحلة التالية.</div></section>}
+function Reports({dash}:any){return <section className="panel page-panel"><div className="panel-head"><div><h2>التقارير</h2><p>ملخصات جاهزة للنموذج الأول من النظام.</p></div></div><div className="report-grid"><div><span>إجمالي الموظفين</span><b>{dash?.employees??0}</b></div><div><span>حضور اليوم</span><b>{dash?.present??0}</b></div><div><span>التأخير</span><b>{dash?.late??0}</b></div><div><span>حالات بدون انصراف</span><b>{dash?.missingCheckout??0}</b></div></div><div className="empty-note">آخر تحديث من الخادم: {dash?.serverTime||'—'} • يتم التحديث تلقائياً كل 15 ثانية.</div></section>}
 function Settings(){return <section className="panel page-panel"><div className="panel-head"><div><h2>إعدادات النظام</h2><p>إعدادات أساسية سيتم ربطها بجدول SETTINGS في Google Sheets.</p></div></div><div className="settings-list"><div><b>نطاق GPS</b><span>يتم التحقق من موقع الموظف عند الحضور والانصراف.</span></div><div><b>الوردية</b><span>تُحدد حسب تعيين الموظف للمشروع والتاريخ.</span></div><div><b>المنطقة الزمنية</b><span>Africa/Cairo</span></div><div><b>الأمان</b><span>الصلاحيات يتم التحقق منها في Backend وليس في الواجهة فقط.</span></div></div></section>}
 function Table({headers,rows}:{headers:string[];rows:any[][]}){return <div className="table-wrap"><table><thead><tr>{headers.map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{rows.map((r,i)=><tr key={i}>{r.map((v,j)=><td key={j}>{String(v??'—')}</td>)}</tr>)}</tbody></table></div>}
 function Empty({text}:{text:string}){return <div className="empty">{text}</div>}
