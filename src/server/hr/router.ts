@@ -11,7 +11,7 @@ import { leaveList, createLeave, decideLeaveManager, decideLeaveHR } from "./lea
 import { permissionList, createPermission, decidePermission } from "./permissions";
 import { listDeductions, listUsers, createUser } from "./users";
 
-async function handleAction(
+export async function handleAction(
   action: string,
   body: Record<string, unknown>,
   session: SessionContext | null
