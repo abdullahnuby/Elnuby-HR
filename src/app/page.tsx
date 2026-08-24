@@ -47,6 +47,7 @@ type Project = {
   status?: string;
   project_manager_id?: string;
   manager_count?: number;
+  employee_count?: number;
   managers?: any[];
 };
 
