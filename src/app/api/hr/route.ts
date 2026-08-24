@@ -1472,44 +1472,22 @@ async function createEmployee(
 async function listProjects(
   session: SessionContext
 ) {
-  if (
-    session.user.role ===
-    "PROJECT_MANAGER"
-  ) {
-    const ids =
-      await getManagedProjectIds(
-        session.user
-      );
+  let query = supabase
+    .from("projects")
+    .select("*")
+    .order("name");
+
+  if (session.user.role === "PROJECT_MANAGER") {
+    const ids = await getManagedProjectIds(session.user);
 
     if (!ids.length) {
       return success([]);
     }
 
-    const { data, error } =
-      await supabase
-        .from("projects")
-        .select("*")
-        .in(
-          "project_id",
-          ids
-        )
-        .order("name");
-
-    if (error) {
-      return errorResponse(
-        "تعذر تحميل المشاريع",
-        500
-      );
-    }
-
-    return success(data || []);
+    query = query.in("project_id", ids);
   }
 
-  const { data, error } =
-    await supabase
-      .from("projects")
-      .select("*")
-      .order("name");
+  const { data: projects, error } = await query;
 
   if (error) {
     return errorResponse(
@@ -1518,7 +1496,115 @@ async function listProjects(
     );
   }
 
-  return success(data || []);
+  if (!projects?.length) {
+    return success([]);
+  }
+
+  const projectIds = projects.map((p: any) => p.project_id);
+
+  const [
+    managersResult,
+    assignmentsResult,
+  ] = await Promise.all([
+    supabase
+      .from("project_managers")
+      .select("id,user_id,project_id,start_date,end_date")
+      .in("project_id", projectIds)
+      .or(`end_date.is.null,end_date.gte.${riyadhDate()}`),
+
+    supabase
+      .from("project_assignments")
+      .select("assignment_id,employee_id,project_id,start_date,end_date,is_current")
+      .in("project_id", projectIds)
+      .eq("is_current", true),
+  ]);
+
+  if (managersResult.error) {
+    console.error("project managers:", managersResult.error);
+    return errorResponse(
+      "تعذر تحميل مديري المشاريع",
+      500
+    );
+  }
+
+  if (assignmentsResult.error) {
+    console.error("project employee assignments:", assignmentsResult.error);
+    return errorResponse(
+      "تعذر تحميل موظفي المشاريع",
+      500
+    );
+  }
+
+  const managers = managersResult.data || [];
+  const assignments = assignmentsResult.data || [];
+
+  const userIds = [...new Set(
+    managers.map((m: any) => m.user_id).filter(Boolean)
+  )];
+
+  let users: any[] = [];
+
+  if (userIds.length) {
+    const { data: userData, error: userError } = await supabase
+      .from("users")
+      .select("user_id,employee_id,username,role,status")
+      .in("user_id", userIds);
+
+    if (userError) {
+      console.error("project manager users:", userError);
+      return errorResponse(
+        "تعذر تحميل بيانات مديري المشاريع",
+        500
+      );
+    }
+
+    users = userData || [];
+  }
+
+  const userMap = new Map<string, any>(
+    users.map((u: any) => [String(u.user_id), u])
+  );
+
+  const managerMap = new Map<string, any[]>();
+
+  for (const manager of managers) {
+    const list = managerMap.get(manager.project_id) || [];
+    const user = userMap.get(String(manager.user_id));
+
+    list.push({
+      id: manager.id,
+      user_id: manager.user_id,
+      employee_id: user?.employee_id ?? null,
+      username: user?.username ?? null,
+      name: user?.username ?? user?.employee_id ?? manager.user_id,
+      role: user?.role ?? "PROJECT_MANAGER",
+      start_date: manager.start_date,
+      end_date: manager.end_date,
+    });
+
+    managerMap.set(manager.project_id, list);
+  }
+
+  const employeeCountMap = new Map<string, number>();
+
+  for (const assignment of assignments) {
+    employeeCountMap.set(
+      assignment.project_id,
+      (employeeCountMap.get(assignment.project_id) || 0) + 1
+    );
+  }
+
+  return success(
+    projects.map((project: any) => ({
+      ...project,
+      manager_count:
+        (managerMap.get(project.project_id) || []).length,
+      managers:
+        managerMap.get(project.project_id) || [],
+      employee_count:
+        employeeCountMap.get(project.project_id) || 0,
+    }))
+  );
 }
 
 async function createProject(
@@ -1699,40 +1785,21 @@ async function listEmployeeShifts(
   let query = supabase
     .from("employee_shifts")
     .select("*")
-    .order(
-      "start_date",
-      {
-        ascending: false,
-      }
-    )
+    .order("start_date", { ascending: false })
     .limit(1000);
 
-  if (
-    session.user.role ===
-    "PROJECT_MANAGER"
-  ) {
-    const ids =
-      await getManagedProjectIds(
-        session.user
-      );
+  if (session.user.role === "PROJECT_MANAGER") {
+    const ids = await getManagedProjectIds(session.user);
 
     if (!ids.length) {
       return success([]);
     }
 
-    query = query.in(
-      "project_id",
-      ids
-    );
+    query = query.in("project_id", ids);
   }
 
-  if (
-    session.user.role ===
-    "EMPLOYEE"
-  ) {
-    if (
-      !session.user.employee_id
-    ) {
+  if (session.user.role === "EMPLOYEE") {
+    if (!session.user.employee_id) {
       return success([]);
     }
 
@@ -1742,14 +1809,10 @@ async function listEmployeeShifts(
     );
   }
 
-  const { data, error } =
-    await query;
+  const { data: assignments, error } = await query;
 
   if (error) {
-    console.error(
-      "employee_shifts:",
-      error
-    );
+    console.error("employee_shifts:", error);
 
     return errorResponse(
       error.message,
@@ -1757,12 +1820,99 @@ async function listEmployeeShifts(
     );
   }
 
-  return success(data || []);
-}
+  if (!assignments?.length) {
+    return success([]);
+  }
 
-/* =========================================================
-   ASSIGN EMPLOYEE SHIFT
-========================================================= */
+  const employeeIds = [...new Set(
+    assignments.map((r: any) => r.employee_id).filter(Boolean)
+  )];
+
+  const projectIds = [...new Set(
+    assignments.map((r: any) => r.project_id).filter(Boolean)
+  )];
+
+  const shiftIds = [...new Set(
+    assignments.map((r: any) => r.shift_id).filter(Boolean)
+  )];
+
+  const [employeesResult, projectsResult, shiftsResult] =
+    await Promise.all([
+      employeeIds.length
+        ? supabase
+            .from("employees")
+            .select("employee_id,name,job_title,department,status")
+            .in("employee_id", employeeIds)
+        : Promise.resolve({ data: [], error: null } as any),
+
+      projectIds.length
+        ? supabase
+            .from("projects")
+            .select("project_id,name,location_name,status")
+            .in("project_id", projectIds)
+        : Promise.resolve({ data: [], error: null } as any),
+
+      shiftIds.length
+        ? supabase
+            .from("shifts")
+            .select("*")
+            .in("shift_id", shiftIds)
+        : Promise.resolve({ data: [], error: null } as any),
+    ]);
+
+  if (employeesResult.error || projectsResult.error || shiftsResult.error) {
+    console.error(
+      "employee shift lookup:",
+      employeesResult.error ||
+        projectsResult.error ||
+        shiftsResult.error
+    );
+
+    return errorResponse(
+      "تعذر تحميل تفاصيل تعيينات الورديات",
+      500
+    );
+  }
+
+  const employeeMap = new Map(
+    (employeesResult.data || []).map((e: any) => [e.employee_id, e])
+  );
+
+  const projectMap = new Map(
+    (projectsResult.data || []).map((p: any) => [p.project_id, p])
+  );
+
+  const shiftMap = new Map(
+    (shiftsResult.data || []).map((s: any) => [s.shift_id, s])
+  );
+
+  return success(
+    assignments.map((row: any) => {
+      const employee = employeeMap.get(row.employee_id);
+      const project = projectMap.get(row.project_id);
+      const shift = shiftMap.get(row.shift_id);
+
+      return {
+        ...row,
+        employee_name: employee?.name ?? row.employee_id,
+        job_title: employee?.job_title ?? null,
+        department: employee?.department ?? null,
+        employee_status: employee?.status ?? null,
+        project_name: project?.name ?? row.project_id,
+        project_location: project?.location_name ?? null,
+        project_status: project?.status ?? null,
+        shift_name: shift?.name ?? row.shift_id,
+        shift_start: shift?.start_time ?? null,
+        attendance_open: shift?.attendance_open ?? null,
+        attendance_close: shift?.attendance_close ?? null,
+        checkout_open: shift?.checkout_open ?? null,
+        checkout_close: shift?.checkout_close ?? null,
+        auto_checkout_time: shift?.auto_checkout_time ?? null,
+        assignment_status: row.end_date ? "HISTORY" : "CURRENT",
+      };
+    })
+  );
+}
 
 async function assignEmployeeShift(
   session: SessionContext,
@@ -1787,6 +1937,13 @@ async function assignEmployeeShift(
   ) {
     return errorResponse(
       "الموظف والمشروع والوردية مطلوبة"
+    );
+  }
+
+  if (!(await canManageProject(session.user, projectId))) {
+    return errorResponse(
+      "ليس لديك صلاحية إدارة موظفين وورديات هذا المشروع",
+      403
     );
   }
 
@@ -1846,7 +2003,7 @@ async function assignEmployeeShift(
    * Employee must have a current project assignment.
    */
 
-  const {
+  let {
     data: currentProject,
     error: currentProjectError,
   } = await supabase
@@ -2085,6 +2242,13 @@ async function assignEmployeeProject(
   if (!employeeId || !projectId) {
     return errorResponse(
       "الموظف والمشروع مطلوبان"
+    );
+  }
+
+  if (!(await canManageProject(session.user, projectId))) {
+    return errorResponse(
+      "ليس لديك صلاحية إدارة موظفين هذا المشروع",
+      403
     );
   }
 
@@ -3986,7 +4150,7 @@ async function handleAction(
       const auth =
         requireRole(
           session,
-          MANAGEMENT_ROLES
+          PROJECT_VIEW_ROLES
         );
 
       if (auth) return auth;
@@ -4003,7 +4167,7 @@ async function handleAction(
       const auth =
         requireRole(
           session,
-          MANAGEMENT_ROLES
+          PROJECT_VIEW_ROLES
         );
 
       if (auth) return auth;

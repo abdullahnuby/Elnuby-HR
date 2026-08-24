@@ -1614,6 +1614,17 @@ function Dashboard({
             {roleLabels[me.user?.role] ||
               me.user?.role}
           </b>
+          {me.project?.name && (
+            <small>المشروع: {me.project.name}</small>
+          )}
+          {me.shift?.name && (
+            <small>
+              الوردية: {me.shift.name}
+              {me.shift.start_time
+                ? ` • ${String(me.shift.start_time).slice(0, 5)}`
+                : ''}
+            </small>
+          )}
         </div>
       </div>
 
@@ -2564,7 +2575,7 @@ function Projects({
                   </span>
 
                   <span>
-                    👷 {assigned.length}{' '}
+                    👷 {p.employee_count ?? assigned.length}{' '}
                     موظف
                   </span>
 
