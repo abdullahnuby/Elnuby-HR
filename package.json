@@ -6,8 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test:contract": "node ../tests/contract.test.js",
-    "test:backend": "node ../tests/backend_smoke.test.js"
+    "test:contract": "node tests/contract.test.js",
+    "test:backend": "node tests/backend_smoke.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.3",
