@@ -1874,15 +1874,15 @@ async function listEmployeeShifts(
     );
   }
 
-  const employeeMap = new Map(
+  const employeeMap = new Map<string, any>(
     (employeesResult.data || []).map((e: any) => [e.employee_id, e])
   );
-
-  const projectMap = new Map(
+  
+  const projectMap = new Map<string, any>(
     (projectsResult.data || []).map((p: any) => [p.project_id, p])
   );
-
-  const shiftMap = new Map(
+  
+  const shiftMap = new Map<string, any>(
     (shiftsResult.data || []).map((s: any) => [s.shift_id, s])
   );
 
