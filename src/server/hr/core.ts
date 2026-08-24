@@ -1,0 +1,392 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import crypto from "crypto";
+
+export const runtime = "nodejs";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !serviceRoleKey) {
+  throw new Error("Missing Supabase environment variables");
+}
+
+export const supabase = createClient(supabaseUrl, serviceRoleKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  },
+});
+
+export type CurrentUser = {
+  user_id: string;
+  employee_id: string | null;
+  username: string;
+  role: string;
+  status: string;
+};
+
+export type SessionContext = {
+  token: string;
+  user: CurrentUser;
+};
+
+export const ROLES = [
+  "SUPER_ADMIN",
+  "HR_MANAGER",
+  "PROJECT_MANAGER",
+  "SITE_SUPERVISOR",
+  "EMPLOYEE",
+];
+
+export const ADMIN_ROLES = ["SUPER_ADMIN", "HR_MANAGER"];
+
+export const MANAGEMENT_ROLES = [
+  "SUPER_ADMIN",
+  "HR_MANAGER",
+];
+
+export const PROJECT_VIEW_ROLES = [
+  "SUPER_ADMIN",
+  "HR_MANAGER",
+  "PROJECT_MANAGER",
+  "SITE_SUPERVISOR",
+];
+
+export function success(data: unknown, status = 200) {
+  return NextResponse.json(
+    {
+      ok: true,
+      data,
+    },
+    { status }
+  );
+}
+
+export function errorResponse(message: string, status = 400) {
+  return NextResponse.json(
+    {
+      ok: false,
+      error: message,
+    },
+    { status }
+  );
+}
+
+export function generateId(prefix: string) {
+  return `${prefix}-${crypto.randomBytes(6).toString("hex").toUpperCase()}`;
+}
+
+export function sha256(value: string) {
+  return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+export function passwordHash(salt: string, password: string) {
+  return crypto
+    .createHash("sha256")
+    .update(salt + password)
+    .digest("base64");
+}
+
+export function nowISO() {
+  return new Date().toISOString();
+}
+
+export function riyadhDate() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Riyadh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+export function riyadhTime() {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Riyadh",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date());
+}
+
+export function timeToMinutes(value: string | null | undefined) {
+  if (!value) return 0;
+
+  const [hours, minutes] = String(value)
+    .substring(0, 5)
+    .split(":")
+    .map(Number);
+
+  return (hours || 0) * 60 + (minutes || 0);
+}
+
+export function minutesBetween(start: string, end: string) {
+  let a = timeToMinutes(start);
+  let b = timeToMinutes(end);
+
+  if (b < a) {
+    b += 24 * 60;
+  }
+
+  return Math.max(0, b - a);
+}
+
+export function haversineDistance(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+) {
+  const earthRadius = 6371000;
+
+  const toRad = (value: number) => (value * Math.PI) / 180;
+
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) ** 2;
+
+  return 2 * earthRadius * Math.asin(Math.sqrt(a));
+}
+
+/* =========================================================
+   AUTH / SESSION
+========================================================= */
+
+export async function getSession(
+  token: string
+): Promise<SessionContext | null> {
+  if (!token) return null;
+
+  const tokenHash = sha256(token);
+
+  const { data: session, error: sessionError } = await supabase
+    .from("app_sessions")
+    .select(
+      "session_id,user_id,token_hash,expires_at,revoked_at"
+    )
+    .eq("token_hash", tokenHash)
+    .is("revoked_at", null)
+    .maybeSingle();
+
+  if (sessionError || !session) {
+    return null;
+  }
+
+  if (
+    session.expires_at &&
+    new Date(session.expires_at).getTime() <= Date.now()
+  ) {
+    return null;
+  }
+
+  const { data: user, error: userError } = await supabase
+    .from("users")
+    .select(
+      "user_id,employee_id,username,role,status"
+    )
+    .eq("user_id", session.user_id)
+    .maybeSingle();
+
+  if (userError || !user) {
+    return null;
+  }
+
+  if (user.status !== "ACTIVE") {
+    return null;
+  }
+
+  await supabase
+    .from("app_sessions")
+    .update({
+      last_used_at: nowISO(),
+    })
+    .eq("session_id", session.session_id);
+
+  return {
+    token,
+    user: {
+      user_id: user.user_id,
+      employee_id: user.employee_id ?? null,
+      username: user.username,
+      role: user.role,
+      status: user.status,
+    },
+  };
+}
+
+export function requireAuth(
+  session: SessionContext | null
+) {
+  if (!session) {
+    return errorResponse(
+      "Authentication required",
+      401
+    );
+  }
+
+  return null;
+}
+
+export function requireRole(
+  session: SessionContext | null,
+  roles: string[]
+) {
+  if (!session) {
+    return errorResponse(
+      "Authentication required",
+      401
+    );
+  }
+
+  if (!roles.includes(session.user.role)) {
+    return errorResponse(
+      "ليس لديك صلاحية لتنفيذ هذا الإجراء.",
+      403
+    );
+  }
+
+  return null;
+}
+
+/* =========================================================
+   PROJECT ACCESS
+========================================================= */
+
+export async function getManagedProjectIds(
+  user: CurrentUser
+): Promise<string[]> {
+  if (
+    user.role === "SUPER_ADMIN" ||
+    user.role === "HR_MANAGER"
+  ) {
+    const { data } = await supabase
+      .from("projects")
+      .select("project_id");
+
+    return (data || []).map(
+      (row: any) => row.project_id
+    );
+  }
+
+  if (!["PROJECT_MANAGER", "SITE_SUPERVISOR"].includes(user.role)) {
+    return [];
+  }
+
+  const table = user.role === "SITE_SUPERVISOR" ? "project_supervisors" : "project_managers";
+  const { data } = await supabase
+    .from(table)
+    .select("project_id,start_date,end_date")
+    .eq("user_id", user.user_id);
+
+  const today = riyadhDate();
+
+  return (data || [])
+    .filter((row: any) => {
+      if (!row.end_date) return true;
+
+      return row.end_date >= today;
+    })
+    .map((row: any) => row.project_id);
+}
+
+export async function canManageProject(
+  user: CurrentUser,
+  projectId: string
+) {
+  if (
+    user.role === "SUPER_ADMIN" ||
+    user.role === "HR_MANAGER"
+  ) {
+    return true;
+  }
+
+  if (!["PROJECT_MANAGER", "SITE_SUPERVISOR"].includes(user.role)) {
+    return false;
+  }
+
+  const projectIds =
+    await getManagedProjectIds(user);
+
+  return projectIds.includes(projectId);
+}
+
+/* =========================================================
+   EMPLOYEE CURRENT ASSIGNMENT
+========================================================= */
+
+export async function getCurrentAssignment(
+  employeeId: string
+) {
+  const { data, error } = await supabase
+    .from("project_assignments")
+    .select("*")
+    .eq("employee_id", employeeId)
+    .eq("is_current", true)
+    .order("start_date", {
+      ascending: false,
+    })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error(
+      "getCurrentAssignment:",
+      error
+    );
+    return null;
+  }
+
+  return data;
+}
+
+/* =========================================================
+   CURRENT SHIFT
+========================================================= */
+
+export async function getCurrentEmployeeShift(
+  employeeId: string,
+  projectId: string
+) {
+  const today = riyadhDate();
+
+  const { data, error } = await supabase
+    .from("employee_shifts")
+    .select(
+      `
+      *,
+      shifts(*)
+      `
+    )
+    .eq("employee_id", employeeId)
+    .eq("project_id", projectId)
+    .lte("start_date", today)
+    .or(
+      `end_date.is.null,end_date.gte.${today}`
+    )
+    .order("start_date", {
+      ascending: false,
+    })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error(
+      "getCurrentEmployeeShift:",
+      error
+    );
+    return null;
+  }
+
+  return data;
+}
+
+/* =========================================================
+   LOGIN
+========================================================= */
+
