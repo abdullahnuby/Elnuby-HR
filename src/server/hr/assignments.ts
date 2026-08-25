@@ -627,7 +627,7 @@ export async function assignManagerProject(
     await supabase
       .from("users")
       .select(
-        "id as user_id,role"
+        "id,role"
       )
       .eq(
         "id",

@@ -236,7 +236,7 @@ export async function getSession(
   const { data: user, error: userError } = await supabase
     .from("users")
     .select(
-      "id as user_id,employee_id,username,role,status"
+      "id,employee_id,username,role,status"
     )
     .eq("id", session.user_id)
     .maybeSingle();
@@ -259,7 +259,7 @@ export async function getSession(
   return {
     token,
     user: {
-      user_id: user.user_id,
+      user_id: user.id,
       employee_id: user.employee_id ?? null,
       username: user.username,
       role: user.role,

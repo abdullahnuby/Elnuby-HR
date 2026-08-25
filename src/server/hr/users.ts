@@ -79,7 +79,10 @@ export async function listDeductions(
   }
 
   return success(
-    data || []
+    (data || []).map((user: any) => ({
+      ...user,
+      user_id: user.id,
+    }))
   );
 }
 
@@ -92,7 +95,7 @@ export async function listUsers() {
     await supabase
       .from("users")
       .select(
-        "id as user_id,employee_id,username,role,status,last_login,created_at,updated_at"
+        "id,employee_id,username,role,status,last_login,created_at,updated_at"
       )
       .order("username");
 
@@ -104,7 +107,10 @@ export async function listUsers() {
   }
 
   return success(
-    data || []
+    (data || []).map((user: any) => ({
+      ...user,
+      user_id: user.id,
+    }))
   );
 }
 
@@ -289,7 +295,7 @@ export async function createUser(
           nowISO(),
       })
       .select(
-        "id as user_id,employee_id,username,role,status,last_login,created_at"
+        "id,employee_id,username,role,status,last_login,created_at"
       )
       .single();
 
@@ -342,7 +348,10 @@ export async function createUser(
   }
 
   return success(
-    data,
+    {
+      ...(data || {}),
+      user_id: data?.id,
+    },
     201
   );
 }

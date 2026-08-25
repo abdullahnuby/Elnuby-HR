@@ -80,7 +80,7 @@ export async function listProjects(
   if (userIds.length) {
     const { data: userData, error: userError } = await supabase
       .from("users")
-      .select("id as user_id,employee_id,username,role,status")
+      .select("id,employee_id,username,role,status")
       .in("id", userIds);
 
     if (userError) {
@@ -95,7 +95,7 @@ export async function listProjects(
   }
 
   const userMap = new Map<string, any>(
-    users.map((u: any) => [String(u.user_id), u])
+    users.map((u: any) => [String(u.id), u])
   );
 
   const managerMap = new Map<string, any[]>();
