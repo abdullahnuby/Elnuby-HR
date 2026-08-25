@@ -16,6 +16,7 @@ export type Employee = {
   attendance_open?: string;
   attendance_close?: string;
   checkout_open?: string;
+  checkout_close?: string;
   auto_checkout_time?: string;
 };
 

@@ -16,6 +16,14 @@ export const supabase = createClient(supabaseUrl, serviceRoleKey, {
     autoRefreshToken: false,
     persistSession: false,
   },
+}).schema("hr");
+
+// Session storage intentionally remains outside the canonical HR business schema.
+export const publicSupabase = createClient(supabaseUrl, serviceRoleKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  },
 });
 
 export type CurrentUser = {
@@ -82,10 +90,43 @@ export function sha256(value: string) {
 }
 
 export function passwordHash(salt: string, password: string) {
-  return crypto
-    .createHash("sha256")
-    .update(salt + password)
-    .digest("base64");
+  return crypto.createHash("sha256").update(salt + password).digest("base64");
+}
+
+export function securePasswordHash(password: string) {
+  const salt = crypto.randomBytes(16);
+  const derived = crypto.scryptSync(password, salt, 64, { N: 16384, r: 8, p: 1 });
+  return `scrypt$16384$8$1$${salt.toString("base64url")}$${derived.toString("base64url")}`;
+}
+
+export function verifyPassword(stored: string, password: string) {
+  try {
+    if (stored.startsWith("scrypt$")) {
+      const [, nRaw, rRaw, pRaw, saltRaw, hashRaw] = stored.split("$");
+      const n = Number(nRaw);
+      const r = Number(rRaw);
+      const p = Number(pRaw);
+      const salt = Buffer.from(saltRaw, "base64url");
+      const expected = Buffer.from(hashRaw, "base64url");
+      const actual = crypto.scryptSync(password, salt, expected.length, { N: n, r, p });
+      return crypto.timingSafeEqual(actual, expected);
+    }
+
+    const separatorIndex = stored.indexOf("$");
+    if (separatorIndex <= 0) return false;
+    const salt = stored.substring(0, separatorIndex);
+    const expected = stored.substring(separatorIndex + 1);
+    const actual = passwordHash(salt, password);
+    return crypto.timingSafeEqual(Buffer.from(actual), Buffer.from(expected));
+  } catch {
+    return false;
+  }
+}
+
+export function parsePagination(body: Record<string, unknown>, maxLimit = 100) {
+  const page = Math.max(1, Number(body.page || 1) || 1);
+  const limit = Math.min(maxLimit, Math.max(1, Number(body.limit || maxLimit) || maxLimit));
+  return { page, limit, from: (page - 1) * limit, to: page * limit - 1 };
 }
 
 export function nowISO() {
@@ -99,6 +140,13 @@ export function riyadhDate() {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
+}
+
+export function previousRiyadhDate(date: string) {
+  const [y, m, d] = date.split("-").map(Number);
+  const value = new Date(Date.UTC(y, m - 1, d));
+  value.setUTCDate(value.getUTCDate() - 1);
+  return value.toISOString().slice(0, 10);
 }
 
 export function riyadhTime() {
@@ -165,7 +213,7 @@ export async function getSession(
 
   const tokenHash = sha256(token);
 
-  const { data: session, error: sessionError } = await supabase
+  const { data: session, error: sessionError } = await publicSupabase
     .from("app_sessions")
     .select(
       "session_id,user_id,token_hash,expires_at,revoked_at"
@@ -188,9 +236,9 @@ export async function getSession(
   const { data: user, error: userError } = await supabase
     .from("users")
     .select(
-      "user_id,employee_id,username,role,status"
+      "id as user_id,employee_id,username,role,status"
     )
-    .eq("user_id", session.user_id)
+    .eq("id", session.user_id)
     .maybeSingle();
 
   if (userError || !user) {
@@ -201,7 +249,7 @@ export async function getSession(
     return null;
   }
 
-  await supabase
+  await publicSupabase
     .from("app_sessions")
     .update({
       last_used_at: nowISO(),
@@ -255,6 +303,34 @@ export function requireRole(
 }
 
 /* =========================================================
+   AUDIT
+========================================================= */
+
+export async function writeAudit(
+  actorUserId: string | null,
+  action: string,
+  entity = "api",
+  entityId: string | null = null,
+  details: Record<string, unknown> = {},
+  successFlag = true
+) {
+  try {
+    await supabase.from("audit_log").insert({
+      log_id: generateId("AUD"),
+      actor_user_id: actorUserId,
+      action,
+      entity,
+      entity_id: entityId,
+      new_value: details,
+      reason: successFlag ? null : "request_failed",
+      created_at: nowISO(),
+    });
+  } catch (error) {
+    console.error("audit_log:", error);
+  }
+}
+
+/* =========================================================
    PROJECT ACCESS
 ========================================================= */
 
@@ -288,9 +364,9 @@ export async function getManagedProjectIds(
 
   return (data || [])
     .filter((row: any) => {
-      if (!row.end_date) return true;
-
-      return row.end_date >= today;
+      const starts = !row.start_date || row.start_date <= today;
+      const active = !row.end_date || row.end_date >= today;
+      return starts && active;
     })
     .map((row: any) => row.project_id);
 }

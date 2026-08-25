@@ -149,9 +149,7 @@ export default function Home() {
   const [permissionReason, setPermissionReason] = useState('');
 
   useEffect(() => {
-    if (localStorage.getItem('hr_token')) {
-      load();
-    }
+    load();
   }, []);
 
   useEffect(() => {
@@ -177,13 +175,6 @@ export default function Home() {
   }, [me]);
 
   async function load() {
-    const token = localStorage.getItem('hr_token');
-
-    if (!token) {
-      setMe(null);
-      return;
-    }
-
     setError('');
 
     try {
@@ -240,19 +231,18 @@ export default function Home() {
       const message = String(e?.message || '');
 
       const authError =
-        /Authentication required|Invalid session|Session expired|User inactive/i.test(
+        /Authentication required|Invalid session|Session expired|User inactive|الجلسة غير صالحة|منتهية/i.test(
           message,
         );
 
       if (authError) {
-        localStorage.removeItem('hr_token');
-
         setMe(null);
         setDash(null);
         setManagerDash(null);
         setUsers([]);
         setEmployees([]);
         setProjects([]);
+        setShifts([]);
 
         setError(
           'انتهت جلسة الدخول، برجاء تسجيل الدخول مرة أخرى.',
@@ -274,8 +264,6 @@ export default function Home() {
         username,
         password,
       });
-
-      localStorage.setItem('hr_token', r.token);
 
       await load();
     } catch (e: any) {
@@ -913,11 +901,12 @@ export default function Home() {
 
           <button
             className="logout"
-            onClick={() => {
-              localStorage.removeItem(
-                'hr_token',
-              );
-              location.reload();
+            onClick={async () => {
+              try {
+                await api('logout');
+              } finally {
+                location.reload();
+              }
             }}
           >
             تسجيل الخروج

@@ -2,7 +2,8 @@ import { supabase, success, errorResponse, generateId, sha256, passwordHash, now
 import type { SessionContext, CurrentUser } from "./core";
 
 export async function listProjects(
-  session: SessionContext
+  session: SessionContext,
+  _body: Record<string, unknown> = {},
 ) {
   let query = supabase
     .from("projects")
@@ -79,8 +80,8 @@ export async function listProjects(
   if (userIds.length) {
     const { data: userData, error: userError } = await supabase
       .from("users")
-      .select("user_id,employee_id,username,role,status")
-      .in("user_id", userIds);
+      .select("id as user_id,employee_id,username,role,status")
+      .in("id", userIds);
 
     if (userError) {
       console.error("project manager users:", userError);

@@ -42,6 +42,7 @@ for (const required of ['employees', 'projects', 'shifts', 'employee_shifts', 'a
 }
 
 if (!route.includes('@/server/hr/router')) throw new Error('API route is not using the modular router');
+if (!route.includes('SESSION_COOKIE')) throw new Error('Secure session cookie is not wired');
 const core = fs.readFileSync(path.join(root, 'src', 'server', 'hr', 'core.ts'), 'utf8');
 if (!core.includes('SITE_SUPERVISOR')) throw new Error('SITE_SUPERVISOR is not represented in scope core');
 

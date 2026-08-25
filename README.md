@@ -93,3 +93,24 @@ These checks validate that frontend API actions map to the modular backend and t
 The production data source is Supabase/PostgreSQL. Google Apps Script and Google Sheets are not part of the current runtime architecture.
 
 Database hardening and scope migrations are maintained in Supabase migrations and should be kept synchronized with the repository before production releases.
+
+## 2026 architecture hardening
+
+- Business data uses the canonical Supabase `hr` schema.
+- Server sessions remain in `public.app_sessions` and are delivered to the browser only as an HttpOnly `elnuby_hr_session` cookie.
+- Passwords created after this release use Node `scrypt`; legacy SHA-256 records are transparently upgraded after successful login.
+- `SITE_SUPERVISOR` access is scoped through `hr.project_supervisors` and project scope checks.
+- Attendance auto-checkout runs through `/api/cron/auto-checkout` every five minutes when deployed on Vercel.
+- SQL migrations are stored under `supabase/migrations/`.
+- Browser authentication tokens are not stored in localStorage.
+
+### Production environment
+
+Required:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Recommended:
+
+- `CRON_SECRET`

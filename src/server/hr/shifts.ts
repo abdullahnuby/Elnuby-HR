@@ -1,7 +1,7 @@
 import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, riyadhDate, riyadhTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
-export async function listShifts() {
+export async function listShifts(_body: Record<string, unknown> = {}) {
   const { data, error } =
     await supabase
       .from("shifts")

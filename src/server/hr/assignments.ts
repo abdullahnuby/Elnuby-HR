@@ -1,14 +1,17 @@
-import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, riyadhDate, riyadhTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift } from "./core";
+import { parsePagination } from "./core";
+import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, riyadhDate, previousRiyadhDate, riyadhTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
 export async function listEmployeeShifts(
-  session: SessionContext
+  session: SessionContext,
+  body: Record<string, unknown> = {},
 ) {
+  const { from, to } = parsePagination(body, 100);
   let query = supabase
     .from("employee_shifts")
     .select("*")
     .order("start_date", { ascending: false })
-    .limit(1000);
+    .range(from, to);
 
   if (["PROJECT_MANAGER", "SITE_SUPERVISOR"].includes(session.user.role)) {
     const ids = await getManagedProjectIds(session.user);
@@ -162,6 +165,8 @@ export async function assignEmployeeShift(
     );
   }
 
+  const startDate = String(body.start_date || riyadhDate());
+
   if (!(await canManageProject(session.user, projectId))) {
     return errorResponse(
       "ليس لديك صلاحية إدارة موظفين وورديات هذا المشروع",
@@ -269,7 +274,7 @@ export async function assignEmployeeShift(
         .from("project_assignments")
         .update({
           is_current: false,
-          end_date: riyadhDate(),
+          end_date: previousRiyadhDate(startDate),
         })
         .eq(
           "assignment_id",
@@ -316,8 +321,7 @@ export async function assignEmployeeShift(
 
         start_date:
           String(
-            body.start_date ||
-              riyadhDate()
+            startDate
           ),
 
         end_date:
@@ -361,7 +365,7 @@ export async function assignEmployeeShift(
     .from("employee_shifts")
     .update({
       end_date:
-        riyadhDate(),
+        previousRiyadhDate(startDate),
     })
     .eq(
       "employee_id",
@@ -461,6 +465,8 @@ export async function assignEmployeeProject(
     body.project_id || ""
   );
 
+  const startDate = String(body.start_date || riyadhDate());
+
   if (!employeeId || !projectId) {
     return errorResponse(
       "الموظف والمشروع مطلوبان"
@@ -495,7 +501,7 @@ export async function assignEmployeeProject(
     .update({
       is_current: false,
       end_date:
-        riyadhDate(),
+        previousRiyadhDate(startDate),
     })
     .eq(
       "employee_id",
@@ -518,8 +524,7 @@ export async function assignEmployeeProject(
           projectId,
         start_date:
           String(
-            body.start_date ||
-              riyadhDate()
+            startDate
           ),
         end_date:
           body.end_date ||
@@ -546,7 +551,7 @@ export async function assignEmployeeProject(
       .from("employee_shifts")
       .update({
         end_date:
-          riyadhDate(),
+          previousRiyadhDate(startDate),
       })
       .eq(
         "employee_id",
@@ -610,6 +615,7 @@ export async function assignManagerProject(
   const projectId = String(
     body.project_id || ""
   );
+  const startDate = String(body.start_date || riyadhDate());
 
   if (!userId || !projectId) {
     return errorResponse(
@@ -621,10 +627,10 @@ export async function assignManagerProject(
     await supabase
       .from("users")
       .select(
-        "user_id,role"
+        "id as user_id,role"
       )
       .eq(
-        "user_id",
+        "id",
         userId
       )
       .maybeSingle();
@@ -696,8 +702,7 @@ export async function assignManagerProject(
           projectId,
         start_date:
           String(
-            body.start_date ||
-              riyadhDate()
+            startDate
           ),
         end_date:
           body.end_date ||

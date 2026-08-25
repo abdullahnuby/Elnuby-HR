@@ -1,9 +1,12 @@
+import { parsePagination } from "./core";
 import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, riyadhDate, riyadhTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
 export async function permissionList(
-  session: SessionContext
+  session: SessionContext,
+  body: Record<string, unknown> = {},
 ) {
+  const { from, to } = parsePagination(body, 100);
   let query = supabase
     .from("permission_requests")
     .select("*")
@@ -13,7 +16,7 @@ export async function permissionList(
         ascending: false,
       }
     )
-    .limit(500);
+    .range(from, to);
 
   if (
     session.user.role ===
@@ -112,6 +115,24 @@ export async function createPermission(
     return errorResponse(
       "وقت الإذن غير صحيح"
     );
+  }
+
+  const { data: existingPermissions } = await supabase
+    .from("permission_requests")
+    .select("start_time,end_time,status")
+    .eq("employee_id", employeeId)
+    .eq("date", date)
+    .in("status", ["PENDING", "APPROVED"]);
+
+  const requestedStart = timeToMinutes(startTime);
+  const requestedEnd = requestedStart + minutes;
+  const overlaps = (existingPermissions || []).some((row: any) => {
+    const existingStart = timeToMinutes(String(row.start_time));
+    const existingEnd = timeToMinutes(String(row.end_time));
+    return requestedStart < existingEnd && existingStart < requestedEnd;
+  });
+  if (overlaps) {
+    return errorResponse("يوجد إذن آخر متداخل مع نفس الفترة.");
   }
 
   const { data, error } =

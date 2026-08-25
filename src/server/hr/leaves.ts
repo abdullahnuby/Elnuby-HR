@@ -1,9 +1,74 @@
+import { parsePagination } from "./core";
 import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, riyadhDate, riyadhTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
+async function refreshLeaveBalance(employeeId: string, leaveTypeId: string, year: number) {
+  const { data: leaveType } = await supabase
+    .from("leave_types")
+    .select("leave_type_id,requires_balance,annual_entitlement")
+    .eq("leave_type_id", leaveTypeId)
+    .maybeSingle();
+
+  if (!leaveType?.requires_balance) return null;
+
+  let { data: balance } = await supabase
+    .from("leave_balances")
+    .select("*")
+    .eq("employee_id", employeeId)
+    .eq("leave_type_id", leaveTypeId)
+    .eq("year", year)
+    .maybeSingle();
+
+  if (!balance) {
+    const entitlement = Number(leaveType.annual_entitlement || 0);
+    const { data: created, error } = await supabase
+      .from("leave_balances")
+      .insert({
+        id: generateId("BAL"),
+        employee_id: employeeId,
+        leave_type_id: leaveTypeId,
+        year,
+        entitlement,
+        used: 0,
+        pending: 0,
+        remaining: entitlement,
+        updated_at: nowISO(),
+      })
+      .select("*")
+      .single();
+    if (error) throw error;
+    balance = created;
+  }
+
+  const { data: requests, error: requestError } = await supabase
+    .from("leave_requests")
+    .select("days,status,from_date")
+    .eq("employee_id", employeeId)
+    .eq("leave_type_id", leaveTypeId);
+  if (requestError) throw requestError;
+
+  const used = (requests || []).reduce((sum: number, row: any) =>
+    row.status === "APPROVED" && Number(String(row.from_date).slice(0, 4)) === year ? sum + Number(row.days || 0) : sum, 0);
+  const pending = (requests || []).reduce((sum: number, row: any) =>
+    ["PENDING_MANAGER", "PENDING_HR"].includes(row.status) && Number(String(row.from_date).slice(0, 4)) === year ? sum + Number(row.days || 0) : sum, 0);
+  const remaining = Math.max(0, Number(balance.entitlement || 0) - used - pending);
+
+  const { data: updated, error: updateError } = await supabase
+    .from("leave_balances")
+    .update({ used, pending, remaining, updated_at: nowISO() })
+    .eq("id", balance.id)
+    .select("*")
+    .single();
+  if (updateError) throw updateError;
+  return updated;
+}
+
+
 export async function leaveList(
-  session: SessionContext
+  session: SessionContext,
+  body: Record<string, unknown> = {},
 ) {
+  const { from, to } = parsePagination(body, 100);
   let query = supabase
     .from("leave_requests")
     .select("*")
@@ -13,7 +78,7 @@ export async function leaveList(
         ascending: false,
       }
     )
-    .limit(500);
+    .range(from, to);
 
   if (
     session.user.role ===
@@ -111,6 +176,10 @@ export async function createLeave(
       `${toDate}T00:00:00`
     );
 
+  if (from.getFullYear() !== to.getFullYear()) {
+    return errorResponse("لا يمكن إنشاء إجازة تمتد بين سنتين؛ أنشئ طلبًا منفصلًا لكل سنة.");
+  }
+
   const days =
     Math.floor(
       (to.getTime() -
@@ -157,6 +226,18 @@ export async function createLeave(
     );
   }
 
+  if (leaveType.requires_balance) {
+    try {
+      const balance = await refreshLeaveBalance(employeeId, leaveTypeId, from.getFullYear());
+      if (balance && Number(balance.remaining || 0) < days) {
+        return errorResponse(`الرصيد المتاح للإجازة غير كافٍ. المتبقي: ${balance.remaining} يوم.`);
+      }
+    } catch (error) {
+      console.error("leave balance check:", error);
+      return errorResponse("تعذر التحقق من رصيد الإجازة", 500);
+    }
+  }
+
   const { data, error } =
     await supabase
       .from("leave_requests")
@@ -192,6 +273,12 @@ export async function createLeave(
       error.message,
       500
     );
+  }
+
+  try {
+    await refreshLeaveBalance(employeeId, leaveTypeId, from.getFullYear());
+  } catch (balanceError) {
+    console.error("leave balance refresh:", balanceError);
   }
 
   return success(
@@ -302,6 +389,12 @@ export async function decideLeaveManager(
     );
   }
 
+  try {
+    await refreshLeaveBalance(request.employee_id, request.leave_type_id, Number(String(request.from_date).slice(0, 4)));
+  } catch (balanceError) {
+    console.error("manager leave balance refresh:", balanceError);
+  }
+
   return success(data);
 }
 
@@ -392,6 +485,12 @@ export async function decideLeaveHR(
       error.message,
       500
     );
+  }
+
+  try {
+    await refreshLeaveBalance(request.employee_id, request.leave_type_id, Number(String(request.from_date).slice(0, 4)));
+  } catch (balanceError) {
+    console.error("HR leave balance refresh:", balanceError);
   }
 
   return success(data);

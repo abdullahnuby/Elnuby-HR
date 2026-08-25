@@ -1,6 +1,6 @@
 import { supabase, success, errorResponse, sha256, nowISO, requireAuth, requireRole, ROLES, ADMIN_ROLES, MANAGEMENT_ROLES, PROJECT_VIEW_ROLES } from "./core";
 import type { SessionContext } from "./core";
-import { login, getMe } from "./auth";
+import { login, logout, getMe } from "./auth";
 import { getDashboard, getProjectManagerDashboard } from "./dashboard";
 import { listEmployees, createEmployee } from "./employees";
 import { listProjects, createProject } from "./projects";
@@ -22,34 +22,8 @@ export async function handleAction(
     case "login":
       return login(body);
 
-    case "logout": {
-      if (!session) {
-        return success({
-          logged_out: true,
-        });
-      }
-
-      await supabase
-        .from("app_sessions")
-        .update({
-          revoked_at:
-            nowISO(),
-        })
-        .eq(
-          "token_hash",
-          sha256(
-            session.token
-          )
-        )
-        .is(
-          "revoked_at",
-          null
-        );
-
-      return success({
-        logged_out: true,
-      });
-    }
+    case "logout":
+      return logout(session);
 
     case "me": {
       const auth =
@@ -135,7 +109,8 @@ export async function handleAction(
       if (auth) return auth;
 
       return listEmployees(
-        session!
+        session!,
+        body
       );
     }
 
@@ -166,7 +141,8 @@ export async function handleAction(
       if (auth) return auth;
 
       return listProjects(
-        session!
+        session!,
+        body
       );
     }
 
@@ -195,7 +171,7 @@ export async function handleAction(
 
       if (auth) return auth;
 
-      return listShifts();
+      return listShifts(body);
     }
 
     case "create_shift": {
@@ -224,7 +200,8 @@ export async function handleAction(
       if (auth) return auth;
 
       return listEmployeeShifts(
-        session!
+        session!,
+        body
       );
     }
 
@@ -287,7 +264,8 @@ export async function handleAction(
       if (auth) return auth;
 
       return attendanceList(
-        session!
+        session!,
+        body
       );
     }
 
@@ -320,7 +298,8 @@ export async function handleAction(
       if (auth) return auth;
 
       return leaveList(
-        session!
+        session!,
+        body
       );
     }
 
@@ -381,7 +360,8 @@ export async function handleAction(
       if (auth) return auth;
 
       return permissionList(
-        session!
+        session!,
+        body
       );
     }
 
@@ -427,7 +407,8 @@ export async function handleAction(
       if (auth) return auth;
 
       return listDeductions(
-        session!
+        session!,
+        body
       );
     }
 

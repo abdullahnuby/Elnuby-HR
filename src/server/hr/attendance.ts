@@ -1,9 +1,17 @@
+import { parsePagination } from "./core";
 import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, riyadhDate, riyadhTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
 export async function attendanceList(
-  session: SessionContext
+  session: SessionContext,
+  body: Record<string, unknown> = {},
 ) {
+  try {
+    await autoCheckoutOpenAttendance();
+  } catch (error) {
+    console.error("attendance auto checkout:", error);
+  }
+  const { from, to } = parsePagination(body, 100);
   let query = supabase
     .from("attendance")
     .select("*")
@@ -19,7 +27,7 @@ export async function attendanceList(
         ascending: false,
       }
     )
-    .limit(500);
+    .range(from, to);
 
   if (
     session.user.role ===
@@ -420,3 +428,53 @@ export async function attendanceAction(
    LEAVE LIST
 ========================================================= */
 
+
+/* =========================================================
+   AUTO CHECKOUT
+========================================================= */
+
+export async function autoCheckoutOpenAttendance() {
+  const today = riyadhDate();
+  const currentTime = riyadhTime();
+  const currentMinutes = timeToMinutes(currentTime);
+
+  const { data: rows, error } = await supabase
+    .from("attendance")
+    .select("attendance_id,employee_id,check_in,check_out,date,auto_closed,shift_id,shifts(auto_checkout_time)")
+    .eq("date", today)
+    .not("check_in", "is", null)
+    .is("check_out", null)
+    .eq("auto_closed", false);
+
+  if (error) {
+    console.error("auto checkout lookup:", error);
+    throw error;
+  }
+
+  let closed = 0;
+  for (const row of rows || []) {
+    const autoTime = (row as any).shifts?.auto_checkout_time;
+    const autoMinutes = timeToMinutes(autoTime);
+    if (!autoTime || currentMinutes < autoMinutes) continue;
+
+    const workedMinutes = minutesBetween(String(row.check_in), String(autoTime));
+    const { error: updateError } = await supabase
+      .from("attendance")
+      .update({
+        check_out: autoTime,
+        worked_minutes: workedMinutes,
+        auto_closed: true,
+        updated_at: nowISO(),
+      })
+      .eq("attendance_id", row.attendance_id)
+      .is("check_out", null);
+
+    if (updateError) {
+      console.error("auto checkout update:", updateError);
+      continue;
+    }
+    closed += 1;
+  }
+
+  return { closed, date: today, time: currentTime };
+}

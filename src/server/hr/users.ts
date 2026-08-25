@@ -1,10 +1,13 @@
+import { parsePagination } from "./core";
 import crypto from "crypto";
-import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, riyadhDate, riyadhTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, ROLES, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift } from "./core";
+import { supabase, success, errorResponse, generateId, sha256, passwordHash, securePasswordHash, nowISO, riyadhDate, riyadhTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, ROLES, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
 export async function listDeductions(
-  session: SessionContext
+  session: SessionContext,
+  body: Record<string, unknown> = {},
 ) {
+  const { from, to } = parsePagination(body, 100);
   let query = supabase
     .from("deductions")
     .select("*")
@@ -14,7 +17,7 @@ export async function listDeductions(
         ascending: false,
       }
     )
-    .limit(1000);
+    .range(from, to);
 
   if (["PROJECT_MANAGER", "SITE_SUPERVISOR"].includes(session.user.role)) {
     const ids =
@@ -89,7 +92,7 @@ export async function listUsers() {
     await supabase
       .from("users")
       .select(
-        "user_id,employee_id,username,role,status,last_login,created_at,updated_at"
+        "id as user_id,employee_id,username,role,status,last_login,created_at,updated_at"
       )
       .order("username");
 
@@ -188,7 +191,7 @@ export async function createUser(
   const { data: existing } =
     await supabase
       .from("users")
-      .select("user_id")
+      .select("id")
       .ilike(
         "username",
         username
@@ -241,14 +244,7 @@ export async function createUser(
     }
   }
 
-  const salt =
-    crypto.randomUUID();
-
-  const hash =
-    passwordHash(
-      salt,
-      password
-    );
+  const hash = securePasswordHash(password);
 
   const userId =
     generateId("USR");
@@ -257,7 +253,9 @@ export async function createUser(
     await supabase
       .from("users")
       .insert({
-        user_id:
+        id:
+          userId,
+        legacy_user_id:
           userId,
 
         employee_id:
@@ -272,7 +270,7 @@ export async function createUser(
         username,
 
         password_hash:
-          `${salt}$${hash}`,
+          hash,
 
         role,
 
@@ -291,7 +289,7 @@ export async function createUser(
           nowISO(),
       })
       .select(
-        "user_id,employee_id,username,role,status,last_login,created_at"
+        "id as user_id,employee_id,username,role,status,last_login,created_at"
       )
       .single();
 

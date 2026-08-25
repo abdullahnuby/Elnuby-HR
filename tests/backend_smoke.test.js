@@ -29,6 +29,7 @@ const workforce = fs.readFileSync(path.join(serverDir, 'assignments.ts'), 'utf8'
 const router = fs.readFileSync(path.join(serverDir, 'router.ts'), 'utf8');
 const users = fs.readFileSync(path.join(serverDir, 'users.ts'), 'utf8');
 
+if (!core.includes('.schema("hr")')) throw new Error('Business client is not pinned to hr schema');
 if (!core.includes('SITE_SUPERVISOR')) throw new Error('Scope core missing SITE_SUPERVISOR');
 if (!core.includes('project_supervisors')) throw new Error('Scope core missing project_supervisors');
 if (!workforce.includes('listEmployeeShifts')) throw new Error('Workforce shift service missing');

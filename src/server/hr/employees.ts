@@ -2,7 +2,8 @@ import { supabase, success, errorResponse, generateId, sha256, passwordHash, now
 import type { SessionContext, CurrentUser } from "./core";
 
 export async function listEmployees(
-  session: SessionContext
+  session: SessionContext,
+  _body: Record<string, unknown> = {},
 ) {
   let employeeIds: string[] | null = null;
 
@@ -18,7 +19,9 @@ export async function listEmployees(
         .from("project_assignments")
         .select("employee_id")
         .in("project_id", projectIds)
-        .eq("is_current", true);
+        .eq("is_current", true)
+        .lte("start_date", riyadhDate())
+        .or(`end_date.is.null,end_date.gte.${riyadhDate()}`);
 
     if (assignmentError) {
       console.error("employees assignments:", assignmentError);
@@ -82,7 +85,9 @@ export async function listEmployees(
         "assignment_id,employee_id,project_id,start_date,end_date,is_current"
       )
       .in("employee_id", ids)
-      .eq("is_current", true),
+      .eq("is_current", true)
+      .lte("start_date", today)
+      .or(`end_date.is.null,end_date.gte.${today}`),
 
     supabase
       .from("employee_shifts")
