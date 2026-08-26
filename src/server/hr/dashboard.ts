@@ -63,6 +63,7 @@ export async function getDashboard(
       present: 0,
       late: 0,
       missingCheckout: 0,
+      selfAttendance: null,
       serverTime: nowISO(),
     });
   }
@@ -82,6 +83,13 @@ export async function getDashboard(
   const rows =
     attendance || [];
 
+  const selfAttendance = session.user.employee_id
+    ? rows.find(
+        (row: any) =>
+          String(row.employee_id) === String(session.user.employee_id)
+      ) || null
+    : null;
+
   return success({
     employees:
       employeeIds.length,
@@ -100,6 +108,8 @@ export async function getDashboard(
         (row: any) =>
           !row.check_out
       ).length,
+
+    selfAttendance,
 
     serverTime:
       nowISO(),

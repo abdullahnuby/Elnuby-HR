@@ -6,6 +6,8 @@ export default function ManagerDashboard({
   managerDash,
   roleLabels,
   setSection,
+  locate,
+  busy,
 }: any) {
   const s = managerDash?.summary || {};
   const projects =
@@ -15,6 +17,18 @@ export default function ManagerDashboard({
     managerDash?.pendingLeaves || [];
   const permissions =
     managerDash?.pendingPermissions || [];
+
+  const myEmployeeId = String(me?.user?.employee_id || '');
+  const myTeamRecord = team.find(
+    (employee: any) =>
+      String(employee?.employee_id || '') === myEmployeeId,
+  );
+  const myAttendance = myTeamRecord?.attendance || null;
+  const canSelfAttend =
+    me?.user?.role === 'PROJECT_MANAGER' &&
+    Boolean(me?.employee?.employee_id) &&
+    Boolean(me?.project?.project_id) &&
+    Boolean(me?.shift);
 
   const stateLabel = (v: string) =>
     (
@@ -63,6 +77,75 @@ export default function ManagerDashboard({
           <b>{projects.length}</b>
         </div>
       </div>
+
+      {canSelfAttend && (
+        <section className="manager-attendance-card panel" aria-label="تسجيل حضور مدير المشروع">
+          <div className="manager-attendance-main">
+            <div className="manager-attendance-icon">
+              <Icon name="attendance" size={24} />
+            </div>
+            <div>
+              <div className="eyebrow">MY ATTENDANCE</div>
+              <h2>حضورك وانصرافك اليوم</h2>
+              <p>
+                {me?.project?.name || 'المشروع الحالي'} •{' '}
+                {me?.shift?.name || 'الوردية الحالية'}
+                {me?.shift?.start_time
+                  ? ` • تبدأ ${String(me.shift.start_time).slice(0, 5)}`
+                  : ''}
+              </p>
+            </div>
+          </div>
+
+          <div className="manager-attendance-status">
+            <div>
+              <span>الحضور</span>
+              <strong>{myAttendance?.check_in || 'لم يسجل'}</strong>
+            </div>
+            <div>
+              <span>الانصراف</span>
+              <strong>{myAttendance?.check_out || 'لم يسجل'}</strong>
+            </div>
+          </div>
+
+          <div className="manager-attendance-actions">
+            {!myAttendance?.check_in ? (
+              <button
+                className="primary attendance-primary-action"
+                disabled={busy}
+                onClick={() => locate?.('check_in')}
+                type="button"
+              >
+                <Icon name="attendance" size={18} />
+                {busy ? 'جاري تحديد الموقع…' : 'تسجيل الحضور'}
+              </button>
+            ) : !myAttendance?.check_out ? (
+              <button
+                className="primary attendance-primary-action"
+                disabled={busy}
+                onClick={() => locate?.('check_out')}
+                type="button"
+              >
+                <Icon name="logout" size={18} />
+                {busy ? 'جاري تحديد الموقع…' : 'تسجيل الانصراف'}
+              </button>
+            ) : (
+              <span className="attendance-complete">
+                <Icon name="check" size={17} />
+                تم تسجيل الحضور والانصراف
+              </span>
+            )}
+
+            <button
+              className="secondary"
+              type="button"
+              onClick={() => setSection('attendance')}
+            >
+              عرض سجل الحضور
+            </button>
+          </div>
+        </section>
+      )}
 
       <div className="kpis">
         <Kpi

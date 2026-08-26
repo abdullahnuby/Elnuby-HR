@@ -1031,6 +1031,8 @@ export default function Home() {
                 managerDash={managerDash}
                 roleLabels={roleLabels}
                 setSection={openSection}
+                locate={locate}
+                busy={busy}
               />
             ) : (
               <DashboardHome
