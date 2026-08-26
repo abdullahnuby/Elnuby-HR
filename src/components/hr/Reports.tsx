@@ -1,4 +1,5 @@
 import { Table } from './common';
+function formatServerTime(value:any){if(!value)return '—';const d=new Date(value);if(Number.isNaN(d.getTime()))return '—';return new Intl.DateTimeFormat('ar-EG',{dateStyle:'medium',timeStyle:'short'}).format(d);}
 export default function Reports({
   dash,
   managerDash,
@@ -52,7 +53,7 @@ export default function Reports({
 
       <div className="empty-note">
         آخر تحديث من الخادم:{' '}
-        {dash?.serverTime || '—'} • يتم
+        {formatServerTime(dash?.serverTime)} • يتم
         التحديث تلقائياً كل 15 ثانية.
       </div>
 

@@ -442,3 +442,16 @@ export async function autoCheckoutOpenAttendance() {
 
   return { closed, date: today, time: currentTime };
 }
+
+
+export async function closeAttendance(session: any, body: any) {
+  const attendanceId = String(body?.attendance_id || '').trim();
+  if (!attendanceId) throw new Error('رقم سجل الحضور مطلوب');
+  const { data: row, error } = await publicSupabase.from('attendance').select('attendance_id,check_in,check_out').eq('attendance_id', attendanceId).maybeSingle();
+  if (error) throw error;
+  if (!row) throw new Error('سجل الحضور غير موجود');
+  if (row.check_out) return { ok: true, closed: false, already_closed: true };
+  const { error: updateError } = await publicSupabase.from('attendance').update({ check_out: new Date().toISOString(), auto_closed: false, status: 'MANUAL_CLOSED' }).eq('attendance_id', attendanceId);
+  if (updateError) throw updateError;
+  return { ok: true, closed: true };
+}

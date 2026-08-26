@@ -747,6 +747,11 @@ export default function Home() {
   async function toggleUser(userId:string,status:string){try{setBusy(true);if(status==='ACTIVE')await api('delete_user',{user_id:userId});else await api('update_user',{user_id:userId,status:'ACTIVE'});setNotice(status==='ACTIVE'?'تم تعطيل الحساب':'تم تفعيل الحساب');setUsers(await api('users'));}catch(e:any){setError(e.message)}finally{setBusy(false)}}
   async function resetUserPassword(userId:string){const password=window.prompt('كلمة المرور الجديدة');if(password===null)return;try{setBusy(true);await api('update_user',{user_id:userId,password});setNotice('تم تغيير كلمة المرور');}catch(e:any){setError(e.message)}finally{setBusy(false)}}
 
+  async function closeAttendanceRecord(attendanceId:string){
+    if(!window.confirm('هل تريد إغلاق سجل الحضور هذا الآن؟')) return;
+    try{setBusy(true);await api('close_attendance',{attendance_id:attendanceId});setNotice('تم إغلاق سجل الحضور');setRows(await api('attendance_list',{}));}catch(e:any){setError(e.message||'تعذر إغلاق سجل الحضور')}finally{setBusy(false)}
+  }
+
   async function createLeave() {
     setBusy(true);
     setError('');
@@ -919,13 +924,7 @@ export default function Home() {
         </div>
 
         <div className="profile-mini">
-          <div className="avatar">
-            {(
-              me.employee?.name ||
-              me.user?.username ||
-              'U'
-            ).slice(0, 1)}
-          </div>
+          <div className="profile-initials" aria-hidden="true"><Icon name="users" size={17}/></div>
 
           <div>
             <strong>
@@ -1002,10 +1001,7 @@ export default function Home() {
                   'لوحة التحكم'}
               </strong>
 
-              <small>
-                ELNUBY Construction • HR
-                Management
-              </small>
+              <small>{roleLabels[me.user?.role] || me.user?.role}</small>
             </div>
           </div>
 
@@ -1022,13 +1018,7 @@ export default function Home() {
               )}
             </span>
 
-            <div className="avatar top-avatar">
-              {(
-                me.employee?.name ||
-                me.user?.username ||
-                'U'
-              ).slice(0, 1)}
-            </div>
+            <details className="profile-menu"><summary className="avatar top-avatar" aria-label="قائمة الحساب">{(me.employee?.name||me.user?.username||'U').slice(0,1)}</summary><div className="profile-menu-card"><strong>{me.employee?.name||me.user?.username}</strong><span>{roleLabels[me.user?.role]||me.user?.role}</span><button className="secondary" onClick={async()=>{try{await api('logout')}finally{setMe(null);setSidebar(false);setSection('dashboard')}}}>تسجيل الخروج</button></div></details>
           </div>
         </header>
 
@@ -1083,7 +1073,7 @@ export default function Home() {
               assignProject={assignProject}
               busy={busy}
             
-              onEdit={updateEmployeeRecord}/>
+              onEdit={['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? updateEmployeeRecord : undefined}/>
           )}
 
           {section === 'shifts' && (
@@ -1096,7 +1086,7 @@ export default function Home() {
               createShift={createShift}
               busy={busy}
             
-              onEdit={updateShiftRecord}/>
+              onEdit={['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? updateShiftRecord : undefined}/>
           )}
 
           {section === 'projects' && (
@@ -1111,7 +1101,7 @@ export default function Home() {
               createProject={createProject}
               busy={busy}
             
-              onEdit={updateProjectRecord}/>
+              onEdit={['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? updateProjectRecord : undefined}/>
           )}
 
           {section === 'attendance' && (
@@ -1120,6 +1110,8 @@ export default function Home() {
               subtitle="متابعة الحضور وتعديلات السجلات"
               rows={rows}
               type="attendance"
+              onCloseAttendance={['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? closeAttendanceRecord : undefined}
+              busy={busy}
             />
           )}
 

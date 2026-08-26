@@ -175,22 +175,7 @@ export default function Users({
           {newRole === 'SECTOR_MANAGER' && (
             <label className="field-stack">
               <span>المشروعات التابعة لمدير القطاع *</span>
-              <select
-                multiple
-                value={selectedSectorProjects}
-                onChange={(e) =>
-                  setSelectedSectorProjects(
-                    Array.from(e.target.selectedOptions).map((o) => o.value),
-                  )
-                }
-                style={{ minHeight: 140 }}
-              >
-                {projects.map((p: Project) => (
-                  <option key={p.project_id} value={p.project_id}>
-                    {p.name} — {p.project_id}
-                  </option>
-                ))}
-              </select>
+              <div className="project-checklist">{projects.map((p: Project) => { const checked=selectedSectorProjects.includes(p.project_id); return <label key={p.project_id} className={checked?'checked':''}><input type="checkbox" checked={checked} onChange={()=>setSelectedSectorProjects(checked?selectedSectorProjects.filter((id:string)=>id!==p.project_id):[...selectedSectorProjects,p.project_id])}/><span>{p.name}</span></label>; })}{!projects.length&&<span className="empty-note">لا توجد مشروعات متاحة.</span>}</div>
             </label>
           )}
 
@@ -335,16 +320,7 @@ export default function Users({
               </option>
             ))}
           </select>
-          <select
-            multiple
-            value={selectedSectorProjects}
-            onChange={(e) => setSelectedSectorProjects(Array.from(e.target.selectedOptions).map((o) => o.value))}
-            style={{ minHeight: 140 }}
-          >
-            {projects.map((p: Project) => (
-              <option key={p.project_id} value={p.project_id}>{p.name} — {p.project_id}</option>
-            ))}
-          </select>
+          <div className="project-checklist">{projects.map((p: Project) => { const checked=selectedSectorProjects.includes(p.project_id); return <label key={p.project_id} className={checked?'checked':''}><input type="checkbox" checked={checked} onChange={()=>setSelectedSectorProjects(checked?selectedSectorProjects.filter((id:string)=>id!==p.project_id):[...selectedSectorProjects,p.project_id])}/><span>{p.name}</span></label>; })}{!projects.length&&<span className="empty-note">لا توجد مشروعات متاحة.</span>}</div>
         </div>
         <button
           className="secondary"

@@ -1,5 +1,6 @@
 import type { Shift, Row } from './types';
-import { Table } from './common';
+function time12(v?: string){if(!v)return '—';const [h,m]=String(v).slice(0,5).split(':').map(Number);if(!Number.isFinite(h))return v;const ap=h>=12?'م':'ص';const hh=(h%12)||12;return `${hh}:${String(m||0).padStart(2,'0')} ${ap}`;}
+import { Table, Badge } from './common';
 export default function Shifts({
   shifts,
   rows,
@@ -176,12 +177,13 @@ export default function Shifts({
         ]}
         rows={shifts.map((s) => [
           s.name,
-          s.start_time,
-          s.attendance_open,
-          s.attendance_close,
-          s.checkout_open,
-          s.checkout_close,
-          s.auto_checkout_time,
+          time12(s.start_time),
+          time12(s.attendance_open),
+          time12(s.attendance_close),
+          time12(s.checkout_open),
+          time12(s.checkout_close),
+          time12(s.auto_checkout_time),
+          <><Badge status={s.status || 'ACTIVE'} /> {onEdit && <button className="table-action" onClick={() => onEdit(s.shift_id)} disabled={busy}>تعديل</button>}</>,
         ])}
       />
 

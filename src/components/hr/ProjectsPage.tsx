@@ -1,6 +1,6 @@
 import Icon from './Icon';
 import type { Project, Employee } from './types';
-import { Empty } from './common';
+import { Empty, Badge } from './common';
 export default function Projects({
   projects,
   employees,
@@ -42,89 +42,13 @@ export default function Projects({
             إضافة مشروع جديد
           </h3>
 
-          <div className="formgrid">
-            <input
-              placeholder="اسم المشروع *"
-              value={projectForm.name}
-              onChange={(e) =>
-                setProjectForm({
-                  ...projectForm,
-                  name: e.target.value,
-                })
-              }
-            />
-
-            <input
-              placeholder="العميل"
-              value={projectForm.client}
-              onChange={(e) =>
-                setProjectForm({
-                  ...projectForm,
-                  client: e.target.value,
-                })
-              }
-            />
-
-            <input
-              placeholder="اسم الموقع"
-              value={
-                projectForm.location_name
-              }
-              onChange={(e) =>
-                setProjectForm({
-                  ...projectForm,
-                  location_name:
-                    e.target.value,
-                })
-              }
-            />
-
-            <input
-              type="number"
-              step="any"
-              placeholder="Latitude *"
-              value={
-                projectForm.latitude
-              }
-              onChange={(e) =>
-                setProjectForm({
-                  ...projectForm,
-                  latitude:
-                    e.target.value,
-                })
-              }
-            />
-
-            <input
-              type="number"
-              step="any"
-              placeholder="Longitude *"
-              value={
-                projectForm.longitude
-              }
-              onChange={(e) =>
-                setProjectForm({
-                  ...projectForm,
-                  longitude:
-                    e.target.value,
-                })
-              }
-            />
-
-            <input
-              type="number"
-              placeholder="نطاق GPS بالمتر"
-              value={
-                projectForm.geofence_radius_m
-              }
-              onChange={(e) =>
-                setProjectForm({
-                  ...projectForm,
-                  geofence_radius_m:
-                    e.target.value,
-                })
-              }
-            />
+          <div className="formgrid project-formgrid">
+            <label><span>اسم المشروع *</span><input value={projectForm.name} onChange={(e)=>setProjectForm({...projectForm,name:e.target.value})}/></label>
+            <label><span>العميل</span><input value={projectForm.client} onChange={(e)=>setProjectForm({...projectForm,client:e.target.value})}/></label>
+            <label><span>اسم الموقع</span><input value={projectForm.location_name} onChange={(e)=>setProjectForm({...projectForm,location_name:e.target.value})}/></label>
+            <label><span>نطاق الحضور (متر)</span><input type="number" min="50" value={projectForm.geofence_radius_m ?? 200} onChange={(e)=>setProjectForm({...projectForm,geofence_radius_m:e.target.value})}/></label>
+            <label><span>خط العرض (Latitude) *</span><input type="number" step="any" value={projectForm.latitude} onChange={(e)=>setProjectForm({...projectForm,latitude:e.target.value})}/></label>
+            <label><span>خط الطول (Longitude) *</span><input type="number" step="any" value={projectForm.longitude} onChange={(e)=>setProjectForm({...projectForm,longitude:e.target.value})}/></label>
           </div>
 
           <button
@@ -172,10 +96,7 @@ export default function Projects({
                 </p>
 
                 <div className="project-meta">
-                  <span>
-                    {p.status ||
-                      'ACTIVE'}
-                  </span>
+                  <Badge status={p.status || 'ACTIVE'} />
 
                   <span>
                     👷 {p.employee_count ?? assigned.length}{' '}

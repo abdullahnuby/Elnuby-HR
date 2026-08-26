@@ -1,5 +1,5 @@
 import type { Employee, Project, Shift } from './types';
-import { Table, Empty } from './common';
+import { Table, Empty, Badge } from './common';
 export default function Employees({
   employees,
   projects,
@@ -65,7 +65,7 @@ export default function Employees({
 
           <div className="formgrid">
             <input
-              placeholder="الاسم بالكامل *"
+              aria-label="الاسم بالكامل" placeholder="الاسم بالكامل *"
               value={employeeForm.name}
               onChange={(e) =>
                 setEmployeeForm({
@@ -76,7 +76,7 @@ export default function Employees({
             />
 
             <input
-              placeholder="الوظيفة *"
+              aria-label="الوظيفة" placeholder="الوظيفة *"
               value={
                 employeeForm.job_title
               }
@@ -90,7 +90,7 @@ export default function Employees({
             />
 
             <input
-              placeholder="القسم"
+              aria-label="القسم" placeholder="القسم"
               value={
                 employeeForm.department
               }
@@ -104,7 +104,7 @@ export default function Employees({
             />
 
             <input
-              placeholder="رقم الهاتف"
+              aria-label="رقم الهاتف" placeholder="رقم الهاتف"
               value={employeeForm.phone}
               onChange={(e) =>
                 setEmployeeForm({
@@ -115,7 +115,7 @@ export default function Employees({
             />
 
             <input
-              placeholder="الرقم القومي"
+              aria-label="الرقم القومي" placeholder="الرقم القومي"
               value={
                 employeeForm.national_id
               }
@@ -179,7 +179,7 @@ export default function Employees({
                   key={p.project_id}
                   value={p.project_id}
                 >
-                  {p.name} — {p.project_id}
+                  {p.name}
                 </option>
               ))}
             </select>
@@ -345,7 +345,8 @@ export default function Employees({
             '—',
           e.checkout_open ||
             '—',
-          e.status || 'ACTIVE',
+          <Badge status={e.status || 'ACTIVE'} />,
+          onEdit ? <button className="table-action" onClick={() => onEdit(e.employee_id)} disabled={busy}>تعديل</button> : null,
         ])}
       />
 

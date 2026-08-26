@@ -299,11 +299,11 @@ export default function SystemAdminPanel() {
         <section style={{ border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden', background: '#fff' }}>
           <div style={{ padding: '15px 17px', background: '#f8faff', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between' }}>
             <div><strong>{config.label}</strong><div style={{ fontSize: 10, color: '#8290a4', marginTop: 4 }}>{filteredRows.length} نتيجة</div></div>
-            <span style={{ fontSize: 10, color: '#8290a4' }}>المفتاح: {idColumn}</span>
+            <span style={{ fontSize: 10, color: '#8290a4' }}>اختر سجلًا لعرض تفاصيله</span>
           </div>
           <div style={{ overflowX: 'auto', maxHeight: 560 }}>
             <table className="data-table">
-              <thead><tr><th>المعرف</th><th>البيانات الأساسية</th><th>الحالة</th><th>إجراء</th></tr></thead>
+              <thead><tr><th>السجل</th><th>البيانات الأساسية</th><th>الحالة</th><th>إجراء</th></tr></thead>
               <tbody>
                 {filteredRows.length === 0 ? (
                   <tr><td colSpan={4} style={{ textAlign: 'center', padding: 40 }}>{busy ? 'جاري التحميل...' : 'لا توجد سجلات'}</td></tr>
@@ -312,7 +312,7 @@ export default function SystemAdminPanel() {
                   const summary = fields.slice(0, 3).map((field) => `${field.label}: ${displayValue(row[field.key])}`).join(' • ');
                   return (
                     <tr key={`${id}-${index}`} style={{ background: selected === row ? '#f5f9ff' : undefined }}>
-                      <td style={{ fontWeight: 800, color: 'var(--blue)' }}>{id || '—'}</td>
+                      <td><button type="button" className="table-action" onClick={() => selectRow(row)} disabled={busy}>فتح السجل</button></td>
                       <td style={{ whiteSpace: 'normal', minWidth: 260 }}>{summary || Object.entries(row).filter(([k]) => k !== 'password_hash').slice(0, 3).map(([k,v]) => `${k}: ${displayValue(v)}`).join(' • ')}</td>
                       <td>{row.status ? <span className="live">{String(row.status)}</span> : '—'}</td>
                       <td><button type="button" className="secondary" onClick={() => selectRow(row)} disabled={busy}>فتح</button></td>
@@ -326,9 +326,9 @@ export default function SystemAdminPanel() {
 
         <section style={{ border: '1px solid var(--line)', borderRadius: 14, padding: 17, background: '#fff', position: 'sticky', top: 90 }}>
           <div style={{ marginBottom: 15 }}>
-            <div className="eyebrow">RECORD EDITOR</div>
+            <div className="eyebrow">إدارة البيانات</div>
             <h3 style={{ margin: '5px 0', fontSize: 17 }}>{selected ? 'تعديل السجل' : 'سجل جديد'}</h3>
-            <p style={{ margin: 0, color: '#8290a4', fontSize: 10 }}>{selected ? `تعديل ${idColumn}: ${String(selected[idColumn] ?? '—')}` : `إضافة سجل إلى ${config.label}`}</p>
+            <p style={{ margin: 0, color: '#8290a4', fontSize: 10 }}>{selected ? `تعديل بيانات ${config.label}` : `إضافة سجل جديد إلى ${config.label}`}</p>
           </div>
 
           {fields.length > 0 ? (
@@ -346,13 +346,7 @@ export default function SystemAdminPanel() {
                 </label>
               ))}
             </div>
-          ) : <div className="empty-note">لا يوجد نموذج مخصص لهذا الجدول. استخدم الوضع المتقدم.</div>}
-
-          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
-            <button type="button" className="secondary" onClick={() => setAdvanced((v) => !v)} disabled={busy}>{advanced ? 'إخفاء الوضع المتقدم' : 'بيانات متقدمة JSON'}</button>
-            {advanced && <textarea value={advancedJson} onChange={(e) => setAdvancedJson(e.target.value)} rows={8} spellCheck={false} style={{ width: '100%', marginTop: 8, direction: 'ltr', fontFamily: 'monospace', border: '1px solid #dbe2ec', borderRadius: 10, padding: 10 }} />}
-          </div>
-
+          ) : <div className="empty-note">لا يوجد نموذج مخصص لهذا القسم حالياً. اختر قسمًا مدعومًا أو تواصل مع مسؤول النظام.</div>}
           <div className="panel-actions" style={{ marginTop: 14 }}>
             <button type="button" className="primary" onClick={() => void save()} disabled={busy}>{busy ? 'جاري الحفظ...' : selected ? 'حفظ التعديلات' : 'إضافة السجل'}</button>
             {selected && <button type="button" className="secondary" onClick={() => void remove()} disabled={busy}>{table === 'shifts' ? 'تعطيل الوردية' : 'حذف'}</button>}

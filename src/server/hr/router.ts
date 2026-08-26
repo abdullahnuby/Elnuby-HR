@@ -6,7 +6,7 @@ import { listEmployees, createEmployee, updateEmployee } from "./employees";
 import { listProjects, createProject, updateProject } from "./projects";
 import { listShifts, createShift, updateShift } from "./shifts";
 import { listEmployeeShifts, assignEmployeeShift, assignEmployeeProject, assignManagerProject } from "./assignments";
-import { attendanceList, attendanceAction } from "./attendance";
+import { attendanceList, attendanceAction , closeAttendance} from "./attendance";
 import { leaveList, createLeave, decideLeaveManager, decideLeaveHR } from "./leaves";
 import { permissionList, createPermission, decidePermission } from "./permissions";
 import { listDeductions, listUsers, createUser, updateUser, deleteUser, assignSectorManagerProjects, adminList, adminInsert, adminUpdate, adminDelete } from "./users";
@@ -329,6 +329,12 @@ export async function handleAction(
     }
 
     /* LEAVES */
+
+    case "close_attendance": {
+      const auth = requireRole(session, ADMIN_ROLES);
+      if (auth) return auth;
+      return closeAttendance(session!, body);
+    }
 
     case "leave_list": {
       const auth =
