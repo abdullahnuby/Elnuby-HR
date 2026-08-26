@@ -8,6 +8,8 @@ type ManagerDashboardProps = {
   managerDash: any;
   roleLabels: Record<string, string>;
   setSection: (section: string) => void;
+  locate?: (action: string) => void;
+  busy?: boolean;
 };
 
 const STATE_META: Record<string, { label: string; tone: string; icon: string }> = {
@@ -42,7 +44,7 @@ function timeValue(value: any) {
   return raw;
 }
 
-export default function ManagerDashboard({ me, managerDash, setSection }: ManagerDashboardProps) {
+export default function ManagerDashboard({ me, managerDash, setSection, locate, busy }: ManagerDashboardProps) {
   const summary = managerDash?.summary || {};
   const projects = Array.isArray(managerDash?.projects) ? managerDash.projects : [];
   const team = Array.isArray(managerDash?.team) ? managerDash.team : [];
@@ -109,8 +111,16 @@ export default function ManagerDashboard({ me, managerDash, setSection }: Manage
             state={selfAttendance?.check_out ? 'PRESENT' : selfAttendance?.check_in ? 'CHECKED_IN' : undefined}
             label={selfAttendance?.check_out ? 'اليوم مكتمل' : selfAttendance?.check_in ? 'تم تسجيل الحضور' : 'لم يتم التسجيل'}
           />
-          <button className="pm-attendance-button" onClick={() => setSection('attendance')}>
-            {selfAttendance?.check_in && !selfAttendance?.check_out ? 'تسجيل الانصراف' : selfAttendance?.check_out ? 'فتح سجل اليوم' : 'تسجيل الحضور'}
+          <button
+            className="pm-attendance-button"
+            disabled={busy}
+            onClick={() => {
+              if (selfAttendance?.check_out) setSection('attendance');
+              else if (locate) locate(selfAttendance?.check_in ? 'check_out' : 'check_in');
+              else setSection('attendance');
+            }}
+          >
+            {busy ? 'جاري التحقق...' : selfAttendance?.check_in && !selfAttendance?.check_out ? 'تسجيل الانصراف' : selfAttendance?.check_out ? 'فتح سجل اليوم' : 'تسجيل الحضور'}
             <Icon name="check" size={16} />
           </button>
         </div>

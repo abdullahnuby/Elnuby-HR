@@ -82,27 +82,20 @@ export async function getDashboard(
   const rows =
     attendance || [];
 
+  const selfAttendance = session.user.employee_id
+    ? rows.find(
+        (row: any) =>
+          String(row.employee_id) === String(session.user.employee_id)
+      ) || null
+    : null;
+
   return success({
-    employees:
-      employeeIds.length,
-
-    present:
-      rows.length,
-
-    late:
-      rows.filter(
-        (row: any) =>
-          row.status === "LATE"
-      ).length,
-
-    missingCheckout:
-      rows.filter(
-        (row: any) =>
-          !row.check_out
-      ).length,
-
-    serverTime:
-      nowISO(),
+    employees: employeeIds.length,
+    present: rows.length,
+    late: rows.filter((row: any) => row.status === "LATE").length,
+    missingCheckout: rows.filter((row: any) => row.check_in && !row.check_out).length,
+    selfAttendance,
+    serverTime: nowISO(),
   });
 }
 

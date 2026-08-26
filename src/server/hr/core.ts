@@ -61,6 +61,7 @@ export const PROJECT_VIEW_ROLES = [
   "HR_MANAGER",
   "SECTOR_MANAGER",
   "PROJECT_MANAGER",
+  "EMPLOYEE",
 ];
 
 export const PROJECT_MANAGE_ROLES = [
