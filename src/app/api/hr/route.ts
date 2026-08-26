@@ -30,14 +30,31 @@ export async function POST(request: Request) {
       if (!session) return errorResponse("الجلسة غير صالحة أو منتهية", 401);
     }
 
-    const response = await handleAction(action, body, session);
-    if (session && AUDITED_ACTIONS.has(action)) {
-      const safeDetails = Object.fromEntries(
-        Object.entries(body).filter(([key]) => !["password", "token"].includes(key))
-      );
-      await writeAudit(session.user.user_id, action, "api", action, safeDetails, response.status < 400);
-    }
-    return response;
+const result = await handleAction(action, body, session);
+
+const response =
+  result instanceof Response
+    ? result
+    : Response.json(result);
+
+if (session && AUDITED_ACTIONS.has(action)) {
+  const safeDetails = Object.fromEntries(
+    Object.entries(body).filter(
+      ([key]) => !["password", "token"].includes(key)
+    )
+  );
+
+  await writeAudit(
+    session.user.user_id,
+    action,
+    "api",
+    action,
+    safeDetails,
+    response.status < 400
+  );
+}
+
+return response;
   } catch (error) {
     console.error("ELNUBY HR API ERROR:", error);
     return errorResponse("حدث خطأ داخلي في الخادم", 500);
