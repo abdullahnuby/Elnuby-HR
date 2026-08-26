@@ -8,6 +8,7 @@ export default function Shifts({
   setShiftForm,
   createShift,
   busy,
+  onEdit,
 }: {
   shifts: Shift[];
   rows: Row[];
@@ -16,6 +17,7 @@ export default function Shifts({
   setShiftForm: any;
   createShift: () => void;
   busy: boolean;
+  onEdit?: (shiftId: string) => void;
 }) {
   return (
     <section className="panel page-panel">
@@ -170,7 +172,7 @@ export default function Shifts({
           'إغلاق الحضور',
           'فتح الانصراف',
           'إغلاق الانصراف',
-          'Auto Checkout',
+          'Auto Checkout','إجراء',
         ]}
         rows={shifts.map((s) => [
           s.name,

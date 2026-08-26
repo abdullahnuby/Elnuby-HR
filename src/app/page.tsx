@@ -405,7 +405,7 @@ export default function Home() {
     try {
       setDash(await api('dashboard'));
 
-      if (me?.user?.role === 'PROJECT_MANAGER') {
+      if (['PROJECT_MANAGER', 'SECTOR_MANAGER'].includes(me?.user?.role)) {
         setManagerDash(
           await api('project_manager_dashboard'),
         );
@@ -716,6 +716,25 @@ export default function Home() {
       setBusy(false);
     }
   }
+
+  async function updateEmployeeRecord(employeeId: string) {
+    const current = employees.find(e => e.employee_id === employeeId); if (!current) return;
+    const name=window.prompt('اسم الموظف',current.name||''); if(name===null)return; const job_title=window.prompt('الوظيفة',current.job_title||''); if(job_title===null)return; const phone=window.prompt('رقم الهاتف',current.phone||''); if(phone===null)return; const status=window.prompt('الحالة ACTIVE / INACTIVE',current.status||'ACTIVE'); if(status===null)return;
+    try{setBusy(true);await api('update_employee',{employee_id:employeeId,name,job_title,phone,status:status.toUpperCase()});setNotice('تم تعديل بيانات الموظف');setEmployees(await api('employees'));}catch(e:any){setError(e.message)}finally{setBusy(false)}
+  }
+
+  async function updateProjectRecord(projectId: string) {
+    const current=projects.find(p=>p.project_id===projectId);if(!current)return; const name=window.prompt('اسم المشروع',current.name||'');if(name===null)return;const client=window.prompt('العميل',current.client||'');if(client===null)return;const location_name=window.prompt('اسم الموقع',current.location_name||'');if(location_name===null)return;const radius=window.prompt('نطاق GPS بالمتر',String(current.geofence_radius_m??200));if(radius===null)return;
+    try{setBusy(true);await api('update_project',{project_id:projectId,name,client,location_name,geofence_radius_m:Number(radius)});setNotice('تم تعديل المشروع');setProjects(await api('projects'));}catch(e:any){setError(e.message)}finally{setBusy(false)}
+  }
+
+  async function updateShiftRecord(shiftId: string) {
+    const current=shifts.find(s=>s.shift_id===shiftId);if(!current)return; const fields=['name','start_time','attendance_open','attendance_close','checkout_open','checkout_close','auto_checkout_time']; const values:any={}; for(const f of fields){const v=window.prompt(f,current[f as keyof typeof current] as string||'');if(v===null)return;values[f]=v;}
+    try{setBusy(true);await api('update_shift',{shift_id:shiftId,...values});setNotice('تم تعديل الوردية');setShifts(await api('shifts'));}catch(e:any){setError(e.message)}finally{setBusy(false)}
+  }
+
+  async function toggleUser(userId:string,status:string){try{setBusy(true);if(status==='ACTIVE')await api('delete_user',{user_id:userId});else await api('update_user',{user_id:userId,status:'ACTIVE'});setNotice(status==='ACTIVE'?'تم تعطيل الحساب':'تم تفعيل الحساب');setUsers(await api('users'));}catch(e:any){setError(e.message)}finally{setBusy(false)}}
+  async function resetUserPassword(userId:string){const password=window.prompt('كلمة المرور الجديدة');if(password===null)return;try{setBusy(true);await api('update_user',{user_id:userId,password});setNotice('تم تغيير كلمة المرور');}catch(e:any){setError(e.message)}finally{setBusy(false)}}
 
   async function createLeave() {
     setBusy(true);
@@ -1049,7 +1068,8 @@ export default function Home() {
               }
               assignProject={assignProject}
               busy={busy}
-            />
+            
+              onEdit={updateEmployeeRecord}/>
           )}
 
           {section === 'shifts' && (
@@ -1061,7 +1081,8 @@ export default function Home() {
               setShiftForm={setShiftForm}
               createShift={createShift}
               busy={busy}
-            />
+            
+              onEdit={updateShiftRecord}/>
           )}
 
           {section === 'projects' && (
@@ -1075,7 +1096,8 @@ export default function Home() {
               }
               createProject={createProject}
               busy={busy}
-            />
+            
+              onEdit={updateProjectRecord}/>
           )}
 
           {section === 'attendance' && (
@@ -1091,9 +1113,7 @@ export default function Home() {
             <LeaveSection
               rows={rows}
               role={me.user?.role}
-              employeeMode={
-                me.user?.role === 'EMPLOYEE'
-              }
+              employeeMode={['EMPLOYEE', 'PROJECT_MANAGER'].includes(me.user?.role)}
               leaveType={leaveType}
               setLeaveType={setLeaveType}
               leaveFrom={leaveFrom}
@@ -1110,9 +1130,7 @@ export default function Home() {
           {section === 'permissions' && (
             <PermissionSection
               rows={rows}
-              employeeMode={
-                me.user?.role === 'EMPLOYEE'
-              }
+              employeeMode={['EMPLOYEE', 'PROJECT_MANAGER'].includes(me.user?.role)}
               permissionType={
                 permissionType
               }
@@ -1201,7 +1219,9 @@ export default function Home() {
               onRefresh={() =>
                 refreshSection('users')
               }
-            />
+            
+              onToggleUser={toggleUser}
+              onResetPassword={resetUserPassword}/>
           )}
 
           {section === 'reports' && (

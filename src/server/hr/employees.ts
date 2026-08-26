@@ -1,4 +1,4 @@
-import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, riyadhDate, riyadhTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift } from "./core";
+import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, riyadhDate, riyadhTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift, writeAudit } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
 export async function listEmployees(
@@ -519,3 +519,13 @@ export async function createEmployee(
    PROJECTS
 ========================================================= */
 
+
+
+export async function updateEmployee(session: SessionContext, body: Record<string, unknown>) {
+  const employeeId=String(body.employee_id||'').trim(); if(!employeeId) return errorResponse('رقم الموظف مطلوب');
+  const changes:Record<string,unknown>={}; for(const k of ['name','job_title','department','phone','national_id','birth_date','hire_date','status']) if(body[k]!==undefined) changes[k]=body[k]===''?null:body[k];
+  if(!Object.keys(changes).length) return errorResponse('لا توجد بيانات للتعديل');
+  const {data,error}=await supabase.from('employees').update({...changes,updated_at:nowISO()}).eq('employee_id',employeeId).select('*').maybeSingle();
+  if(error) return errorResponse(error.message,500); if(!data) return errorResponse('الموظف غير موجود',404);
+  await writeAudit(session.user.user_id,'update_employee','employees',employeeId,{changes}); return success(data);
+}

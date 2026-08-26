@@ -6,11 +6,9 @@ import { SESSION_COOKIE } from "@/server/hr/auth";
 export const runtime = "nodejs";
 
 const AUDITED_ACTIONS = new Set([
-  "check_in", "check_out", "create_employee", "create_project", "create_shift",
-  "assign_employee_project", "assign_employee_shift", "assign_manager_project",
-  "create_user", "create_leave", "decide_leave_manager", "decide_leave_hr",
-  "create_permission", "decide_permission", "create_deduction", "update_employee",
-  "update_project", "update_shift", "update_user", "delete_user",
+  "check_in","check_out","create_employee","update_employee","create_project","update_project","create_shift","update_shift",
+  "assign_employee_project","assign_employee_shift","assign_manager_project","assign_sector_manager_projects",
+  "create_user","update_user","delete_user","create_leave","decide_leave_manager","decide_leave_hr","create_permission","decide_permission","create_deduction",
 ]);
 
 export async function GET() {

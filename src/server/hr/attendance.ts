@@ -1,5 +1,5 @@
 import { parsePagination } from "./core";
-import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, riyadhDate, riyadhTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift } from "./core";
+import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, riyadhDate, previousRiyadhDate, riyadhTime, timeToMinutes, minutesBetween, isTimeWithinWindow, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
 export async function attendanceList(
@@ -203,25 +203,10 @@ export async function attendanceAction(
     );
   }
 
-  const today =
-    riyadhDate();
-
-  const currentTime =
-    riyadhTime();
-
-  const { data: existing } =
-    await supabase
-      .from("attendance")
-      .select("*")
-      .eq(
-        "employee_id",
-        employeeId
-      )
-      .eq(
-        "date",
-        today
-      )
-      .maybeSingle();
+  const today=riyadhDate(); const currentTime=riyadhTime();
+  const overnightAttendance=timeToMinutes(String(shift.attendance_close))<timeToMinutes(String(shift.attendance_open));
+  const attendanceDate=overnightAttendance&&timeToMinutes(currentTime)<timeToMinutes(String(shift.attendance_open))?previousRiyadhDate(today):today;
+  const {data:existing}=await supabase.from("attendance").select("*").eq("employee_id",employeeId).eq("date",attendanceDate).maybeSingle();
 
   /* ======================
      CHECK IN
@@ -253,10 +238,7 @@ export async function attendanceAction(
         shift.attendance_close
       );
 
-    if (
-      current < open ||
-      current > close
-    ) {
+    if (!isTimeWithinWindow(currentTime, shift.attendance_open, shift.attendance_close)) {
       return errorResponse(
         "الحضور غير متاح في هذا الوقت"
       );
@@ -267,17 +249,10 @@ export async function attendanceAction(
         shift.start_time
       );
 
-    const isLate =
-      current > shiftStart;
-
-    const lateMinutes =
-      isLate
-        ? Math.max(
-            0,
-            current -
-              shiftStart
-          )
-        : 0;
+    const overnightShift = timeToMinutes(String(shift.attendance_close)) < timeToMinutes(String(shift.attendance_open));
+    const logicalCurrent = overnightShift && current < shiftStart ? current + 1440 : current;
+    const isLate = logicalCurrent > shiftStart;
+    const lateMinutes = isLate ? Math.max(0, logicalCurrent - shiftStart) : 0;
 
     const { data, error } =
       await supabase
@@ -292,7 +267,7 @@ export async function attendanceAction(
           shift_id:
             employeeShift.shift_id,
           date:
-            today,
+            attendanceDate,
           check_in:
             currentTime,
           check_in_lat:
@@ -363,10 +338,7 @@ export async function attendanceAction(
       shift.checkout_close
     );
 
-  if (
-    current < open ||
-    current > close
-  ) {
+  if (!isTimeWithinWindow(currentTime, shift.checkout_open, shift.checkout_close)) {
     return errorResponse(
       "الانصراف غير متاح في هذا الوقت"
     );
@@ -431,14 +403,10 @@ export async function attendanceAction(
 ========================================================= */
 
 export async function autoCheckoutOpenAttendance() {
-  const today = riyadhDate();
-  const currentTime = riyadhTime();
-  const currentMinutes = timeToMinutes(currentTime);
-
-  const { data: rows, error } = await supabase
-    .from("attendance")
-    .select("attendance_id,employee_id,check_in,check_out,date,auto_closed,shift_id,shifts(auto_checkout_time)")
-    .eq("date", today)
+  const today=riyadhDate(); const previousDate=previousRiyadhDate(today); const currentTime=riyadhTime(); const currentMinutes=timeToMinutes(currentTime);
+  const {data:rows,error}=await supabase.from("attendance")
+    .select("attendance_id,employee_id,check_in,check_out,date,auto_closed,shift_id,shifts(auto_checkout_time,attendance_open,attendance_close)")
+    .in("date",[today,previousDate])
     .not("check_in", "is", null)
     .is("check_out", null)
     .eq("auto_closed", false);
@@ -451,8 +419,7 @@ export async function autoCheckoutOpenAttendance() {
   let closed = 0;
   for (const row of rows || []) {
     const autoTime = (row as any).shifts?.auto_checkout_time;
-    const autoMinutes = timeToMinutes(autoTime);
-    if (!autoTime || currentMinutes < autoMinutes) continue;
+    const autoMinutes=timeToMinutes(autoTime); if(!autoTime) continue; const rs=(row as any).shifts||{}; const overnight=timeToMinutes(String(rs.attendance_close||'00:00'))<timeToMinutes(String(rs.attendance_open||'23:59')); const eligible=overnight&&String(row.date)===previousDate?(currentMinutes<=autoMinutes||currentMinutes>=timeToMinutes(String(rs.attendance_open||'23:59'))):currentMinutes>=autoMinutes; if(!eligible) continue;
 
     const workedMinutes = minutesBetween(String(row.check_in), String(autoTime));
     const { error: updateError } = await supabase

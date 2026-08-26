@@ -28,6 +28,8 @@ export default function Users({
   createAccount,
   busy,
   onRefresh,
+  onToggleUser,
+  onResetPassword,
 }: any) {
   return (
     <section className="panel page-panel">
@@ -362,7 +364,7 @@ export default function Users({
           'الموظف',
           'المشروع',
           'الحالة',
-          'آخر دخول',
+          'آخر دخول','إجراء',
         ]}
         rows={users.map((u: User) => {
           const mp = projects.find(
@@ -382,6 +384,7 @@ export default function Users({
             mp?.name || '—',
             u.status,
             u.last_login || '—',
+            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}><button className="secondary" disabled={busy} onClick={() => onToggleUser?.(u.user_id,u.status)}>{u.status==='ACTIVE'?'تعطيل':'تفعيل'}</button><button className="secondary" disabled={busy} onClick={() => onResetPassword?.(u.user_id)}>تغيير كلمة المرور</button></div>,
           ];
         })}
       />

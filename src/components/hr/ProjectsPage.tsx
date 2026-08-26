@@ -8,6 +8,7 @@ export default function Projects({
   setProjectForm,
   createProject,
   busy,
+  onEdit,
 }: {
   projects: Project[];
   employees: Employee[];
@@ -16,6 +17,7 @@ export default function Projects({
   setProjectForm: any;
   createProject: () => void;
   busy: boolean;
+  onEdit?: (projectId: string) => void;
 }) {
   return (
     <section className="panel page-panel">
@@ -203,6 +205,8 @@ export default function Projects({
                     m
                   </span>
                 </div>
+
+                {onEdit && <button className="secondary" disabled={busy} onClick={() => onEdit(p.project_id)}>تعديل المشروع</button>}
 
                 <div className="project-workers">
                   {assigned

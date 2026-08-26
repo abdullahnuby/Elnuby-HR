@@ -142,29 +142,41 @@ export function nowISO() {
   return new Date().toISOString();
 }
 
-export function riyadhDate() {
+export const APP_TIMEZONE = process.env.APP_TIMEZONE || "Africa/Cairo";
+
+export function appDate() {
   return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Riyadh",
+    timeZone: APP_TIMEZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
 }
 
-export function previousRiyadhDate(date: string) {
+export function previousAppDate(date: string) {
   const [y, m, d] = date.split("-").map(Number);
   const value = new Date(Date.UTC(y, m - 1, d));
   value.setUTCDate(value.getUTCDate() - 1);
   return value.toISOString().slice(0, 10);
 }
 
-export function riyadhTime() {
+export function appTime() {
   return new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Riyadh",
+    timeZone: APP_TIMEZONE,
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
   }).format(new Date());
+}
+
+export const riyadhDate = appDate;
+export const previousRiyadhDate = previousAppDate;
+export const riyadhTime = appTime;
+
+export function isTimeWithinWindow(current: string, open: string, close: string) {
+  const c = timeToMinutes(current), o = timeToMinutes(open), cl = timeToMinutes(close);
+  if (o === cl) return true;
+  return cl > o ? c >= o && c <= cl : c >= o || c <= cl;
 }
 
 export function timeToMinutes(value: string | null | undefined) {

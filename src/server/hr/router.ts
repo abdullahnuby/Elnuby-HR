@@ -2,14 +2,14 @@ import { supabase, success, errorResponse, sha256, nowISO, requireAuth, requireR
 import type { SessionContext } from "./core";
 import { login, logout, getMe } from "./auth";
 import { getDashboard, getProjectManagerDashboard } from "./dashboard";
-import { listEmployees, createEmployee } from "./employees";
-import { listProjects, createProject } from "./projects";
-import { listShifts, createShift } from "./shifts";
+import { listEmployees, createEmployee, updateEmployee } from "./employees";
+import { listProjects, createProject, updateProject } from "./projects";
+import { listShifts, createShift, updateShift } from "./shifts";
 import { listEmployeeShifts, assignEmployeeShift, assignEmployeeProject, assignManagerProject } from "./assignments";
 import { attendanceList, attendanceAction } from "./attendance";
 import { leaveList, createLeave, decideLeaveManager, decideLeaveHR } from "./leaves";
 import { permissionList, createPermission, decidePermission } from "./permissions";
-import { listDeductions, listUsers, createUser, assignSectorManagerProjects, adminList, adminInsert, adminUpdate, adminDelete } from "./users";
+import { listDeductions, listUsers, createUser, updateUser, deleteUser, assignSectorManagerProjects, adminList, adminInsert, adminUpdate, adminDelete } from "./users";
 
 export async function handleAction(
   action: string,
@@ -82,6 +82,10 @@ export async function handleAction(
       return listUsers();
     }
 
+    case "update_user": { const auth = requireRole(session, ADMIN_ROLES); if (auth) return auth; return updateUser(session!, body); }
+
+    case "delete_user": { const auth = requireRole(session, ADMIN_ROLES); if (auth) return auth; return deleteUser(session!, body); }
+
     case "create_user": {
       const auth =
         requireRole(
@@ -140,6 +144,8 @@ export async function handleAction(
       );
     }
 
+    case "update_employee": { const auth = requireRole(session, ADMIN_ROLES); if (auth) return auth; return updateEmployee(session!, body); }
+
     case "create_employee": {
       const auth =
         requireRole(
@@ -172,6 +178,8 @@ export async function handleAction(
       );
     }
 
+    case "update_project": { const auth = requireRole(session, ADMIN_ROLES); if (auth) return auth; return updateProject(session!, body); }
+
     case "create_project": {
       const auth =
         requireRole(
@@ -199,6 +207,8 @@ export async function handleAction(
 
       return listShifts(body);
     }
+
+    case "update_shift": { const auth = requireRole(session, ADMIN_ROLES); if (auth) return auth; return updateShift(session!, body); }
 
     case "create_shift": {
       const auth =
@@ -369,7 +379,7 @@ export async function handleAction(
       const auth =
         requireRole(
           session,
-          MANAGEMENT_ROLES
+          ADMIN_ROLES
         );
 
       if (auth) return auth;

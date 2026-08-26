@@ -1,4 +1,4 @@
-import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, riyadhDate, riyadhTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift } from "./core";
+import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, riyadhDate, riyadhTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift, writeAudit } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
 export async function listProjects(
@@ -242,3 +242,11 @@ export async function createProject(
    SHIFTS
 ========================================================= */
 
+
+
+export async function updateProject(session: SessionContext, body: Record<string, unknown>) {
+  const projectId=String(body.project_id||'').trim(); if(!projectId) return errorResponse('رقم المشروع مطلوب'); const changes:Record<string,unknown>={};
+  for(const k of ['name','client','location_name','latitude','longitude','geofence_radius_m','status']) if(body[k]!==undefined) changes[k]=['latitude','longitude','geofence_radius_m'].includes(k)?(body[k]===''||body[k]==null?null:Number(body[k])):(body[k]===''?null:body[k]);
+  if(!Object.keys(changes).length) return errorResponse('لا توجد بيانات للتعديل'); const {data,error}=await supabase.from('projects').update(changes).eq('project_id',projectId).select('*').maybeSingle();
+  if(error) return errorResponse(error.message,500); if(!data) return errorResponse('المشروع غير موجود',404); await writeAudit(session.user.user_id,'update_project','projects',projectId,{changes}); return success(data);
+}

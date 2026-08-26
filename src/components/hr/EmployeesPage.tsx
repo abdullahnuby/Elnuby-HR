@@ -16,6 +16,7 @@ export default function Employees({
   setSelectedShift,
   assignProject,
   busy,
+  onEdit,
 }: {
   employees: Employee[];
   projects: Project[];
@@ -32,6 +33,7 @@ export default function Employees({
   setSelectedShift: any;
   assignProject: () => void;
   busy: boolean;
+  onEdit?: (employeeId: string) => void;
 }) {
   return (
     <section className="panel page-panel">
@@ -328,7 +330,7 @@ export default function Employees({
           'بداية الوردية',
           'الحضور حتى',
           'الانصراف من',
-          'الحالة',
+          'الحالة','إجراء',
         ]}
         rows={employees.map((e) => [
           e.employee_id,

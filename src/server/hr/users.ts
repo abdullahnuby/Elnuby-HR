@@ -216,6 +216,11 @@ export async function createUser(
     );
   }
 
+  if (employeeId && status === "ACTIVE") {
+    const { data: activeUser } = await supabase.from("users").select("id,username").eq("employee_id",employeeId).eq("status","ACTIVE").limit(1).maybeSingle();
+    if (activeUser) return errorResponse(`الموظف لديه حساب نشط بالفعل: ${activeUser.username}`);
+  }
+
   if (employeeId) {
     const { data: employee } =
       await supabase
@@ -475,6 +480,18 @@ function validateAdminTable(value: unknown) {
   return ADMIN_MUTABLE_TABLES.has(table) ? table : null;
 }
 
+const ADMIN_ID_COLUMNS: Record<string,string> = {
+  employees: "employee_id", projects: "project_id", shifts: "shift_id", users: "id",
+  employee_shifts: "assignment_id", project_assignments: "assignment_id", project_managers: "id",
+  sector_manager_projects: "assignment_id", project_supervisors: "id", attendance: "attendance_id",
+  leave_types: "leave_type_id", leave_balances: "balance_id", leave_requests: "leave_id",
+  permission_requests: "permission_id", deductions: "id",
+};
+
+const BLOCKED_RELATION_COLUMNS = new Set([
+  "employee_id", "project_id", "shift_id", "user_id", "assignment_id",
+]);
+
 export async function adminList(
   _session: SessionContext,
   body: Record<string, unknown>,
@@ -513,10 +530,11 @@ export async function adminUpdate(
   const idColumn = String(body.id_column || "").trim();
   const id = String(body.id ?? "").trim();
   const changes = body.changes;
-  if (!table || !idColumn || !id || !changes || typeof changes !== "object" || Array.isArray(changes)) {
-    return errorResponse("بيانات التعديل غير صحيحة");
-  }
-  const { data, error } = await supabase.from(table).update(changes as Record<string, unknown>).eq(idColumn, id).select("*").maybeSingle();
+  if (!table || !idColumn || !id || !changes || typeof changes !== "object" || Array.isArray(changes)) return errorResponse("بيانات التعديل غير صحيحة");
+  if (ADMIN_ID_COLUMNS[table] !== idColumn) return errorResponse("معرف السجل غير مسموح لهذا الجدول");
+  const safeChanges = Object.fromEntries(Object.entries(changes as Record<string, unknown>).filter(([key]) => !BLOCKED_RELATION_COLUMNS.has(key) && key !== ADMIN_ID_COLUMNS[table]));
+  if (!Object.keys(safeChanges).length) return errorResponse("لا توجد حقول آمنة للتعديل");
+  const { data, error } = await supabase.from(table).update(safeChanges).eq(idColumn, id).select("*").maybeSingle();
   if (error) return errorResponse(error.message, 500);
   if (!data) return errorResponse("السجل غير موجود", 404);
   await writeAudit(session.user.user_id, "ADMIN_UPDATE", table, id, { id_column: idColumn, changes });
@@ -531,9 +549,26 @@ export async function adminDelete(
   const idColumn = String(body.id_column || "").trim();
   const id = String(body.id ?? "").trim();
   if (!table || !idColumn || !id) return errorResponse("بيانات الحذف غير صحيحة");
+  if (ADMIN_ID_COLUMNS[table] !== idColumn) return errorResponse("معرف السجل غير مسموح لهذا الجدول");
 
-  if (table === "users" && id === session.user.user_id) {
-    return errorResponse("لا يمكن لمدير النظام حذف حسابه الحالي");
+  if (table === "users") {
+    if (id === session.user.user_id) return errorResponse("لا يمكن لمدير النظام تعطيل حسابه الحالي");
+    const { data, error } = await supabase.from("users").update({status:"INACTIVE",updated_at:nowISO()}).eq("id",id).select("id,employee_id,username,role,status").maybeSingle();
+    if (error) return errorResponse(error.message,500); if (!data) return errorResponse("السجل غير موجود",404);
+    await writeAudit(session.user.user_id,"ADMIN_DELETE","users",id,{soft_delete:true,status:"INACTIVE"}); return success(data);
+  }
+
+  if (table === "employees") {
+    const { count } = await supabase.from("attendance").select("attendance_id",{count:"exact",head:true}).eq("employee_id",id);
+    if ((count || 0) > 0) return errorResponse("لا يمكن حذف موظف لديه سجل حضور تاريخي. استخدم تعطيل الموظف.",409);
+  }
+  if (table === "projects") {
+    const { count } = await supabase.from("project_assignments").select("assignment_id",{count:"exact",head:true}).eq("project_id",id);
+    if ((count || 0) > 0) return errorResponse("لا يمكن حذف مشروع لديه تعيينات موظفين. استخدم تعطيل المشروع.",409);
+  }
+  if (table === "shifts") {
+    const { count } = await supabase.from("employee_shifts").select("assignment_id",{count:"exact",head:true}).eq("shift_id",id);
+    if ((count || 0) > 0) return errorResponse("لا يمكن حذف وردية مستخدمة في تعيينات تاريخية. استخدم تعطيل الوردية.",409);
   }
 
   const { data, error } = await supabase.from(table).delete().eq(idColumn, id).select("*").maybeSingle();
@@ -541,4 +576,17 @@ export async function adminDelete(
   if (!data) return errorResponse("السجل غير موجود", 404);
   await writeAudit(session.user.user_id, "ADMIN_DELETE", table, id, { id_column: idColumn, deleted: data });
   return success(data);
+}
+
+
+export async function updateUser(session: SessionContext, body: Record<string, unknown>) {
+ const userId=String(body.user_id||'').trim(); if(!userId) return errorResponse('معرف المستخدم مطلوب'); const changes:Record<string,unknown>={};
+ if(body.status!==undefined){const status=String(body.status).toUpperCase();if(!['ACTIVE','INACTIVE'].includes(status))return errorResponse('حالة الحساب غير صحيحة');if(userId===session.user.user_id&&status!=='ACTIVE')return errorResponse('لا يمكن تعطيل حسابك الحالي');changes.status=status;}
+ if(body.password!==undefined){const password=String(body.password||'');if(password.length<8)return errorResponse('كلمة المرور يجب أن تكون 8 أحرف على الأقل');changes.password_hash=securePasswordHash(password);}
+ if(!Object.keys(changes).length)return errorResponse('لا توجد بيانات للتعديل'); const {data,error}=await supabase.from('users').update({...changes,updated_at:nowISO()}).eq('id',userId).select('id,employee_id,username,role,status,last_login,created_at,updated_at').maybeSingle();
+ if(error)return errorResponse(error.message,500);if(!data)return errorResponse('المستخدم غير موجود',404);await writeAudit(session.user.user_id,'update_user','users',userId,{changes:Object.fromEntries(Object.entries(changes).map(([k,v])=>[k,k==='password_hash'?'[REDACTED]':v]))});return success({...data,user_id:data.id});
+}
+
+export async function deleteUser(session: SessionContext, body: Record<string, unknown>) {
+ const userId=String(body.user_id||'').trim();if(!userId)return errorResponse('معرف المستخدم مطلوب');if(userId===session.user.user_id)return errorResponse('لا يمكن تعطيل حسابك الحالي');const {data,error}=await supabase.from('users').update({status:'INACTIVE',updated_at:nowISO()}).eq('id',userId).select('id,employee_id,username,role,status').maybeSingle();if(error)return errorResponse(error.message,500);if(!data)return errorResponse('المستخدم غير موجود',404);await writeAudit(session.user.user_id,'delete_user','users',userId,{soft_delete:true,status:'INACTIVE'});return success({...data,user_id:data.id});
 }
