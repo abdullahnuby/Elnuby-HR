@@ -1,156 +1,23 @@
-'use client';
+import { useState } from 'react';
 
-import { useMemo, useState } from 'react';
-
-type SettingCard = {
-  title: string;
-  description: string;
-  value: string;
-  icon: string;
-  tone: 'blue' | 'green' | 'amber' | 'slate';
-};
-
-export default function Settings() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'attendance' | 'security'>('overview');
-
-  const cards: SettingCard[] = [
-    { title: 'نظام الحضور', description: 'الحضور والانصراف يعتمد على الوردية والتعيين والموقع.', value: 'مفعل', icon: '◷', tone: 'blue' },
-    { title: 'صلاحيات النظام', description: 'التحقق من الصلاحيات يتم في Backend قبل تنفيذ العمليات.', value: 'محمي', icon: '✓', tone: 'green' },
-    { title: 'المنطقة الزمنية', description: 'التوقيت التشغيلي المستخدم في النظام.', value: 'Africa/Cairo', icon: '⌚', tone: 'slate' },
-    { title: 'سجل التدقيق', description: 'العمليات الإدارية الحساسة تمر عبر Audit Trail.', value: 'مفعل', icon: '▤', tone: 'amber' },
-  ];
-
-  const tabs = [
-    ['overview', 'نظرة عامة'],
-    ['attendance', 'الحضور والورديات'],
-    ['security', 'الأمان والصلاحيات'],
-  ] as const;
-
-  const toneClass = useMemo(() => ({
-    blue: { background: '#eef4ff', color: '#1769e0' },
-    green: { background: '#eaf9f3', color: '#08744f' },
-    amber: { background: '#fff8e7', color: '#9a6a00' },
-    slate: { background: '#f3f5f8', color: '#526178' },
-  }), []);
-
-  return (
-    <section className="panel page-panel" style={{ minHeight: 600 }}>
-      <div className="panel-head" style={{ alignItems: 'center' }}>
-        <div>
-          <div className="eyebrow">SYSTEM SETTINGS</div>
-          <h2 style={{ fontSize: 22, marginTop: 5 }}>إعدادات النظام</h2>
-          <p>مركز معلومات وتشغيل إعدادات ELNUBY HR بشكل واضح ومنظم.</p>
-        </div>
-        <span className="live"><b /> النظام متصل</span>
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, padding: 6, background: '#f5f7fb', border: '1px solid var(--line)', borderRadius: 13, marginBottom: 18 }}>
-        {tabs.map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setActiveTab(id)}
-            className={activeTab === id ? 'primary' : 'secondary'}
-            style={{ flex: 1 }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {activeTab === 'overview' && (
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 12, marginBottom: 18 }}>
-            {cards.map((card) => (
-              <div key={card.title} style={{ border: '1px solid var(--line)', borderRadius: 15, padding: 16, background: '#fff', boxShadow: 'var(--shadow)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ width: 42, height: 42, borderRadius: 12, display: 'grid', placeItems: 'center', fontWeight: 900, ...toneClass[card.tone] }}>{card.icon}</div>
-                  <span style={{ fontSize: 10, color: toneClass[card.tone].color, fontWeight: 800 }}>{card.value}</span>
-                </div>
-                <h3 style={{ fontSize: 13, margin: '14px 0 6px' }}>{card.title}</h3>
-                <p style={{ fontSize: 10, lineHeight: 1.8, color: '#8290a4', margin: 0 }}>{card.description}</p>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1.3fr .7fr', gap: 14 }}>
-            <section className="request-card" style={{ margin: 0 }}>
-              <h3 style={{ fontSize: 14 }}>كيف يعمل النظام؟</h3>
-              {[
-                ['01', 'الموظف', 'يتم ربط الموظف بمشروع ووردية فعالة.'],
-                ['02', 'الحضور', 'تتحكم الوردية في فتح وإغلاق الحضور والانصراف.'],
-                ['03', 'الإجازات والأذونات', 'الطلبات تمر بمسار الاعتماد حسب الدور والصلاحيات.'],
-                ['04', 'الإدارة', 'العمليات الحساسة يتم تسجيلها ومراجعتها.'],
-              ].map(([n, title, text]) => (
-                <div key={n} style={{ display: 'grid', gridTemplateColumns: '42px 120px 1fr', gap: 10, alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #e9edf4' }}>
-                  <strong style={{ color: '#1769e0' }}>{n}</strong>
-                  <strong style={{ fontSize: 11 }}>{title}</strong>
-                  <span style={{ fontSize: 10, color: '#8290a4' }}>{text}</span>
-                </div>
-              ))}
-            </section>
-
-            <section className="request-card" style={{ margin: 0 }}>
-              <h3 style={{ fontSize: 14 }}>حالة التشغيل</h3>
-              {['قاعدة البيانات', 'Backend API', 'نظام الصلاحيات', 'Audit Trail'].map((item) => (
-                <div key={item} style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 0', borderBottom: '1px solid #e9edf4', fontSize: 11 }}>
-                  <span>{item}</span><b style={{ color: '#08744f' }}>● يعمل</b>
-                </div>
-              ))}
-            </section>
-          </div>
-        </>
-      )}
-
-      {activeTab === 'attendance' && (
-        <div className="dashboard-grid">
-          <section className="request-card">
-            <h3>قواعد الحضور والانصراف</h3>
-            {[
-              ['فتح الحضور', 'يتم تحديده من الوردية المعينة للموظف.'],
-              ['إغلاق الحضور', 'بعد هذه النقطة يسجل الحضور كمتأخر حسب محرك الحضور.'],
-              ['فتح الانصراف', 'لا يظهر الانصراف قبل وقت الوردية المحدد.'],
-              ['الانصراف التلقائي', 'يستخدم لإغلاق السجل عند انتهاء يوم العمل إذا لم يسجل الموظف انصرافه.'],
-              ['GPS', 'يتم التحقق من موقع الموظف مقابل نطاق المشروع.'],
-            ].map(([title, text]) => (
-              <div key={title} style={{ padding: '13px 0', borderBottom: '1px solid #e9edf4' }}>
-                <strong style={{ display: 'block', fontSize: 11 }}>{title}</strong>
-                <span style={{ display: 'block', color: '#8290a4', fontSize: 10, marginTop: 4 }}>{text}</span>
-              </div>
-            ))}
-          </section>
-          <section className="request-card">
-            <h3>مصدر الإعداد</h3>
-            <p style={{ fontSize: 11, lineHeight: 1.9, color: '#66758b' }}>قيم أوقات الورديات الفعلية يتم إدارتها من شاشة <b>الورديات</b> وليس من إعداد ثابت داخل الواجهة.</p>
-            <div className="alert success">التصميم يمنع وجود إعدادات متضاربة بين الشاشة وقاعدة البيانات.</div>
-          </section>
-        </div>
-      )}
-
-      {activeTab === 'security' && (
-        <div className="dashboard-grid">
-          <section className="request-card">
-            <h3>نموذج الصلاحيات</h3>
-            {[
-              ['SYSTEM_ADMIN', 'تحكم كامل في بيانات النظام والإدارة.'],
-              ['HR_MANAGER', 'إدارة الموارد البشرية والطلبات وفق نطاق HR.'],
-              ['SECTOR_MANAGER', 'إدارة المشروعات المسندة إليه دون حضور وانصراف.'],
-              ['PROJECT_MANAGER', 'موظف له حضور وانصراف، ويدير موظفي مشروعاته.'],
-              ['EMPLOYEE', 'حضور وانصراف وطلبات الموظف الخاصة.'],
-            ].map(([role, text]) => (
-              <div key={role} style={{ padding: '12px 0', borderBottom: '1px solid #e9edf4' }}>
-                <strong style={{ display: 'block', fontSize: 11 }}>{role}</strong>
-                <span style={{ display: 'block', color: '#8290a4', fontSize: 10, marginTop: 4 }}>{text}</span>
-              </div>
-            ))}
-          </section>
-          <section className="request-card">
-            <h3>حماية البيانات</h3>
-            <div className="alert success">التحقق من الدور والنطاق يتم في Backend، وليس في إخفاء عناصر الواجهة فقط.</div>
-            <p style={{ fontSize: 10, lineHeight: 1.9, color: '#8290a4' }}>لا تستخدم هذه الشاشة لتغيير الصلاحيات مباشرة. إدارة الحسابات والأدوار تتم من قسم حسابات المستخدمين، بينما مدير النظام يملك مركز CRUD الكامل.</p>
-          </section>
-        </div>
-      )}
-    </section>
-  );
+type Tab='overview'|'attendance'|'roles'|'operations';
+const roleCards=[
+ {role:'SYSTEM_ADMIN',title:'مدير النظام',tone:'blue',text:'تحكم كامل في النظام: الموظفون، المشاريع، الورديات، الحسابات، التعيينات، الطلبات والإعدادات.'},
+ {role:'HR_MANAGER',title:'مدير الموارد البشرية',tone:'green',text:'إدارة الموظفين وطلبات الإجازات والأذونات والخصومات ومتابعة القوى العاملة وفق نطاق HR.'},
+ {role:'SECTOR_MANAGER',title:'مدير القطاع',tone:'amber',text:'إدارة المشروعات المسندة إليه ومتابعة مديري المشاريع والطلبات. لا يوجد له حضور أو انصراف.'},
+ {role:'PROJECT_MANAGER',title:'مدير المشروع',tone:'navy',text:'موظف داخل الشركة وله حضور وانصراف، ويدير الموظفين والطلبات داخل مشروعاته فقط.'},
+ {role:'EMPLOYEE',title:'الموظف',tone:'slate',text:'حضور وانصراف وطلبات الإجازات والأذونات الخاصة به.'},
+];
+export default function Settings(){
+ const [tab,setTab]=useState<Tab>('overview');
+ const tabs:[Tab,string,string][]=[['overview','نظرة عامة','◈'],['attendance','الحضور والورديات','◷'],['roles','الأدوار والصلاحيات','♙'],['operations','قواعد التشغيل','⚙']];
+ return <section className="panel page-panel hr-settings"><div className="hr-settings-hero"><div><div className="eyebrow">ELNUBY HR • CONTROL CENTER</div><h2>إعدادات النظام</h2><p>مركز موحد لفهم تشغيل النظام والصلاحيات وقواعد الحضور بدون تعقيد.</p></div><div className="hr-system-status"><span className="status-dot"/> النظام متصل</div></div>
+  <div className="hr-settings-tabs">{tabs.map(([id,label,icon])=><button key={id} className={tab===id?'active':''} onClick={()=>setTab(id)}><span>{icon}</span><b>{label}</b></button>)}</div>
+  {tab==='overview'&&<div className="hr-settings-body"><div className="hr-stat-grid"><div><span>الحضور</span><strong>مفعل</strong><small>حسب الوردية والموقع</small></div><div><span>الجلسات</span><strong>محمي</strong><small>جلسات موقعة ومدة محددة</small></div><div><span>الاعتماد</span><strong>متدرج</strong><small>مدير مشروع ← HR</small></div><div><span>التدقيق</span><strong>Audit</strong><small>للعمليات الإدارية الحساسة</small></div></div><div className="hr-settings-columns"><section><div className="hr-section-title"><span>01</span><div><h3>كيف يعمل النظام؟</h3><p>تسلسل العمل من الموظف إلى الإدارة.</p></div></div>{[['ربط الموظف','المشروع والوردية الحالية يحددان نطاق الحضور.'],['الحضور','يتم التحقق من الوقت والـGPS ونطاق المشروع.'],['الطلبات','الإجازات والأذونات تمر بمسار اعتماد واضح.'],['الإدارة','مدير النظام يدير البيانات من داخل البرنامج.']].map(([a,b])=><div className="hr-rule" key={a}><b>{a}</b><span>{b}</span></div>)}</section><aside><div className="hr-section-title"><span>02</span><div><h3>مصادر الإعداد</h3><p>المصدر الحقيقي لكل قاعدة.</p></div></div>{[['الورديات','شاشة الورديات'],['المشروعات','شاشة المشاريع'],['الحسابات','حسابات المستخدمين'],['الصلاحيات','Backend + Role Scope']].map(([a,b])=><div className="hr-source" key={a}><span>{a}</span><b>{b}</b></div>)}</aside></div></div>}
+  {tab==='attendance'&&<div className="hr-settings-body"><div className="hr-feature"><div className="feature-icon blue">◷</div><div><h3>محرك الحضور والانصراف</h3><p>الحضور والانصراف لا يعتمدان على زر الواجهة فقط؛ الـBackend يتحقق من الدور والوردية والوقت وموقع المشروع.</p></div></div><div className="hr-rule-grid">{[['فتح الحضور','من attendance_open إلى attendance_close'],['التأخير','بعد start_time يحسب late_minutes'],['فتح الانصراف','لا يسمح قبل checkout_open'],['الإغلاق التلقائي','auto_checkout_time يغلق السجل المفتوح'],['الموقع','GPS + geofence_radius_m'],['التاريخ','توقيت التشغيل Asia/Riyadh']].map(([a,b])=><div className="hr-rule-card" key={a}><b>{a}</b><span>{b}</span></div>)}</div></div>}
+  {tab==='roles'&&<div className="hr-settings-body"><div className="hr-role-grid">{roleCards.map(c=><article className={`hr-role-card ${c.tone}`} key={c.role}><div className="role-code">{c.role}</div><h3>{c.title}</h3><p>{c.text}</p></article>)}</div></div>}
+  {tab==='operations'&&<div className="hr-settings-body"><div className="hr-operation-grid">{[['التعيينات','الموظف يمكن أن يكون له تعيين حالي واحد للمشروع، مع الاحتفاظ بالتاريخ.'],['الورديات','لا نحذف وردية مرتبطة بسجلات تاريخية؛ يتم تعطيلها بدل كسر العلاقات.'],['مدير القطاع','له نطاق مشروعات مستقل ولا يُعامل كمشرف موقع.'],['مدير المشروع','حساب إداري + موظف فعلي في نفس الوقت.'],['مدير النظام','CRUD كامل من داخل البرنامج مع مرور العمليات عبر Backend وAudit.'],['الخصوصية','النطاق يطبق في Backend وليس بإخفاء عناصر الواجهة فقط.']].map(([a,b])=><article key={a}><div className="operation-icon">✓</div><div><h3>{a}</h3><p>{b}</p></div></article>)}</div></div>}
+  <style jsx global>{`
+.hr-settings{min-height:620px}.hr-settings-hero{display:flex;justify-content:space-between;gap:18px;align-items:center;padding:4px 0 20px;border-bottom:1px solid #e8edf4}.hr-settings-hero h2{margin:6px 0;font-size:25px}.hr-settings-hero p{margin:0;color:#7b8799;font-size:11px;line-height:1.8}.hr-system-status{display:flex;align-items:center;gap:7px;background:#eaf9f3;color:#08744f;border:1px solid #c9efdf;padding:9px 13px;border-radius:999px;font-size:10px;font-weight:800;white-space:nowrap}.status-dot{width:7px;height:7px;background:#0d9f6e;border-radius:50%}.hr-settings-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;background:#f6f8fb;border:1px solid #e6ebf2;padding:6px;border-radius:14px;margin:18px 0}.hr-settings-tabs button{display:flex;align-items:center;justify-content:center;gap:8px;background:transparent;color:#64748b;padding:11px;border-radius:10px;font-size:11px}.hr-settings-tabs button.active{background:#fff;color:#1769e0;box-shadow:0 5px 18px rgba(20,42,76,.08)}.hr-settings-body{display:grid;gap:18px}.hr-stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.hr-stat-grid>div{border:1px solid #e5eaf2;background:#fff;border-radius:14px;padding:15px;box-shadow:0 5px 20px rgba(20,42,76,.04)}.hr-stat-grid span,.hr-stat-grid strong,.hr-stat-grid small{display:block}.hr-stat-grid span{font-size:10px;color:#7c899b}.hr-stat-grid strong{font-size:20px;margin-top:7px}.hr-stat-grid small{font-size:9px;color:#98a3b3;margin-top:5px}.hr-settings-columns{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}.hr-settings-columns>section,.hr-settings-columns>aside{border:1px solid #e5eaf2;border-radius:16px;padding:17px;background:#fff}.hr-section-title{display:flex;gap:11px;align-items:center;margin-bottom:10px}.hr-section-title>span{width:35px;height:35px;border-radius:10px;background:#eef4ff;color:#1769e0;display:grid;place-items:center;font-weight:900;font-size:10px}.hr-section-title h3{margin:0;font-size:13px}.hr-section-title p{margin:3px 0 0;color:#8995a8;font-size:9px}.hr-rule{display:grid;grid-template-columns:130px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid #edf1f5}.hr-rule:last-child{border-bottom:0}.hr-rule b,.hr-source b{font-size:10px}.hr-rule span,.hr-source span{font-size:10px;color:#7b8799;line-height:1.7}.hr-source{display:flex;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid #edf1f5}.hr-source:last-child{border-bottom:0}.hr-feature{display:flex;gap:13px;align-items:flex-start;padding:17px;border:1px solid #dce7fa;background:linear-gradient(135deg,#f8fbff,#fff);border-radius:16px}.feature-icon{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-weight:900}.feature-icon.blue{background:#eaf2ff;color:#1769e0}.hr-feature h3{margin:0 0 5px;font-size:13px}.hr-feature p{margin:0;color:#718096;font-size:10px;line-height:1.9}.hr-rule-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.hr-rule-card{padding:15px;border:1px solid #e5eaf2;border-radius:14px;background:#fff}.hr-rule-card b,.hr-rule-card span{display:block}.hr-rule-card b{font-size:11px}.hr-rule-card span{font-size:9px;color:#8290a4;margin-top:6px}.hr-role-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.hr-role-card{padding:17px;border:1px solid #e5eaf2;border-radius:15px;background:#fff;border-right:4px solid #1769e0}.hr-role-card.green{border-right-color:#0d9f6e}.hr-role-card.amber{border-right-color:#d39b1e}.hr-role-card.navy{border-right-color:#15365f}.hr-role-card.slate{border-right-color:#8b96a7}.hr-role-card .role-code{font-size:8px;letter-spacing:1px;color:#8a96a8;font-weight:900}.hr-role-card h3{margin:7px 0 5px;font-size:13px}.hr-role-card p{margin:0;color:#718096;font-size:10px;line-height:1.9}.hr-operation-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.hr-operation-grid article{display:flex;gap:11px;padding:15px;border:1px solid #e5eaf2;border-radius:14px;background:#fff}.operation-icon{width:31px;height:31px;border-radius:9px;background:#eaf9f3;color:#08744f;display:grid;place-items:center;font-weight:900;flex:0 0 auto}.hr-operation-grid h3{margin:0 0 4px;font-size:11px}.hr-operation-grid p{margin:0;color:#7b8799;font-size:9px;line-height:1.8}@media(max-width:800px){.hr-settings-hero{display:block}.hr-system-status{display:inline-flex;margin-top:12px}.hr-settings-hero h2{font-size:21px}.hr-settings-tabs{grid-template-columns:repeat(2,1fr)}.hr-settings-tabs button{font-size:10px}.hr-stat-grid{grid-template-columns:repeat(2,1fr)}.hr-settings-columns,.hr-rule-grid,.hr-role-grid,.hr-operation-grid{grid-template-columns:1fr}.hr-rule{grid-template-columns:1fr;gap:3px}.hr-settings{min-height:0}.hr-settings-body{gap:12px}}`}</style>
+ </section>;
 }
