@@ -448,67 +448,30 @@ export async function closeAttendance(
   session: SessionContext,
   body: Record<string, unknown>
 ) {
-  const attendanceId = String(
-    body?.attendance_id || ""
-  ).trim();
-
-  if (!attendanceId) {
-    throw new Error("رقم سجل الحضور مطلوب");
-  }
+  const attendanceId = String(body?.attendance_id || '').trim();
+  if (!attendanceId) throw new Error('رقم سجل الحضور مطلوب');
 
   const { data: row, error } = await supabase
-    .from("attendance")
-    .select(
-      "attendance_id,check_in,check_out"
-    )
-    .eq(
-      "attendance_id",
-      attendanceId
-    )
+    .from('attendance')
+    .select('attendance_id,check_in,check_out')
+    .eq('attendance_id', attendanceId)
     .maybeSingle();
 
-  if (error) {
-    throw error;
-  }
+  if (error) throw error;
+  if (!row) throw new Error('سجل الحضور غير موجود');
+  if (row.check_out) return { ok: true, closed: false, already_closed: true };
 
-  if (!row) {
-    throw new Error(
-      "سجل الحضور غير موجود"
-    );
-  }
+  const { error: updateError } = await supabase
+    .from('attendance')
+    .update({
+      check_out: riyadhTime(),
+      auto_closed: false,
+      status: 'MANUAL_CLOSED',
+      updated_at: nowISO(),
+    })
+    .eq('attendance_id', attendanceId)
+    .is('check_out', null);
 
-  if (row.check_out) {
-    return {
-      ok: true,
-      closed: false,
-      already_closed: true,
-    };
-  }
-
-  const { error: updateError } =
-    await supabase
-      .from("attendance")
-      .update({
-        check_out: riyadhTime(),
-        auto_closed: false,
-        status: "MANUAL_CLOSED",
-        updated_at: nowISO(),
-      })
-      .eq(
-        "attendance_id",
-        attendanceId
-      )
-      .is(
-        "check_out",
-        null
-      );
-
-  if (updateError) {
-    throw updateError;
-  }
-
-  return {
-    ok: true,
-    closed: true,
-  };
+  if (updateError) throw updateError;
+  return { ok: true, closed: true };
 }

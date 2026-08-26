@@ -31,6 +31,13 @@ export default function Users({
   onToggleUser,
   onResetPassword,
 }: any) {
+  const safeUsers: User[] = Array.isArray(users) ? users : [];
+  const safeEmployees: Employee[] = Array.isArray(employees) ? employees : [];
+  const safeProjects: Project[] = Array.isArray(projects) ? projects : [];
+  const safeSelectedSectorProjects: string[] = Array.isArray(selectedSectorProjects)
+    ? selectedSectorProjects.map(String)
+    : [];
+
   return (
     <section className="panel page-panel">
       <div className="panel-head">
@@ -47,7 +54,7 @@ export default function Users({
 
         <div className="panel-actions">
           <span className="count-pill">
-            {employees.length} موظف متاح
+            {safeEmployees.length} موظف متاح
           </span>
 
           <button
@@ -131,14 +138,13 @@ export default function Users({
                 اختر الموظف المرتبط بالحساب *
               </option>
 
-              {employees.map(
+              {safeEmployees.map(
                 (e: Employee) => (
                   <option
                     key={e.employee_id}
                     value={e.employee_id}
                   >
-                    {e.name} —{' '}
-                    {e.employee_id}
+                    {e.name}
                   </option>
                 ),
               )}
@@ -158,14 +164,13 @@ export default function Users({
                 اختر المشروع المرتبط بالحساب *
               </option>
 
-              {projects.map(
+              {safeProjects.map(
                 (p: Project) => (
                   <option
                     key={p.project_id}
                     value={p.project_id}
                   >
-                    {p.name} —{' '}
-                    {p.project_id}
+                    {p.name}
                   </option>
                 ),
               )}
@@ -175,7 +180,7 @@ export default function Users({
           {newRole === 'SECTOR_MANAGER' && (
             <label className="field-stack">
               <span>المشروعات التابعة لمدير القطاع *</span>
-              <div className="project-checklist">{projects.map((p: Project) => { const checked=selectedSectorProjects.includes(p.project_id); return <label key={p.project_id} className={checked?'checked':''}><input type="checkbox" checked={checked} onChange={()=>setSelectedSectorProjects(checked?selectedSectorProjects.filter((id:string)=>id!==p.project_id):[...selectedSectorProjects,p.project_id])}/><span>{p.name}</span></label>; })}{!projects.length&&<span className="empty-note">لا توجد مشروعات متاحة.</span>}</div>
+              <div className="project-checklist">{safeProjects.map((p: Project) => { const checked=safeSelectedSectorProjects.includes(String(p.project_id)); return <label key={p.project_id} className={checked?'checked':''}><input type="checkbox" checked={checked} onChange={()=>setSelectedSectorProjects(checked?safeSelectedSectorProjects.filter((id:string)=>id!==String(p.project_id)):[...safeSelectedSectorProjects,String(p.project_id)])}/><span>{p.name}</span></label>; })}{!safeProjects.length&&<span className="empty-note">لا توجد مشروعات متاحة.</span>}</div>
             </label>
           )}
 
@@ -251,7 +256,7 @@ export default function Users({
               اختر مدير المشروع
             </option>
 
-            {users
+            {safeUsers
               .filter(
                 (u: User) =>
                   u.role ===
@@ -282,7 +287,7 @@ export default function Users({
               اختر المشروع
             </option>
 
-            {projects.map(
+            {safeProjects.map(
               (p: Project) => (
                 <option
                   key={p.project_id}
@@ -320,11 +325,11 @@ export default function Users({
               </option>
             ))}
           </select>
-          <div className="project-checklist">{projects.map((p: Project) => { const checked=selectedSectorProjects.includes(p.project_id); return <label key={p.project_id} className={checked?'checked':''}><input type="checkbox" checked={checked} onChange={()=>setSelectedSectorProjects(checked?selectedSectorProjects.filter((id:string)=>id!==p.project_id):[...selectedSectorProjects,p.project_id])}/><span>{p.name}</span></label>; })}{!projects.length&&<span className="empty-note">لا توجد مشروعات متاحة.</span>}</div>
+          <div className="project-checklist">{safeProjects.map((p: Project) => { const checked=safeSelectedSectorProjects.includes(String(p.project_id)); return <label key={p.project_id} className={checked?'checked':''}><input type="checkbox" checked={checked} onChange={()=>setSelectedSectorProjects(checked?safeSelectedSectorProjects.filter((id:string)=>id!==String(p.project_id)):[...safeSelectedSectorProjects,String(p.project_id)])}/><span>{p.name}</span></label>; })}{!safeProjects.length&&<span className="empty-note">لا توجد مشروعات متاحة.</span>}</div>
         </div>
         <button
           className="secondary"
-          disabled={busy || !selectedSectorManager || !selectedSectorProjects.length}
+          disabled={busy || !selectedSectorManager || !safeSelectedSectorProjects.length}
           onClick={async () => {
             await assignSectorManagerProjects();
           }}
@@ -342,7 +347,7 @@ export default function Users({
           'الحالة',
           'آخر دخول','إجراء',
         ]}
-        rows={users.map((u: User) => {
+        rows={safeUsers.map((u: User) => {
           const mp = projects.find(
             (p: Project) =>
               (p.managers || []).some(

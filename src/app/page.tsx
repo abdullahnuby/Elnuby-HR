@@ -1206,6 +1206,18 @@ export default function Home() {
               setSelectedManager={
                 setSelectedManager
               }
+              selectedSectorProjects={
+                selectedSectorProjects
+              }
+              setSelectedSectorProjects={
+                setSelectedSectorProjects
+              }
+              selectedSectorManager={
+                selectedSectorManager
+              }
+              setSelectedSectorManager={
+                setSelectedSectorManager
+              }
               selectedProject={
                 selectedProject
               }
