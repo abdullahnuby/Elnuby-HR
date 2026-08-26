@@ -1,3 +1,4 @@
+import Icon from './Icon';
 import { Kpi, Table, Empty } from './common';
 export default function ManagerDashboard({
   me,
@@ -48,7 +49,7 @@ export default function ManagerDashboard({
             لوحة مدير المشروع —{' '}
             {me.employee?.name ||
               me.user?.username}{' '}
-            👋
+
           </h1>
 
           <p>
@@ -67,25 +68,25 @@ export default function ManagerDashboard({
         <Kpi
           title="موظفو المشروع"
           value={s.employees ?? 0}
-          icon="♙"
+          icon="users"
         />
 
         <Kpi
           title="حاضر اليوم"
           value={s.present ?? 0}
-          icon="✓"
+          icon="check"
         />
 
         <Kpi
           title="متأخرون"
           value={s.late ?? 0}
-          icon="◷"
+          icon="shifts"
         />
 
         <Kpi
           title="في إجازة"
           value={s.onLeave ?? 0}
-          icon="▤"
+          icon="leaves"
         />
       </div>
 
@@ -108,7 +109,7 @@ export default function ManagerDashboard({
                 key={p.project_id}
               >
                 <div className="project-icon">
-                  ▦
+                  <Icon name="projects" size={20} />
                 </div>
 
                 <div className="project-card-main">
@@ -124,7 +125,7 @@ export default function ManagerDashboard({
 
                   <div className="project-meta">
                     <span>
-                      👷 {p.employee_count || 0}{' '}
+                      <Icon name="users" size={13} /> {p.employee_count || 0}{' '}
                       موظف
                     </span>
 

@@ -275,7 +275,7 @@ export default function SystemAdminPanel() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10, marginBottom: 18 }}>
         {(['workforce', 'operations', 'requests', 'security'] as const).map((group) => (
           <div key={group} style={{ border: '1px solid var(--line)', borderRadius: 13, padding: 13, background: '#fbfcff' }}>
-            <div style={{ color: '#1769e0', fontSize: 18, fontWeight: 900 }}>{TABLES.filter((x) => x.group === group).length}</div>
+            <div style={{ color: 'var(--blue)', fontSize: 18, fontWeight: 900 }}>{TABLES.filter((x) => x.group === group).length}</div>
             <div style={{ fontSize: 11, fontWeight: 800, marginTop: 4 }}>{groupLabels[group]}</div>
           </div>
         ))}
@@ -312,7 +312,7 @@ export default function SystemAdminPanel() {
                   const summary = fields.slice(0, 3).map((field) => `${field.label}: ${displayValue(row[field.key])}`).join(' • ');
                   return (
                     <tr key={`${id}-${index}`} style={{ background: selected === row ? '#f5f9ff' : undefined }}>
-                      <td style={{ fontWeight: 800, color: '#1769e0' }}>{id || '—'}</td>
+                      <td style={{ fontWeight: 800, color: 'var(--blue)' }}>{id || '—'}</td>
                       <td style={{ whiteSpace: 'normal', minWidth: 260 }}>{summary || Object.entries(row).filter(([k]) => k !== 'password_hash').slice(0, 3).map(([k,v]) => `${k}: ${displayValue(v)}`).join(' • ')}</td>
                       <td>{row.status ? <span className="live">{String(row.status)}</span> : '—'}</td>
                       <td><button type="button" className="secondary" onClick={() => selectRow(row)} disabled={busy}>فتح</button></td>

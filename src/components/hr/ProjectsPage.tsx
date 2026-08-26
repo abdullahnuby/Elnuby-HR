@@ -1,3 +1,4 @@
+import Icon from './Icon';
 import type { Project, Employee } from './types';
 import { Empty } from './common';
 export default function Projects({
@@ -153,7 +154,7 @@ export default function Projects({
               key={p.project_id}
             >
               <div className="project-icon">
-                ▦
+                <Icon name="projects" size={19} />
               </div>
 
               <div className="project-card-main">

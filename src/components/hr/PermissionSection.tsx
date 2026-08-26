@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Empty } from './common';
 export default function PermissionSection({
@@ -14,6 +15,14 @@ export default function PermissionSection({
   createPermission,
   busy,
 }: any) {
+  const [localRows, setLocalRows] = useState(rows);
+  useEffect(() => setLocalRows(rows), [rows]);
+
+  async function decide(requestId: string, decision: 'APPROVE'|'REJECT') {
+    try { await api('decide_permission', { request_id: requestId, decision }); setLocalRows((prev:any[]) => prev.map(r => r.request_id === requestId ? {...r, status: decision === 'APPROVE' ? 'APPROVED' : 'REJECTED'} : r)); window.dispatchEvent(new CustomEvent('hr:toast',{detail:{message:decision==='APPROVE'?'تم اعتماد طلب الإذن':'تم رفض طلب الإذن'}})); }
+    catch (error:any) { window.dispatchEvent(new CustomEvent('hr:toast',{detail:{message:error?.message||'تعذر تنفيذ القرار',type:'error'}})); }
+  }
+
   return (
     <section className="panel page-panel">
       <div className="panel-head">
@@ -106,7 +115,7 @@ export default function PermissionSection({
           </thead>
 
           <tbody>
-            {rows.map((r: any) => (
+            {localRows.map((r: any) => (
               <tr key={r.request_id}>
                 <td>
                   {r.employee_id}
@@ -137,17 +146,7 @@ export default function PermissionSection({
                       <button
                         className="tiny approve"
                         onClick={async () => {
-                          await api(
-                            'decide_permission',
-                            {
-                              request_id:
-                                r.request_id,
-                              decision:
-                                'APPROVE',
-                            },
-                          );
-
-                          location.reload();
+                          void decide(r.request_id, 'APPROVE');
                         }}
                       >
                         اعتماد
@@ -156,17 +155,7 @@ export default function PermissionSection({
                       <button
                         className="tiny reject"
                         onClick={async () => {
-                          await api(
-                            'decide_permission',
-                            {
-                              request_id:
-                                r.request_id,
-                              decision:
-                                'REJECT',
-                            },
-                          );
-
-                          location.reload();
+                          void decide(r.request_id, 'REJECT');
                         }}
                       >
                         رفض

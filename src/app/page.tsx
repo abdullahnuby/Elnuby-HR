@@ -15,6 +15,7 @@ import UsersPage from '@/components/hr/UsersPage';
 import Reports from '@/components/hr/Reports';
 import Settings from '@/components/hr/Settings';
 import SystemAdminPanel from '@/components/hr/SystemAdminPanel';
+import Icon from '@/components/hr/Icon';
 
 
 type Employee = {
@@ -153,6 +154,16 @@ export default function Home() {
 
   useEffect(() => {
     load();
+  }, []);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {};
+      setNotice(String(detail.message || 'تم تنفيذ العملية بنجاح'));
+      window.setTimeout(() => setNotice(''), 3500);
+    };
+    window.addEventListener('hr:toast', handler);
+    return () => window.removeEventListener('hr:toast', handler);
   }, []);
 
   useEffect(() => {
@@ -942,7 +953,7 @@ export default function Home() {
                 openSection(n.id)
               }
             >
-              <i>{n.icon}</i>
+              <Icon name={n.icon} size={18} />
               <span>{n.label}</span>
             </button>
           ))}
@@ -959,10 +970,13 @@ export default function Home() {
               try {
                 await api('logout');
               } finally {
-                location.reload();
+                setMe(null);
+                setSidebar(false);
+                setSection('dashboard');
               }
             }}
           >
+            <Icon name="logout" size={16} />
             تسجيل الخروج
           </button>
         </div>
@@ -977,7 +991,7 @@ export default function Home() {
                 setSidebar((v) => !v)
               }
             >
-              ☰
+              <Icon name="menu" size={19} />
             </button>
 
             <div>
