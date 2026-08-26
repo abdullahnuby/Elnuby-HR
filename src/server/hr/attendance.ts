@@ -45,7 +45,7 @@ export async function attendanceList(
     );
   }
 
-  if (["PROJECT_DIRECTOR", "PROJECT_MANAGER", "SITE_SUPERVISOR"].includes(session.user.role)) {
+  if (["SECTOR_MANAGER", "PROJECT_MANAGER"].includes(session.user.role)) {
     const ids =
       await getManagedProjectIds(
         session.user
@@ -85,7 +85,7 @@ export async function attendanceAction(
   action: string,
   body: Record<string, unknown>
 ) {
-  if (!["EMPLOYEE", "PROJECT_MANAGER", "PROJECT_DIRECTOR", "SITE_SUPERVISOR"].includes(session.user.role)) {
+  if (!["EMPLOYEE", "PROJECT_MANAGER"].includes(session.user.role)) {
     return errorResponse(
       "هذا الحساب غير مصرح له بتسجيل الحضور والانصراف",
       403

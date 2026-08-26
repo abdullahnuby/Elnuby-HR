@@ -40,35 +40,33 @@ export type SessionContext = {
 };
 
 export const ROLES = [
-  "SUPER_ADMIN",
+  "SYSTEM_ADMIN",
   "HR_MANAGER",
   "PROJECT_MANAGER",
-  "PROJECT_DIRECTOR",
-  "SITE_SUPERVISOR",
+  "SECTOR_MANAGER",
   "EMPLOYEE",
 ];
 
-export const ADMIN_ROLES = ["SUPER_ADMIN", "HR_MANAGER"];
+export const ADMIN_ROLES = ["SYSTEM_ADMIN", "HR_MANAGER"];
 
 export const MANAGEMENT_ROLES = [
-  "SUPER_ADMIN",
+  "SYSTEM_ADMIN",
   "HR_MANAGER",
-  "PROJECT_DIRECTOR",
+  "SECTOR_MANAGER",
   "PROJECT_MANAGER",
 ];
 
 export const PROJECT_VIEW_ROLES = [
-  "SUPER_ADMIN",
+  "SYSTEM_ADMIN",
   "HR_MANAGER",
-  "PROJECT_DIRECTOR",
+  "SECTOR_MANAGER",
   "PROJECT_MANAGER",
-  "SITE_SUPERVISOR",
 ];
 
 export const PROJECT_MANAGE_ROLES = [
-  "SUPER_ADMIN",
+  "SYSTEM_ADMIN",
   "HR_MANAGER",
-  "PROJECT_DIRECTOR",
+  "SECTOR_MANAGER",
   "PROJECT_MANAGER",
 ];
 
@@ -349,7 +347,7 @@ export async function getManagedProjectIds(
   user: CurrentUser
 ): Promise<string[]> {
   if (
-    user.role === "SUPER_ADMIN" ||
+    user.role === "SYSTEM_ADMIN" ||
     user.role === "HR_MANAGER"
   ) {
     const { data } = await supabase
@@ -361,15 +359,13 @@ export async function getManagedProjectIds(
     );
   }
 
-  if (!["PROJECT_DIRECTOR", "PROJECT_MANAGER", "SITE_SUPERVISOR"].includes(user.role)) {
+  if (!["SECTOR_MANAGER", "PROJECT_MANAGER"].includes(user.role)) {
     return [];
   }
 
-  const table = user.role === "SITE_SUPERVISOR"
-    ? "project_supervisors"
-    : user.role === "PROJECT_DIRECTOR"
-      ? "sector_manager_projects"
-      : "project_managers";
+  const table = user.role === "SECTOR_MANAGER"
+    ? "sector_manager_projects"
+    : "project_managers";
   const { data } = await supabase
     .from(table)
     .select("project_id,start_date,end_date")
@@ -391,13 +387,13 @@ export async function canManageProject(
   projectId: string
 ) {
   if (
-    user.role === "SUPER_ADMIN" ||
+    user.role === "SYSTEM_ADMIN" ||
     user.role === "HR_MANAGER"
   ) {
     return true;
   }
 
-  if (!["PROJECT_DIRECTOR", "PROJECT_MANAGER", "SITE_SUPERVISOR"].includes(user.role)) {
+  if (!["SECTOR_MANAGER", "PROJECT_MANAGER"].includes(user.role)) {
     return false;
   }
 

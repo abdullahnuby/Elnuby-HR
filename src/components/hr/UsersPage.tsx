@@ -101,27 +101,22 @@ export default function Users({
               مدير مشروع
             </option>
 
-            <option value="PROJECT_DIRECTOR">
+            <option value="SECTOR_MANAGER">
               مدير قطاع / مدير مشروعات
-            </option>
-
-            <option value="SITE_SUPERVISOR">
-              مشرف موقع
             </option>
 
             <option value="HR_MANAGER">
               مدير HR
             </option>
 
-            <option value="SUPER_ADMIN">
+            <option value="SYSTEM_ADMIN">
               مدير النظام
             </option>
           </select>
 
           {(newRole === 'EMPLOYEE' ||
             newRole === 'PROJECT_MANAGER' ||
-            newRole === 'PROJECT_DIRECTOR' ||
-            newRole === 'SITE_SUPERVISOR') && (
+            newRole === 'SECTOR_MANAGER') && (
             <select
               value={newEmployee}
               onChange={(e) =>
@@ -148,8 +143,7 @@ export default function Users({
             </select>
           )}
 
-          {(newRole === 'PROJECT_MANAGER' ||
-            newRole === 'SITE_SUPERVISOR') && (
+          {newRole === 'PROJECT_MANAGER' && (
             <select
               value={newProject}
               onChange={(e) =>
@@ -176,7 +170,7 @@ export default function Users({
             </select>
           )}
 
-          {newRole === 'PROJECT_DIRECTOR' && (
+          {newRole === 'SECTOR_MANAGER' && (
             <label className="field-stack">
               <span>المشروعات التابعة لمدير القطاع *</span>
               <select
@@ -199,9 +193,9 @@ export default function Users({
           )}
 
           {newRole ===
-            'PROJECT_DIRECTOR' && (
+            'SECTOR_MANAGER' && (
             <div className="empty-note">
-              مدير القطاع موظف فعلي في الشركة، وله صلاحيات إدارية على المشروعات المحددة فقط، ويستطيع تسجيل الحضور والانصراف وطلب الإجازات والأذونات مثل أي موظف.
+              مدير القطاع موظف فعلي في الشركة، وله صلاحيات إدارية على المشروعات المحددة فقط، ولا يملك حضورًا أو انصرافًا، وتقتصر صلاحياته على المشروعات المحددة والعمليات التابعة لها.
             </div>
           )}
 
@@ -215,7 +209,7 @@ export default function Users({
           )}
 
           {newRole ===
-            'SUPER_ADMIN' && (
+            'SYSTEM_ADMIN' && (
             <div className="empty-note">
               حساب مدير النظام إداري مركزي: لا
               يحتاج موظفاً ولا مشروعاً.
@@ -333,7 +327,7 @@ export default function Users({
         <div className="formgrid">
           <select value={selectedSectorManager} onChange={(e) => setSelectedSectorManager(e.target.value)}>
             <option value="">اختر مدير القطاع</option>
-            {users.filter((u: User) => u.role === 'PROJECT_DIRECTOR' && u.status === 'ACTIVE').map((u: User) => (
+            {users.filter((u: User) => u.role === 'SECTOR_MANAGER' && u.status === 'ACTIVE').map((u: User) => (
               <option key={u.user_id} value={u.user_id}>
                 {u.username} — {u.employee_id || 'بدون موظف'}
               </option>

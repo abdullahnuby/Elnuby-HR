@@ -14,6 +14,7 @@ import PermissionSection from '@/components/hr/PermissionSection';
 import UsersPage from '@/components/hr/UsersPage';
 import Reports from '@/components/hr/Reports';
 import Settings from '@/components/hr/Settings';
+import SystemAdminPanel from '@/components/hr/SystemAdminPanel';
 
 
 type Employee = {
@@ -161,7 +162,7 @@ export default function Home() {
       try {
         setDash(await api('dashboard'));
 
-        if (['PROJECT_MANAGER', 'PROJECT_DIRECTOR'].includes(me.user?.role)) {
+        if (['PROJECT_MANAGER', 'SECTOR_MANAGER'].includes(me.user?.role)) {
           setManagerDash(await api('project_manager_dashboard'));
         }
       } catch {
@@ -190,7 +191,7 @@ export default function Home() {
         setError(e.message || 'تعذر تحميل لوحة التحكم');
       }
 
-      if (['PROJECT_MANAGER', 'PROJECT_DIRECTOR'].includes(m.user?.role)) {
+      if (['PROJECT_MANAGER', 'SECTOR_MANAGER'].includes(m.user?.role)) {
         try {
           setManagerDash(await api('project_manager_dashboard'));
         } catch (e: any) {
@@ -199,7 +200,7 @@ export default function Home() {
       }
 
       if (
-        ['SUPER_ADMIN', 'HR_MANAGER', 'PROJECT_DIRECTOR', 'PROJECT_MANAGER'].includes(
+        ['SYSTEM_ADMIN', 'HR_MANAGER', 'SECTOR_MANAGER', 'PROJECT_MANAGER'].includes(
           m.user?.role,
         )
       ) {
@@ -222,7 +223,7 @@ export default function Home() {
         }
       }
 
-      if (['SUPER_ADMIN', 'HR_MANAGER'].includes(m.user?.role)) {
+      if (['SYSTEM_ADMIN', 'HR_MANAGER'].includes(m.user?.role)) {
         try {
           setUsers(await api('users'));
         } catch (e: any) {
@@ -635,8 +636,7 @@ export default function Home() {
     if (
       (newRole === 'EMPLOYEE' ||
         newRole === 'PROJECT_MANAGER' ||
-        newRole === 'PROJECT_DIRECTOR' ||
-        newRole === 'SITE_SUPERVISOR') &&
+        newRole === 'SECTOR_MANAGER') &&
       !newEmployee
     ) {
       return setError(
@@ -645,7 +645,7 @@ export default function Home() {
     }
 
     if (
-      (newRole === 'PROJECT_MANAGER' || newRole === 'SITE_SUPERVISOR') &&
+      (newRole === 'PROJECT_MANAGER') &&
       !newProject
     ) {
       return setError(
@@ -653,7 +653,7 @@ export default function Home() {
       );
     }
 
-    if (newRole === 'PROJECT_DIRECTOR' && !selectedSectorProjects.length) {
+    if (newRole === 'SECTOR_MANAGER' && !selectedSectorProjects.length) {
       return setError('اختر مشروعًا واحدًا على الأقل لمدير القطاع');
     }
 
@@ -665,27 +665,25 @@ export default function Home() {
         password: newPassword,
         role: newRole,
         employee_id:
-          (newRole === 'EMPLOYEE' || newRole === 'PROJECT_MANAGER' || newRole === 'PROJECT_DIRECTOR' || newRole === 'SITE_SUPERVISOR')
+          (newRole === 'EMPLOYEE' || newRole === 'PROJECT_MANAGER' || newRole === 'SECTOR_MANAGER')
             ? newEmployee
             : '',
         project_id:
-          (newRole === 'PROJECT_MANAGER' || newRole === 'SITE_SUPERVISOR')
+          (newRole === 'PROJECT_MANAGER')
             ? newProject
             : '',
         project_ids:
-          newRole === 'PROJECT_DIRECTOR'
+          newRole === 'SECTOR_MANAGER'
             ? selectedSectorProjects
             : [],
         status: 'ACTIVE',
       });
 
       setNotice(
-        newRole === 'PROJECT_DIRECTOR'
+        newRole === 'SECTOR_MANAGER'
           ? 'تم إنشاء حساب مدير القطاع وربطه بالمشروعات المحددة بنجاح'
           : newRole === 'PROJECT_MANAGER'
           ? 'تم إنشاء حساب مدير المشروع وربطه بالمشروع بنجاح'
-          : newRole === 'SITE_SUPERVISOR'
-            ? 'تم إنشاء حساب مشرف الموقع وربطه بالمشروع بنجاح'
           : newRole === 'HR_MANAGER'
             ? 'تم إنشاء حساب HR بدون ربطه بموظف أو مشروع'
             : 'تم إنشاء الحساب بنجاح',
@@ -1003,8 +1001,7 @@ export default function Home() {
 
         <div className="content">
           {section === 'dashboard' &&
-            (me.user?.role ===
-            'PROJECT_MANAGER' ? (
+            (['PROJECT_MANAGER', 'SECTOR_MANAGER'].includes(me.user?.role) ? (
               <ManagerDashboard
                 me={me}
                 dash={dash}
@@ -1025,7 +1022,7 @@ export default function Home() {
 
           {section === 'employees' && (
             <EmployeesPage
-              managerMode={['PROJECT_DIRECTOR', 'PROJECT_MANAGER'].includes(me.user?.role)}
+              managerMode={['SECTOR_MANAGER', 'PROJECT_MANAGER'].includes(me.user?.role)}
               employees={employees}
               projects={projects}
               shifts={shifts}
@@ -1057,7 +1054,7 @@ export default function Home() {
 
           {section === 'shifts' && (
             <ShiftsPage
-              managerMode={['PROJECT_DIRECTOR', 'PROJECT_MANAGER'].includes(me.user?.role)}
+              managerMode={['SECTOR_MANAGER', 'PROJECT_MANAGER'].includes(me.user?.role)}
               shifts={shifts}
               rows={rows}
               shiftForm={shiftForm}
@@ -1069,7 +1066,7 @@ export default function Home() {
 
           {section === 'projects' && (
             <ProjectsPage
-              managerMode={['PROJECT_DIRECTOR', 'PROJECT_MANAGER'].includes(me.user?.role)}
+              managerMode={['SECTOR_MANAGER', 'PROJECT_MANAGER'].includes(me.user?.role)}
               projects={projects}
               employees={employees}
               projectForm={projectForm}
@@ -1215,7 +1212,11 @@ export default function Home() {
           )}
 
           {section === 'settings' && (
-            <Settings />
+            me.user?.role === 'SYSTEM_ADMIN' ? (
+              <SystemAdminPanel />
+            ) : (
+              <Settings />
+            )
           )}
 
           {error && (

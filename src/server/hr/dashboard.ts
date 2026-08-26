@@ -17,7 +17,7 @@ export async function getDashboard(
       ];
     }
   } else if (
-    ["PROJECT_DIRECTOR", "PROJECT_MANAGER", "SITE_SUPERVISOR"].includes(session.user.role)
+    ["SECTOR_MANAGER", "PROJECT_MANAGER"].includes(session.user.role)
   ) {
     const projectIds =
       await getManagedProjectIds(

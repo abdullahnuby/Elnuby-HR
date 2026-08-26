@@ -93,7 +93,7 @@ export default function Dashboard({
             </span>
           </div>
 
-          {['EMPLOYEE', 'PROJECT_MANAGER', 'PROJECT_DIRECTOR', 'SITE_SUPERVISOR'].includes(me?.user?.role) && (
+          {['EMPLOYEE', 'PROJECT_MANAGER', 'SECTOR_MANAGER', ].includes(me?.user?.role) && (
           <div className="attendance-actions">
             <button
               className="attendance-btn in"

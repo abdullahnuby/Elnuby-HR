@@ -20,7 +20,7 @@ export default function LeaveSection({
 
   const hr =
     role === 'HR_MANAGER' ||
-    role === 'SUPER_ADMIN';
+    role === 'SYSTEM_ADMIN';
 
   return (
     <section className="panel page-panel">

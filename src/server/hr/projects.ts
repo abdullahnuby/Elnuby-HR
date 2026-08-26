@@ -10,7 +10,7 @@ export async function listProjects(
     .select("*")
     .order("name");
 
-  if (["PROJECT_DIRECTOR", "PROJECT_MANAGER", "SITE_SUPERVISOR"].includes(session.user.role)) {
+  if (["SECTOR_MANAGER", "PROJECT_MANAGER"].includes(session.user.role)) {
     const ids = await getManagedProjectIds(session.user);
 
     if (!ids.length) {
@@ -142,7 +142,7 @@ export async function listProjects(
       employee_id: user?.employee_id ?? null,
       username: user?.username ?? null,
       name: user?.username ?? user?.employee_id ?? manager.user_id,
-      role: "PROJECT_DIRECTOR",
+      role: "SECTOR_MANAGER",
       start_date: manager.start_date,
       end_date: manager.end_date,
     });

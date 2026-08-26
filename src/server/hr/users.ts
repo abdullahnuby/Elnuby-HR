@@ -19,7 +19,7 @@ export async function listDeductions(
     )
     .range(from, to);
 
-  if (["PROJECT_DIRECTOR", "PROJECT_MANAGER", "SITE_SUPERVISOR"].includes(session.user.role)) {
+  if (["SECTOR_MANAGER", "PROJECT_MANAGER"].includes(session.user.role)) {
     const ids =
       await getManagedProjectIds(
         session.user
@@ -172,9 +172,9 @@ export async function createUser(
     );
   }
 
-  // HR can manage workforce accounts, but only SUPER_ADMIN can create
+  // HR can manage workforce accounts, but only SYSTEM_ADMIN can create
   // another HR administrator or a full system administrator.
-  if (session.user.role === "HR_MANAGER" && ["SUPER_ADMIN", "HR_MANAGER"].includes(role)) {
+  if (session.user.role === "HR_MANAGER" && ["SYSTEM_ADMIN", "HR_MANAGER"].includes(role)) {
     return errorResponse("مدير HR لا يستطيع إنشاء حساب مدير نظام أو حساب HR إداري آخر", 403);
   }
 
@@ -182,8 +182,7 @@ export async function createUser(
     [
       "EMPLOYEE",
       "PROJECT_MANAGER",
-      "PROJECT_DIRECTOR",
-      "SITE_SUPERVISOR",
+      "SECTOR_MANAGER",
     ].includes(role) &&
     !employeeId
   ) {
@@ -193,7 +192,7 @@ export async function createUser(
   }
 
   if (
-    ["PROJECT_MANAGER", "SITE_SUPERVISOR"].includes(role) &&
+    ["PROJECT_MANAGER"].includes(role) &&
     !projectId
   ) {
     return errorResponse(
@@ -257,11 +256,11 @@ export async function createUser(
     }
   }
 
-  const directorProjectIds = role === "PROJECT_DIRECTOR"
+  const directorProjectIds = role === "SECTOR_MANAGER"
     ? [...new Set((Array.isArray(body.project_ids) ? body.project_ids : projectId ? [projectId] : []).map((v) => String(v).trim()).filter(Boolean))]
     : [];
 
-  if (role === "PROJECT_DIRECTOR" && !directorProjectIds.length) {
+  if (role === "SECTOR_MANAGER" && !directorProjectIds.length) {
     return errorResponse("مدير القطاع يجب أن يتم إسناده إلى مشروع واحد على الأقل");
   }
 
@@ -290,9 +289,8 @@ export async function createUser(
           [
             "EMPLOYEE",
             "PROJECT_MANAGER",
-            "PROJECT_DIRECTOR",
-            "SITE_SUPERVISOR",
-          ].includes(role)
+            "SECTOR_MANAGER",
+                ].includes(role)
             ? employeeId
             : null,
 
@@ -329,7 +327,7 @@ export async function createUser(
     );
   }
 
-  if (role === "PROJECT_DIRECTOR") {
+  if (role === "SECTOR_MANAGER") {
     const { error: scopeError } = await supabase.from("sector_manager_projects").insert(
       directorProjectIds.map((id) => ({
         assignment_id: generateId("SEC"),
@@ -358,26 +356,6 @@ export async function createUser(
     if (managerError) {
       return errorResponse(
         `تم إنشاء الحساب لكن فشل ربط مدير المشروع: ${managerError.message}`,
-        500
-      );
-    }
-  } else if (role === "SITE_SUPERVISOR") {
-    const { error: supervisorError } =
-      await supabase
-        .from("project_supervisors")
-        .insert({
-          assignment_id: generateId("SUP"),
-          user_id: userId,
-          project_id: projectId,
-          start_date: riyadhDate(),
-          end_date: null,
-          created_by: session.user.user_id,
-          created_at: nowISO(),
-        });
-
-    if (supervisorError) {
-      return errorResponse(
-        `تم إنشاء الحساب لكن فشل ربط مشرف الموقع بالمشروع: ${supervisorError.message}`,
         500
       );
     }
@@ -419,7 +397,7 @@ export async function assignSectorManagerProjects(
     .eq("id", userId)
     .maybeSingle();
 
-  if (!user || user.role !== "PROJECT_DIRECTOR") {
+  if (!user || user.role !== "SECTOR_MANAGER") {
     return errorResponse("المستخدم المحدد ليس مدير قطاع");
   }
 
@@ -428,8 +406,8 @@ export async function assignSectorManagerProjects(
   }
 
   // A project director may only add projects that they themselves already control
-  // when a director is doing the assignment; HR/SUPER_ADMIN can assign any project.
-  if (session.user.role === "PROJECT_DIRECTOR") {
+  // when a director is doing the assignment; HR/SYSTEM_ADMIN can assign any project.
+  if (session.user.role === "SECTOR_MANAGER") {
     const allowed = new Set(await getManagedProjectIds(session.user));
     if (projectIds.some((id) => !allowed.has(id))) {
       return errorResponse("مدير القطاع لا يستطيع إسناد مشروع خارج نطاقه", 403);
@@ -495,6 +473,21 @@ const ADMIN_MUTABLE_TABLES = new Set([
 function validateAdminTable(value: unknown) {
   const table = String(value || "").trim();
   return ADMIN_MUTABLE_TABLES.has(table) ? table : null;
+}
+
+export async function adminList(
+  _session: SessionContext,
+  body: Record<string, unknown>,
+) {
+  const table = validateAdminTable(body.table);
+  if (!table) return errorResponse("الجدول غير مسموح بإدارته");
+  const { data, error } = await supabase.from(table).select("*").limit(200);
+  if (error) return errorResponse(error.message, 500);
+  return success((data || []).map((row: any) => {
+    const safe = { ...row };
+    if (table === "users") delete safe.password_hash;
+    return safe;
+  }));
 }
 
 export async function adminInsert(
