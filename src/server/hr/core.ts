@@ -375,23 +375,41 @@ export async function getManagedProjectIds(
     return [];
   }
 
-  const table = user.role === "SECTOR_MANAGER"
-    ? "sector_manager_projects"
-    : "project_managers";
-  const { data } = await supabase
-    .from(table)
-    .select("project_id,start_date,end_date")
-    .eq("user_id", user.user_id);
-
   const today = riyadhDate();
 
-  return (data || [])
-    .filter((row: any) => {
-      const starts = !row.start_date || row.start_date <= today;
-      const active = !row.end_date || row.end_date >= today;
-      return starts && active;
+  const tables = user.role === "SECTOR_MANAGER"
+    ? ["sector_manager_projects"]
+    : ["project_managers", "project_supervisors"];
+
+  const results = await Promise.all(
+    tables.map(async (table) => {
+      const { data, error } = await supabase
+        .from(table)
+        .select("project_id,start_date,end_date")
+        .eq("user_id", user.user_id);
+
+      if (error) {
+        console.error(`getManagedProjectIds(${table}):`, error);
+        return [];
+      }
+
+      return data || [];
     })
-    .map((row: any) => row.project_id);
+  );
+
+  return Array.from(
+    new Set(
+      results
+        .flat()
+        .filter((row: any) => {
+          const starts = !row.start_date || row.start_date <= today;
+          const active = !row.end_date || row.end_date >= today;
+          return starts && active;
+        })
+        .map((row: any) => String(row.project_id))
+        .filter(Boolean)
+    )
+  );
 }
 
 export async function canManageProject(

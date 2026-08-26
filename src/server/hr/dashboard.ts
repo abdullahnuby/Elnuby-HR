@@ -63,7 +63,6 @@ export async function getDashboard(
       present: 0,
       late: 0,
       missingCheckout: 0,
-      selfAttendance: null,
       serverTime: nowISO(),
     });
   }
@@ -82,13 +81,6 @@ export async function getDashboard(
 
   const rows =
     attendance || [];
-
-  const selfAttendance = session.user.employee_id
-    ? rows.find(
-        (row: any) =>
-          String(row.employee_id) === String(session.user.employee_id)
-      ) || null
-    : null;
 
   return success({
     employees:
@@ -109,8 +101,6 @@ export async function getDashboard(
           !row.check_out
       ).length,
 
-    selfAttendance,
-
     serverTime:
       nowISO(),
   });
@@ -123,19 +113,18 @@ export async function getDashboard(
 export async function getProjectManagerDashboard(
   session: SessionContext
 ) {
-  const projectIds =
-    await getManagedProjectIds(
-      session.user
-    );
+  const projectIds = await getManagedProjectIds(session.user);
 
   if (!projectIds.length) {
     return success({
+      assignmentMissing: true,
       summary: {
         employees: 0,
         present: 0,
         late: 0,
         onLeave: 0,
         absent: 0,
+        missingCheckout: 0,
         pendingLeaves: 0,
         pendingPermissions: 0,
       },
@@ -143,215 +132,166 @@ export async function getProjectManagerDashboard(
       team: [],
       pendingLeaves: [],
       pendingPermissions: [],
+      selfAttendance: null,
     });
-  }
-
-  const [
-    projectsResult,
-    assignmentsResult,
-  ] = await Promise.all([
-    supabase
-      .from("projects")
-      .select("*")
-      .in(
-        "project_id",
-        projectIds
-      ),
-
-    supabase
-      .from("project_assignments")
-      .select("*")
-      .in(
-        "project_id",
-        projectIds
-      )
-      .eq(
-        "is_current",
-        true
-      ),
-  ]);
-
-  const projects =
-    projectsResult.data || [];
-
-  const assignments =
-    assignmentsResult.data || [];
-
-  const employeeIds = [
-    ...new Set(
-      assignments.map(
-        (row: any) =>
-          row.employee_id
-      )
-    ),
-  ];
-
-  let employees: any[] = [];
-
-  if (employeeIds.length) {
-    const { data } =
-      await supabase
-        .from("employees")
-        .select("*")
-        .in(
-          "employee_id",
-          employeeIds
-        );
-
-    employees = data || [];
   }
 
   const today = riyadhDate();
 
-  const [
-    attendanceResult,
-    leaveResult,
-    permissionResult,
-  ] = await Promise.all([
-    supabase
-      .from("attendance")
-      .select("*")
-      .eq("date", today)
-      .in(
-        "project_id",
-        projectIds
-      ),
+  const [projectsResult, assignmentsResult, attendanceResult, leaveResult, permissionResult] =
+    await Promise.all([
+      supabase
+        .from("projects")
+        .select("*")
+        .in("project_id", projectIds),
+      supabase
+        .from("project_assignments")
+        .select("*")
+        .in("project_id", projectIds)
+        .eq("is_current", true),
+      supabase
+        .from("attendance")
+        .select("*")
+        .eq("date", today)
+        .in("project_id", projectIds),
+      supabase
+        .from("leave_requests")
+        .select("*")
+        .in("project_id", projectIds)
+        .in("status", ["PENDING_MANAGER", "PENDING_HR", "APPROVED"]),
+      supabase
+        .from("permission_requests")
+        .select("*")
+        .in("project_id", projectIds)
+        .eq("status", "PENDING"),
+    ]);
 
-    supabase
-      .from("leave_requests")
-      .select("*")
-      .in(
-        "project_id",
-        projectIds
-      )
-      .in(
-        "status",
-        [
-          "PENDING_MANAGER",
-          "PENDING_HR",
-          "APPROVED",
-        ]
-      ),
+  const firstError = [
+    projectsResult.error,
+    assignmentsResult.error,
+    attendanceResult.error,
+    leaveResult.error,
+    permissionResult.error,
+  ].find(Boolean);
 
-    supabase
-      .from("permission_requests")
-      .select("*")
-      .in(
-        "project_id",
-        projectIds
-      )
-      .eq(
-        "status",
-        "PENDING"
-      ),
-  ]);
+  if (firstError) {
+    console.error("project manager dashboard:", firstError);
+    return errorResponse("تعذر تحميل بيانات لوحة مدير المشروع", 500);
+  }
 
-  const attendance =
-    attendanceResult.data || [];
+  const projects = projectsResult.data || [];
+  const assignments = assignmentsResult.data || [];
+  const attendance = attendanceResult.data || [];
+  const leaves = leaveResult.data || [];
+  const permissions = permissionResult.data || [];
 
-  const leaves =
-    leaveResult.data || [];
-
-  const permissions =
-    permissionResult.data || [];
-
-  const presentEmployees =
+  const employeeIds = Array.from(
     new Set(
-      attendance.map(
+      assignments
+        .map((row: any) => String(row.employee_id || ""))
+        .filter(Boolean)
+    )
+  );
+
+  let employees: any[] = [];
+  if (employeeIds.length) {
+    const { data, error } = await supabase
+      .from("employees")
+      .select("*")
+      .in("employee_id", employeeIds);
+    if (error) {
+      console.error("project manager employees:", error);
+      return errorResponse("تعذر تحميل موظفي المشروع", 500);
+    }
+    employees = data || [];
+  }
+
+  const projectMap = new Map(
+    projects.map((project: any) => [String(project.project_id), project])
+  );
+
+  const attendanceByEmployee = new Map<string, any>();
+  for (const row of attendance) {
+    const id = String(row.employee_id || "");
+    if (id && !attendanceByEmployee.has(id)) attendanceByEmployee.set(id, row);
+  }
+
+  const employeesOnLeave = new Set(
+    leaves
+      .filter(
         (row: any) =>
-          row.employee_id
+          row.status === "APPROVED" &&
+          row.from_date <= today &&
+          row.to_date >= today
       )
-    );
+      .map((row: any) => String(row.employee_id))
+  );
 
-  const employeesOnLeave =
-    new Set(
-      leaves
-        .filter(
-          (row: any) =>
-            row.status ===
-              "APPROVED" &&
-            row.from_date <=
-              today &&
-            row.to_date >=
-              today
-        )
-        .map(
-          (row: any) =>
-            row.employee_id
-        )
-    );
+  const presentEmployeeIds = new Set(
+    attendance
+      .map((row: any) => String(row.employee_id || ""))
+      .filter(Boolean)
+  );
 
-  const absentEmployees =
-    employeeIds.filter(
-      (employeeId) =>
-        !presentEmployees.has(
-          employeeId
-        ) &&
-        !employeesOnLeave.has(
-          employeeId
-        )
-    );
+  const absentEmployeeIds = employeeIds.filter(
+    (id) => !presentEmployeeIds.has(id) && !employeesOnLeave.has(id)
+  );
+
+  const team = employees.map((employee: any) => {
+    const assignment = assignments.find(
+      (row: any) => String(row.employee_id) === String(employee.employee_id)
+    ) || null;
+    const record = attendanceByEmployee.get(String(employee.employee_id)) || null;
+    const onLeave = employeesOnLeave.has(String(employee.employee_id));
+
+    let state = "ABSENT";
+    if (onLeave) state = "ON_LEAVE";
+    else if (record?.status === "LATE") state = "LATE";
+    else if (record?.check_in && !record?.check_out) state = "CHECKED_IN";
+    else if (record?.check_in) state = "PRESENT";
+
+    return {
+      ...employee,
+      project_id: assignment?.project_id || null,
+      project_name: assignment
+        ? projectMap.get(String(assignment.project_id))?.name || "—"
+        : "—",
+      assignment,
+      attendance: record,
+      state,
+    };
+  });
+
+  const projectStats = projects.map((project: any) => ({
+    ...project,
+    employee_count: assignments.filter(
+      (row: any) => String(row.project_id) === String(project.project_id)
+    ).length,
+  }));
+
+  const pendingLeaves = leaves.filter(
+    (row: any) => row.status === "PENDING_MANAGER"
+  );
 
   return success({
+    assignmentMissing: false,
     summary: {
-      employees:
-        employeeIds.length,
-
-      present:
-        attendance.length,
-
-      late:
-        attendance.filter(
-          (row: any) =>
-            row.status === "LATE"
-        ).length,
-
-      onLeave:
-        employeesOnLeave.size,
-
-      absent:
-        absentEmployees.length,
-
-      pendingLeaves:
-        leaves.filter(
-          (row: any) =>
-            row.status ===
-            "PENDING_MANAGER"
-        ).length,
-
-      pendingPermissions:
-        permissions.length,
+      employees: employeeIds.length,
+      present: presentEmployeeIds.size,
+      late: attendance.filter((row: any) => row.status === "LATE").length,
+      onLeave: employeesOnLeave.size,
+      absent: absentEmployeeIds.length,
+      missingCheckout: attendance.filter((row: any) => row.check_in && !row.check_out).length,
+      pendingLeaves: pendingLeaves.length,
+      pendingPermissions: permissions.length,
     },
-
-    projects,
-
-    team: employees.map(
-      (employee: any) => ({
-        ...employee,
-        assignment:
-          assignments.find(
-            (assignment: any) =>
-              assignment.employee_id ===
-              employee.employee_id
-          ) || null,
-        attendance:
-          attendance.find(
-            (attendanceRow: any) =>
-              attendanceRow.employee_id ===
-              employee.employee_id
-          ) || null,
-      })
-    ),
-
-    pendingLeaves:
-      leaves.filter(
-        (row: any) =>
-          row.status !==
-          "APPROVED"
-      ),
-
-    pendingPermissions:
-      permissions,
+    projects: projectStats,
+    team,
+    pendingLeaves,
+    pendingPermissions: permissions,
+    selfAttendance: session.user.employee_id
+      ? attendanceByEmployee.get(String(session.user.employee_id)) || null
+      : null,
   });
 }
 

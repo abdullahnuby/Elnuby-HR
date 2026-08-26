@@ -1,396 +1,233 @@
+import type { CSSProperties } from 'react';
 import Icon from './Icon';
-import { Kpi, Table, Empty } from './common';
-export default function ManagerDashboard({
-  me,
-  dash,
-  managerDash,
-  roleLabels,
-  setSection,
-  locate,
-  busy,
-}: any) {
-  const s = managerDash?.summary || {};
-  const projects =
-    managerDash?.projects || [];
-  const team = managerDash?.team || [];
-  const leaves =
-    managerDash?.pendingLeaves || [];
-  const permissions =
-    managerDash?.pendingPermissions || [];
+import { Empty } from './common';
 
-  const myEmployeeId = String(me?.user?.employee_id || '');
-  const myTeamRecord = team.find(
-    (employee: any) =>
-      String(employee?.employee_id || '') === myEmployeeId,
-  );
-  const myAttendance = myTeamRecord?.attendance || null;
-  const canSelfAttend =
-    me?.user?.role === 'PROJECT_MANAGER' &&
-    Boolean(me?.employee?.employee_id) &&
-    Boolean(me?.project?.project_id) &&
-    Boolean(me?.shift);
+type ManagerDashboardProps = {
+  me: any;
+  dash: any;
+  managerDash: any;
+  roleLabels: Record<string, string>;
+  setSection: (section: string) => void;
+};
 
-  const stateLabel = (v: string) =>
-    (
-      {
-        PRESENT: 'حاضر',
-        CHECKED_IN: 'حاضر ولم ينصرف',
-        LATE: 'متأخر',
-        ON_LEAVE: 'إجازة',
-        ABSENT: 'غائب',
-      } as any
-    )[v] || v;
+const STATE_META: Record<string, { label: string; tone: string; icon: string }> = {
+  PRESENT: { label: 'حاضر', tone: 'success', icon: 'check' },
+  CHECKED_IN: { label: 'لم ينصرف', tone: 'warning', icon: 'attendance' },
+  LATE: { label: 'متأخر', tone: 'danger', icon: 'alert' },
+  ON_LEAVE: { label: 'إجازة', tone: 'info', icon: 'calendar' },
+  ABSENT: { label: 'غائب', tone: 'muted', icon: 'users' },
+};
 
+function StatusBadge({ state, label }: { state?: string; label?: string }) {
+  const meta = STATE_META[state || ''] || { label: label || state || '—', tone: 'muted', icon: 'dashboard' };
   return (
-    <>
-      {managerDash?.assignmentMissing && (
-        <div className="alert danger">
-          هذا الحساب مدير مشروع لكنه غير مربوط
-          بأي مشروع. من حساب مدير النظام افتح
-          «حسابات المستخدمين» ثم «ربط مدير مشروع
-          بمشروع» واحفظ المشروع، وبعدها أعد تحميل
-          الصفحة.
-        </div>
-      )}
-
-      <div className="welcome">
-        <div>
-          <div className="eyebrow">
-            PROJECT MANAGEMENT CENTER
-          </div>
-
-          <h1>
-            لوحة مدير المشروع —{' '}
-            {me.employee?.name ||
-              me.user?.username}{' '}
-
-          </h1>
-
-          <p>
-            إدارة ومتابعة مشروعك وموظفيك والحضور
-            والطلبات من مكان واحد.
-          </p>
-        </div>
-
-        <div className="welcome-role">
-          <span>المشاريع التابعة</span>
-          <b>{projects.length}</b>
-        </div>
-      </div>
-
-      {canSelfAttend && (
-        <section className="manager-attendance-card panel" aria-label="تسجيل حضور مدير المشروع">
-          <div className="manager-attendance-main">
-            <div className="manager-attendance-icon">
-              <Icon name="attendance" size={24} />
-            </div>
-            <div>
-              <div className="eyebrow">MY ATTENDANCE</div>
-              <h2>حضورك وانصرافك اليوم</h2>
-              <p>
-                {me?.project?.name || 'المشروع الحالي'} •{' '}
-                {me?.shift?.name || 'الوردية الحالية'}
-                {me?.shift?.start_time
-                  ? ` • تبدأ ${String(me.shift.start_time).slice(0, 5)}`
-                  : ''}
-              </p>
-            </div>
-          </div>
-
-          <div className="manager-attendance-status">
-            <div>
-              <span>الحضور</span>
-              <strong>{myAttendance?.check_in || 'لم يسجل'}</strong>
-            </div>
-            <div>
-              <span>الانصراف</span>
-              <strong>{myAttendance?.check_out || 'لم يسجل'}</strong>
-            </div>
-          </div>
-
-          <div className="manager-attendance-actions">
-            {!myAttendance?.check_in ? (
-              <button
-                className="primary attendance-primary-action"
-                disabled={busy}
-                onClick={() => locate?.('check_in')}
-                type="button"
-              >
-                <Icon name="attendance" size={18} />
-                {busy ? 'جاري تحديد الموقع…' : 'تسجيل الحضور'}
-              </button>
-            ) : !myAttendance?.check_out ? (
-              <button
-                className="primary attendance-primary-action"
-                disabled={busy}
-                onClick={() => locate?.('check_out')}
-                type="button"
-              >
-                <Icon name="logout" size={18} />
-                {busy ? 'جاري تحديد الموقع…' : 'تسجيل الانصراف'}
-              </button>
-            ) : (
-              <span className="attendance-complete">
-                <Icon name="check" size={17} />
-                تم تسجيل الحضور والانصراف
-              </span>
-            )}
-
-            <button
-              className="secondary"
-              type="button"
-              onClick={() => setSection('attendance')}
-            >
-              عرض سجل الحضور
-            </button>
-          </div>
-        </section>
-      )}
-
-      <div className="kpis">
-        <Kpi
-          title="موظفو المشروع"
-          value={s.employees ?? 0}
-          icon="users"
-        />
-
-        <Kpi
-          title="حاضر اليوم"
-          value={s.present ?? 0}
-          icon="check"
-        />
-
-        <Kpi
-          title="متأخرون"
-          value={s.late ?? 0}
-          icon="shifts"
-        />
-
-        <Kpi
-          title="في إجازة"
-          value={s.onLeave ?? 0}
-          icon="leaves"
-        />
-      </div>
-
-      <div className="dashboard-grid">
-        <section className="panel page-panel">
-          <div className="panel-head">
-            <div>
-              <h2>مشاريعي</h2>
-              <p>
-                المشاريع التي تم تعيينك عليها
-                رسميًا.
-              </p>
-            </div>
-          </div>
-
-          <div className="project-cards">
-            {projects.map((p: any) => (
-              <div
-                className="project-card"
-                key={p.project_id}
-              >
-                <div className="project-icon">
-                  <Icon name="projects" size={20} />
-                </div>
-
-                <div className="project-card-main">
-                  <h3>{p.name}</h3>
-
-                  <p>
-                    {p.location_name ||
-                      'الموقع غير محدد'}{' '}
-                    {p.client
-                      ? `• ${p.client}`
-                      : ''}
-                  </p>
-
-                  <div className="project-meta">
-                    <span>
-                      <Icon name="users" size={13} /> {p.employee_count || 0}{' '}
-                      موظف
-                    </span>
-
-                    <span>
-                      GPS {p.latitude},{' '}
-                      {p.longitude}
-                    </span>
-
-                    <span>
-                      {p.geofence_radius_m ||
-                        200}
-                      m
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="panel today-panel">
-          <div className="panel-head">
-            <div>
-              <h2>حالة اليوم</h2>
-              <p>
-                حالة القوة العاملة في مشروعك.
-              </p>
-            </div>
-          </div>
-
-          <div className="today-row">
-            <span>غائب</span>
-            <strong>{s.absent ?? 0}</strong>
-          </div>
-
-          <div className="today-row">
-            <span>في إجازة</span>
-            <strong>{s.onLeave ?? 0}</strong>
-          </div>
-
-          <div className="today-row">
-            <span>
-              طلبات إجازة معلقة
-            </span>
-            <strong>
-              {s.pendingLeaves ?? 0}
-            </strong>
-          </div>
-
-          <div className="today-row">
-            <span>
-              طلبات إذن معلقة
-            </span>
-            <strong>
-              {s.pendingPermissions ?? 0}
-            </strong>
-          </div>
-        </section>
-      </div>
-
-      <section className="panel page-panel">
-        <div className="panel-head">
-          <div>
-            <h2>حالة الموظفين الآن</h2>
-            <p>
-              حاضر، متأخر، غائب أو في إجازة.
-            </p>
-          </div>
-
-          <span className="count-pill">
-            {team.length} موظف
-          </span>
-        </div>
-
-        <Table
-          headers={[
-            'الموظف',
-            'الوظيفة',
-            'المشروع',
-            'الحالة',
-            'الحضور',
-            'الانصراف',
-          ]}
-          rows={team.map((e: any) => [
-            e.name,
-            e.job_title || '—',
-            e.project_name || '—',
-            stateLabel(e.state),
-            e.attendance?.check_in || '—',
-            e.attendance?.check_out || '—',
-          ])}
-        />
-      </section>
-
-      <div className="dashboard-grid">
-        <section className="panel page-panel">
-          <div className="panel-head">
-            <div>
-              <h2>طلبات الإجازات</h2>
-              <p>
-                الطلبات التي تحتاج قرار مدير
-                المشروع.
-              </p>
-            </div>
-          </div>
-
-          {leaves.length ? (
-            <Table
-              headers={[
-                'الموظف',
-                'النوع',
-                'من',
-                'إلى',
-                'الحالة',
-              ]}
-              rows={leaves.map((r: any) => [
-                r.employee_name,
-                r.leave_type_name ||
-                  r.leave_type_id,
-                r.from_date,
-                r.to_date,
-                r.status,
-              ])}
-            />
-          ) : (
-            <Empty text="لا توجد طلبات إجازة معلقة." />
-          )}
-
-          <button
-            className="secondary"
-            onClick={() =>
-              setSection('leaves')
-            }
-          >
-            فتح كل الإجازات
-          </button>
-        </section>
-
-        <section className="panel page-panel">
-          <div className="panel-head">
-            <div>
-              <h2>طلبات الأذونات</h2>
-              <p>
-                طلبات الأذونات المنتظرة.
-              </p>
-            </div>
-          </div>
-
-          {permissions.length ? (
-            <Table
-              headers={[
-                'الموظف',
-                'البداية',
-                'النهاية',
-                'المدة',
-                'الحالة',
-              ]}
-              rows={permissions.map(
-                (r: any) => [
-                  r.employee_name,
-                  r.start_time,
-                  r.end_time,
-                  `${r.minutes} دقيقة`,
-                  r.status,
-                ],
-              )}
-            />
-          ) : (
-            <Empty text="لا توجد طلبات إذن معلقة." />
-          )}
-
-          <button
-            className="secondary"
-            onClick={() =>
-              setSection('permissions')
-            }
-          >
-            فتح كل الأذونات
-          </button>
-        </section>
-      </div>
-    </>
+    <span className={`pm-status pm-status-${meta.tone}`}>
+      <Icon name={meta.icon} size={13} />
+      {label || meta.label}
+    </span>
   );
 }
 
+function formatDate() {
+  return new Intl.DateTimeFormat('ar-EG', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(new Date());
+}
+
+function timeValue(value: any) {
+  if (!value) return '—';
+  const raw = String(value).slice(0, 5);
+  return raw;
+}
+
+export default function ManagerDashboard({ me, managerDash, setSection }: ManagerDashboardProps) {
+  const summary = managerDash?.summary || {};
+  const projects = Array.isArray(managerDash?.projects) ? managerDash.projects : [];
+  const team = Array.isArray(managerDash?.team) ? managerDash.team : [];
+  const leaves = Array.isArray(managerDash?.pendingLeaves) ? managerDash.pendingLeaves : [];
+  const permissions = Array.isArray(managerDash?.pendingPermissions) ? managerDash.pendingPermissions : [];
+  const selfAttendance = managerDash?.selfAttendance || null;
+  const total = Math.max(Number(summary.employees) || 0, 1);
+  const presentPct = Math.min(100, Math.round(((Number(summary.present) || 0) / total) * 100));
+  const attendedPct = Math.min(100, Math.round((((Number(summary.present) || 0) + (Number(summary.onLeave) || 0)) / total) * 100));
+
+  const firstName = String(me?.employee?.name || me?.user?.username || 'مدير المشروع').split(' ')[0];
+  const attentionCount = (Number(summary.missingCheckout) || 0) + (Number(summary.pendingLeaves) || 0) + (Number(summary.pendingPermissions) || 0);
+
+  return (
+    <div className="pm-dashboard">
+      {managerDash?.assignmentMissing && (
+        <section className="pm-alert">
+          <div className="pm-alert-icon"><Icon name="alert" size={19} /></div>
+          <div>
+            <strong>لا يوجد مشروع مرتبط بهذا الحساب</strong>
+            <p>اربط مدير المشروع بمشروع من حسابات المستخدمين حتى تظهر بيانات الفريق والمؤشرات.</p>
+          </div>
+          <button className="secondary" onClick={() => setSection('users')}>فتح الحسابات</button>
+        </section>
+      )}
+
+      <section className="pm-hero">
+        <div className="pm-hero-copy">
+          <div className="pm-eyebrow"><span className="pm-live-dot" /> مركز إدارة المشروع</div>
+          <h1>صباح الخير، {firstName}</h1>
+          <p>نظرة تشغيلية سريعة على مشاريعك، فريق العمل، الحضور والطلبات التي تحتاج قرارًا.</p>
+          <div className="pm-hero-meta">
+            <span><Icon name="calendar" size={15} /> {formatDate()}</span>
+            <span><Icon name="projects" size={15} /> {projects.length} {projects.length === 1 ? 'مشروع' : 'مشاريع'} نشطة</span>
+          </div>
+        </div>
+        <div className="pm-hero-actions">
+          <button className="pm-action pm-action-primary" onClick={() => setSection('attendance')}>
+            <Icon name="attendance" size={18} />
+            <span>الحضور والانصراف</span>
+          </button>
+          <button className="pm-action" onClick={() => setSection('employees')}>
+            <Icon name="users" size={18} />
+            <span>فريق العمل</span>
+          </button>
+        </div>
+      </section>
+
+      <section className="pm-attendance-card">
+        <div className="pm-attendance-main">
+          <div className="pm-attendance-icon"><Icon name="attendance" size={23} /></div>
+          <div>
+            <div className="pm-section-kicker">حضورك الشخصي</div>
+            <h2>سجل حضورك وانصرافك من الموقع</h2>
+            <p>يتم التحقق من موقعك الجغرافي ونطاق المشروع قبل التسجيل.</p>
+          </div>
+        </div>
+        <div className="pm-attendance-times">
+          <div><span>الحضور</span><strong>{timeValue(selfAttendance?.check_in)}</strong></div>
+          <div><span>الانصراف</span><strong>{timeValue(selfAttendance?.check_out)}</strong></div>
+        </div>
+        <div className="pm-attendance-cta">
+          <StatusBadge
+            state={selfAttendance?.check_out ? 'PRESENT' : selfAttendance?.check_in ? 'CHECKED_IN' : undefined}
+            label={selfAttendance?.check_out ? 'اليوم مكتمل' : selfAttendance?.check_in ? 'تم تسجيل الحضور' : 'لم يتم التسجيل'}
+          />
+          <button className="pm-attendance-button" onClick={() => setSection('attendance')}>
+            {selfAttendance?.check_in && !selfAttendance?.check_out ? 'تسجيل الانصراف' : selfAttendance?.check_out ? 'فتح سجل اليوم' : 'تسجيل الحضور'}
+            <Icon name="check" size={16} />
+          </button>
+        </div>
+      </section>
+
+      <section className="pm-kpi-grid">
+        <div className="pm-kpi pm-kpi-blue">
+          <div className="pm-kpi-icon"><Icon name="users" size={20} /></div>
+          <div><span>إجمالي الفريق</span><strong>{summary.employees ?? 0}</strong><small>موظف على مشاريعك</small></div>
+        </div>
+        <div className="pm-kpi pm-kpi-green">
+          <div className="pm-kpi-icon"><Icon name="check" size={20} /></div>
+          <div><span>حاضر اليوم</span><strong>{summary.present ?? 0}</strong><small>{presentPct}% من الفريق</small></div>
+        </div>
+        <div className="pm-kpi pm-kpi-orange">
+          <div className="pm-kpi-icon"><Icon name="shifts" size={20} /></div>
+          <div><span>متأخرون</span><strong>{summary.late ?? 0}</strong><small>يحتاجون متابعة</small></div>
+        </div>
+        <div className="pm-kpi pm-kpi-purple">
+          <div className="pm-kpi-icon"><Icon name="leaves" size={20} /></div>
+          <div><span>في إجازة</span><strong>{summary.onLeave ?? 0}</strong><small>اليوم</small></div>
+        </div>
+      </section>
+
+      <div className="pm-main-grid">
+        <section className="pm-card pm-workforce-card">
+          <div className="pm-card-head">
+            <div><span className="pm-section-kicker">المؤشرات التشغيلية</span><h2>حالة القوة العاملة اليوم</h2></div>
+            {attentionCount > 0 && <button className="pm-inline-alert" onClick={() => setSection('attendance')}><Icon name="alert" size={14} /> {attentionCount} تحتاج متابعة</button>}
+          </div>
+          <div className="pm-health-layout">
+            <div className="pm-health-ring" style={{ '--pm-progress': `${attendedPct}%` } as CSSProperties}>
+              <div><strong>{attendedPct}%</strong><span>متابعة اليوم</span></div>
+            </div>
+            <div className="pm-health-legend">
+              <div><i className="pm-dot green" /><span>حاضر</span><strong>{summary.present ?? 0}</strong></div>
+              <div><i className="pm-dot orange" /><span>متأخر</span><strong>{summary.late ?? 0}</strong></div>
+              <div><i className="pm-dot blue" /><span>إجازة</span><strong>{summary.onLeave ?? 0}</strong></div>
+              <div><i className="pm-dot gray" /><span>غائب</span><strong>{summary.absent ?? 0}</strong></div>
+            </div>
+          </div>
+          <div className="pm-progress-block"><div><span>نسبة الحضور</span><strong>{presentPct}%</strong></div><div className="pm-progress"><span style={{ width: `${presentPct}%` }} /></div></div>
+        </section>
+
+        <section className="pm-card pm-alerts-card">
+          <div className="pm-card-head"><div><span className="pm-section-kicker">يتطلب انتباهك</span><h2>المتابعات المفتوحة</h2></div></div>
+          <div className="pm-alert-list">
+            <button onClick={() => setSection('attendance')}><span className="pm-list-icon warning"><Icon name="attendance" size={16} /></span><span><b>{summary.missingCheckout ?? 0}</b> موظف بدون انصراف</span><Icon name="menu" size={14} /></button>
+            <button onClick={() => setSection('leaves')}><span className="pm-list-icon info"><Icon name="leaves" size={16} /></span><span><b>{summary.pendingLeaves ?? 0}</b> طلب إجازة معلق</span><Icon name="menu" size={14} /></button>
+            <button onClick={() => setSection('permissions')}><span className="pm-list-icon purple"><Icon name="permissions" size={16} /></span><span><b>{summary.pendingPermissions ?? 0}</b> طلب إذن معلق</span><Icon name="menu" size={14} /></button>
+          </div>
+        </section>
+      </div>
+
+      <section className="pm-card">
+        <div className="pm-card-head">
+          <div><span className="pm-section-kicker">نطاق الإدارة</span><h2>مشاريعك</h2><p>ملخص سريع لكل مشروع مرتبط بحسابك.</p></div>
+          <button className="secondary" onClick={() => setSection('projects')}>عرض المشاريع</button>
+        </div>
+        {projects.length ? (
+          <div className="pm-project-grid">
+            {projects.map((project: any) => {
+              const projectTeam = team.filter((e: any) => String(e.project_id) === String(project.project_id));
+              const projectPresent = projectTeam.filter((e: any) => ['PRESENT', 'CHECKED_IN', 'LATE'].includes(e.state)).length;
+              const pct = project.employee_count ? Math.round((projectPresent / project.employee_count) * 100) : 0;
+              return (
+                <article className="pm-project" key={project.project_id}>
+                  <div className="pm-project-top"><span className="pm-project-icon"><Icon name="projects" size={18} /></span><StatusBadge label={project.status === 'ACTIVE' || !project.status ? 'نشط' : project.status} state="PRESENT" /></div>
+                  <h3>{project.name}</h3>
+                  <p>{project.location_name || 'الموقع غير محدد'}{project.client ? ` • ${project.client}` : ''}</p>
+                  <div className="pm-project-stats"><span><Icon name="users" size={14} /> {project.employee_count || 0} موظف</span><span><Icon name="check" size={14} /> {projectPresent} حاضر</span></div>
+                  <div className="pm-project-progress"><div><span>تغطية اليوم</span><b>{pct}%</b></div><div className="pm-progress"><span style={{ width: `${Math.min(100, pct)}%` }} /></div></div>
+                </article>
+              );
+            })}
+          </div>
+        ) : <Empty text="لا توجد مشاريع مرتبطة بهذا الحساب." />}
+      </section>
+
+      <section className="pm-card">
+        <div className="pm-card-head">
+          <div><span className="pm-section-kicker">المتابعة اليومية</span><h2>فريق العمل</h2><p>آخر حالة معروفة لكل موظف على مشاريعك.</p></div>
+          <div className="pm-team-summary"><span>{team.length} موظف</span><button className="secondary" onClick={() => setSection('attendance')}>سجل الحضور</button></div>
+        </div>
+        {team.length ? (
+          <div className="pm-team-table-wrap">
+            <table className="pm-team-table">
+              <thead><tr><th>الموظف</th><th>المشروع</th><th>الحالة</th><th>الحضور</th><th>الانصراف</th></tr></thead>
+              <tbody>
+                {team.slice(0, 10).map((employee: any) => (
+                  <tr key={employee.employee_id}>
+                    <td><div className="pm-employee"><span>{String(employee.name || '?').trim().charAt(0)}</span><div><strong>{employee.name}</strong><small>{employee.job_title || 'موظف'}</small></div></div></td>
+                    <td>{employee.project_name || '—'}</td>
+                    <td><StatusBadge state={employee.state} /></td>
+                    <td className="pm-time">{timeValue(employee.attendance?.check_in)}</td>
+                    <td className="pm-time">{timeValue(employee.attendance?.check_out)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {team.length > 10 && <button className="pm-more" onClick={() => setSection('employees')}>عرض باقي الفريق ({team.length - 10})</button>}
+          </div>
+        ) : <Empty text="لا توجد بيانات موظفين لعرضها." />}
+      </section>
+
+      <div className="pm-request-grid">
+        <section className="pm-card">
+          <div className="pm-card-head"><div><span className="pm-section-kicker">القرارات</span><h2>إجازات تحتاج اعتمادك</h2></div><span className="pm-count">{leaves.length}</span></div>
+          {leaves.length ? leaves.slice(0, 4).map((row: any) => <div className="pm-request" key={row.leave_id || `${row.employee_id}-${row.from_date}`}><span className="pm-request-avatar">{String(row.employee_name || '?').charAt(0)}</span><div><strong>{row.employee_name || 'موظف'}</strong><small>{row.leave_type_name || row.leave_type_id || 'إجازة'} • {row.from_date} إلى {row.to_date}</small></div><Icon name="calendar" size={16} /></div>) : <Empty text="لا توجد إجازات معلقة." />}
+          <button className="secondary pm-full-button" onClick={() => setSection('leaves')}>فتح الإجازات</button>
+        </section>
+        <section className="pm-card">
+          <div className="pm-card-head"><div><span className="pm-section-kicker">القرارات</span><h2>أذونات تحتاج متابعة</h2></div><span className="pm-count">{permissions.length}</span></div>
+          {permissions.length ? permissions.slice(0, 4).map((row: any) => <div className="pm-request" key={row.permission_id || `${row.employee_id}-${row.start_time}`}><span className="pm-request-avatar purple">{String(row.employee_name || '?').charAt(0)}</span><div><strong>{row.employee_name || 'موظف'}</strong><small>{timeValue(row.start_time)} – {timeValue(row.end_time)} • {row.minutes || 0} دقيقة</small></div><Icon name="permissions" size={16} /></div>) : <Empty text="لا توجد أذونات معلقة." />}
+          <button className="secondary pm-full-button" onClick={() => setSection('permissions')}>فتح الأذونات</button>
+        </section>
+      </div>
+    </div>
+  );
+}
