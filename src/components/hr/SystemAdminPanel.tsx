@@ -1,17 +1,36 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 
-const TABLES = [
-  ['employees', 'الموظفون', 'employee_id'], ['projects', 'المشاريع', 'project_id'],
-  ['shifts', 'الورديات', 'shift_id'], ['users', 'حسابات المستخدمين', 'id'],
-  ['project_assignments', 'تعيينات الموظفين بالمشاريع', 'assignment_id'],
-  ['employee_shifts', 'تعيينات الموظفين بالورديات', 'assignment_id'],
-  ['project_managers', 'مديرو المشاريع', 'id'], ['sector_manager_projects', 'مديرو القطاعات ومشروعاتهم', 'assignment_id'],
-  ['attendance', 'الحضور والانصراف', 'attendance_id'], ['leave_types', 'أنواع الإجازات', 'leave_type_id'],
-  ['leave_balances', 'أرصدة الإجازات', 'id'], ['leave_requests', 'طلبات الإجازات', 'request_id'],
-  ['permission_requests', 'طلبات الأذونات', 'request_id'], ['deductions', 'الخصومات', 'deduction_id'],
-] as const;
+type AdminTable = {
+  value: string;
+  label: string;
+  idColumn: string;
+};
 
+const TABLES: AdminTable[] = [
+  { value: 'employees', label: 'الموظفون', idColumn: 'employee_id' },
+  { value: 'projects', label: 'المشاريع', idColumn: 'project_id' },
+  { value: 'shifts', label: 'الورديات', idColumn: 'shift_id' },
+  { value: 'users', label: 'حسابات المستخدمين', idColumn: 'id' },
+  { value: 'project_assignments', label: 'تعيينات الموظفين بالمشاريع', idColumn: 'assignment_id' },
+  { value: 'employee_shifts', label: 'تعيينات الموظفين بالورديات', idColumn: 'assignment_id' },
+  { value: 'project_managers', label: 'مديرو المشاريع', idColumn: 'id' },
+  { value: 'sector_manager_projects', label: 'مديرو القطاعات ومشروعاتهم', idColumn: 'assignment_id' },
+  { value: 'attendance', label: 'الحضور والانصراف', idColumn: 'attendance_id' },
+  { value: 'leave_types', label: 'أنواع الإجازات', idColumn: 'leave_type_id' },
+  { value: 'leave_balances', label: 'أرصدة الإجازات', idColumn: 'id' },
+  { value: 'leave_requests', label: 'طلبات الإجازات', idColumn: 'request_id' },
+  { value: 'permission_requests', label: 'طلبات الأذونات', idColumn: 'request_id' },
+  { value: 'deductions', label: 'الخصومات', idColumn: 'deduction_id' },
+];
+const [table, setTable] = useState<string>(TABLES[0].value);
+
+const config = useMemo(
+  () => TABLES.find((x) => x.value === table) ?? TABLES[0],
+  [table]
+);
+
+const idColumn = config.idColumn;
 export default function SystemAdminPanel() {
   const [table, setTable] = useState(TABLES[0][0]); const [rows, setRows] = useState<any[]>([]);
   const [selected, setSelected] = useState<any>(null); const [json, setJson] = useState('{}');
