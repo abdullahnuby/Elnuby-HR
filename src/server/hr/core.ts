@@ -43,6 +43,7 @@ export const ROLES = [
   "SUPER_ADMIN",
   "HR_MANAGER",
   "PROJECT_MANAGER",
+  "PROJECT_DIRECTOR",
   "SITE_SUPERVISOR",
   "EMPLOYEE",
 ];
@@ -52,13 +53,23 @@ export const ADMIN_ROLES = ["SUPER_ADMIN", "HR_MANAGER"];
 export const MANAGEMENT_ROLES = [
   "SUPER_ADMIN",
   "HR_MANAGER",
+  "PROJECT_DIRECTOR",
+  "PROJECT_MANAGER",
 ];
 
 export const PROJECT_VIEW_ROLES = [
   "SUPER_ADMIN",
   "HR_MANAGER",
+  "PROJECT_DIRECTOR",
   "PROJECT_MANAGER",
   "SITE_SUPERVISOR",
+];
+
+export const PROJECT_MANAGE_ROLES = [
+  "SUPER_ADMIN",
+  "HR_MANAGER",
+  "PROJECT_DIRECTOR",
+  "PROJECT_MANAGER",
 ];
 
 export function success(data: unknown, status = 200) {
@@ -350,11 +361,15 @@ export async function getManagedProjectIds(
     );
   }
 
-  if (!["PROJECT_MANAGER", "SITE_SUPERVISOR"].includes(user.role)) {
+  if (!["PROJECT_DIRECTOR", "PROJECT_MANAGER", "SITE_SUPERVISOR"].includes(user.role)) {
     return [];
   }
 
-  const table = user.role === "SITE_SUPERVISOR" ? "project_supervisors" : "project_managers";
+  const table = user.role === "SITE_SUPERVISOR"
+    ? "project_supervisors"
+    : user.role === "PROJECT_DIRECTOR"
+      ? "sector_manager_projects"
+      : "project_managers";
   const { data } = await supabase
     .from(table)
     .select("project_id,start_date,end_date")
@@ -382,7 +397,7 @@ export async function canManageProject(
     return true;
   }
 
-  if (!["PROJECT_MANAGER", "SITE_SUPERVISOR"].includes(user.role)) {
+  if (!["PROJECT_DIRECTOR", "PROJECT_MANAGER", "SITE_SUPERVISOR"].includes(user.role)) {
     return false;
   }
 

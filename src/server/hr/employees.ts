@@ -7,7 +7,7 @@ export async function listEmployees(
 ) {
   let employeeIds: string[] | null = null;
 
-  if (["PROJECT_MANAGER", "SITE_SUPERVISOR"].includes(session.user.role)) {
+  if (["PROJECT_DIRECTOR", "PROJECT_MANAGER", "SITE_SUPERVISOR"].includes(session.user.role)) {
     const projectIds = await getManagedProjectIds(session.user);
 
     if (!projectIds.length) {

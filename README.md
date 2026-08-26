@@ -47,11 +47,13 @@ Site HR / Workforce Management System for construction projects.
 - `SUPER_ADMIN`
 - `HR_MANAGER`
 - `PROJECT_MANAGER`
+- `PROJECT_DIRECTOR`
 - `SITE_SUPERVISOR`
 - `EMPLOYEE`
 
 `PROJECT_MANAGER` is scoped by `project_managers`.
-`SITE_SUPERVISOR` is scoped by `project_supervisors`.
+`PROJECT_DIRECTOR` (مدير قطاع / مدير مشروعات) is an employee-linked role scoped by `sector_manager_projects` and can manage the project managers and workforce within those assigned projects.
+`SITE_SUPERVISOR` is scoped by `project_supervisors` and remains an employee-linked role capable of attendance.
 
 ## Environment
 
@@ -100,7 +102,7 @@ Database hardening and scope migrations are maintained in Supabase migrations an
 - Server sessions remain in `public.app_sessions` and are delivered to the browser only as an HttpOnly `elnuby_hr_session` cookie.
 - Passwords created after this release use Node `scrypt`; legacy SHA-256 records are transparently upgraded after successful login.
 - `SITE_SUPERVISOR` access is scoped through `hr.project_supervisors` and project scope checks.
-- Attendance auto-checkout runs through `/api/cron/auto-checkout` every five minutes when deployed on Vercel.
+- Attendance auto-checkout is evaluated on every attendance-list refresh and also reconciled by the Vercel Hobby-compatible daily cron at `/api/cron/auto-checkout`.
 - SQL migrations are stored under `supabase/migrations/`.
 - Browser authentication tokens are not stored in localStorage.
 

@@ -90,7 +90,7 @@ export async function leaveList(
     );
   }
 
-  if (["PROJECT_MANAGER", "SITE_SUPERVISOR"].includes(session.user.role)) {
+  if (["PROJECT_DIRECTOR", "PROJECT_MANAGER", "SITE_SUPERVISOR"].includes(session.user.role)) {
     const ids =
       await getManagedProjectIds(
         session.user

@@ -15,11 +15,16 @@ export default function Users({
   setNewEmployee,
   newProject,
   setNewProject,
+  selectedSectorProjects,
+  setSelectedSectorProjects,
+  selectedSectorManager,
+  setSelectedSectorManager,
   selectedManager,
   setSelectedManager,
   selectedProject,
   setSelectedProject,
   assignManager,
+  assignSectorManagerProjects,
   createAccount,
   busy,
   onRefresh,
@@ -96,6 +101,10 @@ export default function Users({
               مدير مشروع
             </option>
 
+            <option value="PROJECT_DIRECTOR">
+              مدير قطاع / مدير مشروعات
+            </option>
+
             <option value="SITE_SUPERVISOR">
               مشرف موقع
             </option>
@@ -111,6 +120,7 @@ export default function Users({
 
           {(newRole === 'EMPLOYEE' ||
             newRole === 'PROJECT_MANAGER' ||
+            newRole === 'PROJECT_DIRECTOR' ||
             newRole === 'SITE_SUPERVISOR') && (
             <select
               value={newEmployee}
@@ -164,6 +174,35 @@ export default function Users({
                 ),
               )}
             </select>
+          )}
+
+          {newRole === 'PROJECT_DIRECTOR' && (
+            <label className="field-stack">
+              <span>المشروعات التابعة لمدير القطاع *</span>
+              <select
+                multiple
+                value={selectedSectorProjects}
+                onChange={(e) =>
+                  setSelectedSectorProjects(
+                    Array.from(e.target.selectedOptions).map((o) => o.value),
+                  )
+                }
+                style={{ minHeight: 140 }}
+              >
+                {projects.map((p: Project) => (
+                  <option key={p.project_id} value={p.project_id}>
+                    {p.name} — {p.project_id}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {newRole ===
+            'PROJECT_DIRECTOR' && (
+            <div className="empty-note">
+              مدير القطاع موظف فعلي في الشركة، وله صلاحيات إدارية على المشروعات المحددة فقط، ويستطيع تسجيل الحضور والانصراف وطلب الإجازات والأذونات مثل أي موظف.
+            </div>
           )}
 
           {newRole ===
@@ -286,6 +325,39 @@ export default function Users({
           onClick={assignManager}
         >
           حفظ صلاحية مدير المشروع
+        </button>
+      </div>
+
+      <div className="request-card">
+        <h3>تحديد مشروعات مدير القطاع</h3>
+        <div className="formgrid">
+          <select value={selectedSectorManager} onChange={(e) => setSelectedSectorManager(e.target.value)}>
+            <option value="">اختر مدير القطاع</option>
+            {users.filter((u: User) => u.role === 'PROJECT_DIRECTOR' && u.status === 'ACTIVE').map((u: User) => (
+              <option key={u.user_id} value={u.user_id}>
+                {u.username} — {u.employee_id || 'بدون موظف'}
+              </option>
+            ))}
+          </select>
+          <select
+            multiple
+            value={selectedSectorProjects}
+            onChange={(e) => setSelectedSectorProjects(Array.from(e.target.selectedOptions).map((o) => o.value))}
+            style={{ minHeight: 140 }}
+          >
+            {projects.map((p: Project) => (
+              <option key={p.project_id} value={p.project_id}>{p.name} — {p.project_id}</option>
+            ))}
+          </select>
+        </div>
+        <button
+          className="secondary"
+          disabled={busy || !selectedSectorManager || !selectedSectorProjects.length}
+          onClick={async () => {
+            await assignSectorManagerProjects();
+          }}
+        >
+          حفظ مشروعات مدير القطاع
         </button>
       </div>
 

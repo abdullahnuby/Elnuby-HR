@@ -30,11 +30,15 @@ const router = fs.readFileSync(path.join(serverDir, 'router.ts'), 'utf8');
 const users = fs.readFileSync(path.join(serverDir, 'users.ts'), 'utf8');
 
 if (!core.includes('.schema("hr")')) throw new Error('Business client is not pinned to hr schema');
+if (!core.includes('PROJECT_DIRECTOR')) throw new Error('Scope core missing PROJECT_DIRECTOR');
 if (!core.includes('SITE_SUPERVISOR')) throw new Error('Scope core missing SITE_SUPERVISOR');
 if (!core.includes('project_supervisors')) throw new Error('Scope core missing project_supervisors');
 if (!workforce.includes('listEmployeeShifts')) throw new Error('Workforce shift service missing');
+if (!users.includes('sector_manager_projects')) throw new Error('PROJECT_DIRECTOR provisioning missing');
 if (!users.includes('project_supervisors')) throw new Error('SITE_SUPERVISOR provisioning missing');
 if (!router.includes('case "employee_shifts"')) throw new Error('employee_shifts action missing');
+if (!router.includes('case "admin_update"')) throw new Error('SUPER_ADMIN update action missing');
+if (!router.includes('case "admin_delete"')) throw new Error('SUPER_ADMIN delete action missing');
 if (!router.includes('case "deductions"')) throw new Error('deductions action missing');
 if (!fs.readFileSync(path.join(root, '.gitignore'), 'utf8').includes('.env*')) throw new Error('.env files are not ignored');
 

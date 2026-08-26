@@ -1,4 +1,4 @@
-import { supabase, success, errorResponse, sha256, nowISO, requireAuth, requireRole, ROLES, ADMIN_ROLES, MANAGEMENT_ROLES, PROJECT_VIEW_ROLES } from "./core";
+import { supabase, success, errorResponse, sha256, nowISO, requireAuth, requireRole, ROLES, ADMIN_ROLES, MANAGEMENT_ROLES, PROJECT_VIEW_ROLES, PROJECT_MANAGE_ROLES } from "./core";
 import type { SessionContext } from "./core";
 import { login, logout, getMe } from "./auth";
 import { getDashboard, getProjectManagerDashboard } from "./dashboard";
@@ -9,7 +9,7 @@ import { listEmployeeShifts, assignEmployeeShift, assignEmployeeProject, assignM
 import { attendanceList, attendanceAction } from "./attendance";
 import { leaveList, createLeave, decideLeaveManager, decideLeaveHR } from "./leaves";
 import { permissionList, createPermission, decidePermission } from "./permissions";
-import { listDeductions, listUsers, createUser } from "./users";
+import { listDeductions, listUsers, createUser, assignSectorManagerProjects, adminInsert, adminUpdate, adminDelete } from "./users";
 
 export async function handleAction(
   action: string,
@@ -74,7 +74,7 @@ export async function handleAction(
       const auth =
         requireRole(
           session,
-          ["SUPER_ADMIN"]
+          ADMIN_ROLES
         );
 
       if (auth) return auth;
@@ -86,7 +86,7 @@ export async function handleAction(
       const auth =
         requireRole(
           session,
-          ["SUPER_ADMIN"]
+          ADMIN_ROLES
         );
 
       if (auth) return auth;
@@ -95,6 +95,26 @@ export async function handleAction(
         session!,
         body
       );
+    }
+
+    /* SUPER ADMIN CRUD */
+
+    case "admin_insert": {
+      const auth = requireRole(session, ["SUPER_ADMIN"]);
+      if (auth) return auth;
+      return adminInsert(session!, body);
+    }
+
+    case "admin_update": {
+      const auth = requireRole(session, ["SUPER_ADMIN"]);
+      if (auth) return auth;
+      return adminUpdate(session!, body);
+    }
+
+    case "admin_delete": {
+      const auth = requireRole(session, ["SUPER_ADMIN"]);
+      if (auth) return auth;
+      return adminDelete(session!, body);
     }
 
     /* EMPLOYEES */
@@ -209,7 +229,7 @@ export async function handleAction(
       const auth =
         requireRole(
           session,
-          PROJECT_VIEW_ROLES
+          PROJECT_MANAGE_ROLES
         );
 
       if (auth) return auth;
@@ -226,7 +246,7 @@ export async function handleAction(
       const auth =
         requireRole(
           session,
-          PROJECT_VIEW_ROLES
+          PROJECT_MANAGE_ROLES
         );
 
       if (auth) return auth;
@@ -241,7 +261,7 @@ export async function handleAction(
       const auth =
         requireRole(
           session,
-          MANAGEMENT_ROLES
+          [...ADMIN_ROLES, "PROJECT_DIRECTOR"]
         );
 
       if (auth) return auth;
@@ -250,6 +270,12 @@ export async function handleAction(
         session!,
         body
       );
+    }
+
+    case "assign_sector_manager_projects": {
+      const auth = requireRole(session, [...ADMIN_ROLES, "PROJECT_DIRECTOR"]);
+      if (auth) return auth;
+      return assignSectorManagerProjects(session!, body);
     }
 
     /* ATTENDANCE */
@@ -274,7 +300,7 @@ export async function handleAction(
       const auth =
         requireRole(
           session,
-          ["EMPLOYEE"]
+          ["EMPLOYEE", "PROJECT_MANAGER", "PROJECT_DIRECTOR", "SITE_SUPERVISOR"]
         );
 
       if (auth) return auth;
@@ -307,7 +333,7 @@ export async function handleAction(
       const auth =
         requireRole(
           session,
-          ["EMPLOYEE"]
+          ["EMPLOYEE", "PROJECT_MANAGER", "PROJECT_DIRECTOR", "SITE_SUPERVISOR"]
         );
 
       if (auth) return auth;
@@ -322,7 +348,7 @@ export async function handleAction(
       const auth =
         requireRole(
           session,
-          ["PROJECT_MANAGER"]
+          ["PROJECT_MANAGER", "PROJECT_DIRECTOR"]
         );
 
       if (auth) return auth;
@@ -369,7 +395,7 @@ export async function handleAction(
       const auth =
         requireRole(
           session,
-          ["EMPLOYEE"]
+          ["EMPLOYEE", "PROJECT_MANAGER", "PROJECT_DIRECTOR", "SITE_SUPERVISOR"]
         );
 
       if (auth) return auth;
@@ -384,7 +410,7 @@ export async function handleAction(
       const auth =
         requireRole(
           session,
-          ["PROJECT_MANAGER"]
+          ["PROJECT_MANAGER", "PROJECT_DIRECTOR"]
         );
 
       if (auth) return auth;

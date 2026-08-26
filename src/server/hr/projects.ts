@@ -10,7 +10,7 @@ export async function listProjects(
     .select("*")
     .order("name");
 
-  if (["PROJECT_MANAGER", "SITE_SUPERVISOR"].includes(session.user.role)) {
+  if (["PROJECT_DIRECTOR", "PROJECT_MANAGER", "SITE_SUPERVISOR"].includes(session.user.role)) {
     const ids = await getManagedProjectIds(session.user);
 
     if (!ids.length) {
@@ -37,11 +37,18 @@ export async function listProjects(
 
   const [
     managersResult,
+    sectorManagersResult,
     assignmentsResult,
   ] = await Promise.all([
     supabase
       .from("project_managers")
       .select("id,user_id,project_id,start_date,end_date")
+      .in("project_id", projectIds)
+      .or(`end_date.is.null,end_date.gte.${riyadhDate()}`),
+
+    supabase
+      .from("sector_manager_projects")
+      .select("assignment_id,user_id,project_id,start_date,end_date")
       .in("project_id", projectIds)
       .or(`end_date.is.null,end_date.gte.${riyadhDate()}`),
 
@@ -68,12 +75,19 @@ export async function listProjects(
     );
   }
 
+  if (sectorManagersResult.error) {
+    console.error("sector managers:", sectorManagersResult.error);
+    return errorResponse("تعذر تحميل مديري القطاعات", 500);
+  }
+
   const managers = managersResult.data || [];
+  const sectorManagers = sectorManagersResult.data || [];
   const assignments = assignmentsResult.data || [];
 
-  const userIds = [...new Set(
-    managers.map((m: any) => m.user_id).filter(Boolean)
-  )];
+  const userIds = [...new Set([
+    ...managers.map((m: any) => m.user_id),
+    ...sectorManagers.map((m: any) => m.user_id),
+  ].filter(Boolean))];
 
   let users: any[] = [];
 
@@ -118,6 +132,23 @@ export async function listProjects(
     managerMap.set(manager.project_id, list);
   }
 
+  const sectorManagerMap = new Map<string, any[]>();
+  for (const manager of sectorManagers) {
+    const list = sectorManagerMap.get(manager.project_id) || [];
+    const user = userMap.get(String(manager.user_id));
+    list.push({
+      assignment_id: manager.assignment_id,
+      user_id: manager.user_id,
+      employee_id: user?.employee_id ?? null,
+      username: user?.username ?? null,
+      name: user?.username ?? user?.employee_id ?? manager.user_id,
+      role: "PROJECT_DIRECTOR",
+      start_date: manager.start_date,
+      end_date: manager.end_date,
+    });
+    sectorManagerMap.set(manager.project_id, list);
+  }
+
   const employeeCountMap = new Map<string, number>();
 
   for (const assignment of assignments) {
@@ -134,6 +165,10 @@ export async function listProjects(
         (managerMap.get(project.project_id) || []).length,
       managers:
         managerMap.get(project.project_id) || [],
+      sector_manager_count:
+        (sectorManagerMap.get(project.project_id) || []).length,
+      sector_managers:
+        sectorManagerMap.get(project.project_id) || [],
       employee_count:
         employeeCountMap.get(project.project_id) || 0,
     }))

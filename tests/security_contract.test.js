@@ -11,6 +11,7 @@ const migrationDir = path.join(root, 'supabase', 'migrations');
 
 if (!core.includes('.schema("hr")')) throw new Error('Business Supabase client is not pinned to hr schema');
 if (!core.includes('publicSupabase')) throw new Error('Public session client is missing');
+if (!core.includes('PROJECT_DIRECTOR')) throw new Error('PROJECT_DIRECTOR scope missing');
 if (!core.includes('SITE_SUPERVISOR')) throw new Error('SITE_SUPERVISOR scope missing');
 if (!auth.includes('elnuby_hr_session')) throw new Error('HttpOnly session cookie missing');
 if (!auth.includes('scrypt$')) throw new Error('Scrypt password format missing');

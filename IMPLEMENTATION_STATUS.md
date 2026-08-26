@@ -15,7 +15,7 @@
 8. Attendance engine — project + shift + GPS/geofence validation; current assignment/shift rules; auto checkout service.
 9. Leave engine — year-bound requests, balance validation, pending/used/remaining recalculation.
 10. Permission engine — overlap protection for pending/approved permissions.
-11. Auto checkout — Vercel cron every 5 minutes plus an on-demand refresh before attendance listing.
+11. Auto checkout — configured auto-checkout time plus on-demand reconciliation before attendance listing and a Vercel Hobby-compatible daily reconciliation cron.
 12. Tests — contract, backend smoke, and security contract tests.
 13. Pagination — list endpoints support `page`/`limit` parameters with bounded ranges where large datasets are expected.
 

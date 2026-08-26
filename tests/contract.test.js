@@ -44,6 +44,7 @@ for (const required of ['employees', 'projects', 'shifts', 'employee_shifts', 'a
 if (!route.includes('@/server/hr/router')) throw new Error('API route is not using the modular router');
 if (!route.includes('SESSION_COOKIE')) throw new Error('Secure session cookie is not wired');
 const core = fs.readFileSync(path.join(root, 'src', 'server', 'hr', 'core.ts'), 'utf8');
+if (!core.includes('PROJECT_DIRECTOR')) throw new Error('PROJECT_DIRECTOR is not represented in scope core');
 if (!core.includes('SITE_SUPERVISOR')) throw new Error('SITE_SUPERVISOR is not represented in scope core');
 
 console.log(`PASS contract: ${new Set(uiActions).size} UI actions map to modular backend routes.`);

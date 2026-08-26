@@ -1,7 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/hr?action=auto_checkout",
+      "path": "/api/cron/auto-checkout",
       "schedule": "0 23 * * *"
     }
   ]

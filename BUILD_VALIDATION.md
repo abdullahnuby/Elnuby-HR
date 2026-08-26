@@ -13,4 +13,4 @@ Sessions remain in `public.app_sessions` because they are server-only session st
 The browser uses an HttpOnly `elnuby_hr_session` cookie. Do not restore `hr_token` in localStorage.
 
 ## Auto checkout
-Vercel cron calls `/api/cron/auto-checkout` every five minutes. `CRON_SECRET` is optional but recommended.
+Vercel Hobby cron calls `/api/cron/auto-checkout` once daily for reconciliation. The attendance-list endpoint also runs the auto-checkout reconciliation, so records are closed at the configured `auto_checkout_time` when the attendance data is refreshed. `CRON_SECRET` is optional but recommended.

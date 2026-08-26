@@ -13,7 +13,7 @@ export async function listEmployeeShifts(
     .order("start_date", { ascending: false })
     .range(from, to);
 
-  if (["PROJECT_MANAGER", "SITE_SUPERVISOR"].includes(session.user.role)) {
+  if (["PROJECT_DIRECTOR", "PROJECT_MANAGER", "SITE_SUPERVISOR"].includes(session.user.role)) {
     const ids = await getManagedProjectIds(session.user);
 
     if (!ids.length) {
@@ -664,6 +664,10 @@ export async function assignManagerProject(
     return errorResponse(
       "المشروع غير موجود"
     );
+  }
+
+  if (session.user.role === "PROJECT_DIRECTOR" && !(await canManageProject(session.user, projectId))) {
+    return errorResponse("مدير القطاع لا يستطيع إدارة مدير مشروع خارج نطاقه", 403);
   }
 
   const { data: existing } =

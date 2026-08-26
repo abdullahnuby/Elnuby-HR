@@ -101,6 +101,8 @@ export default function Home() {
   const [newRole, setNewRole] = useState('EMPLOYEE');
   const [newEmployee, setNewEmployee] = useState('');
   const [newProject, setNewProject] = useState('');
+  const [selectedSectorProjects, setSelectedSectorProjects] = useState<string[]>([]);
+  const [selectedSectorManager, setSelectedSectorManager] = useState('');
 
   const [employeeForm, setEmployeeForm] = useState<any>({
     name: '',
@@ -159,7 +161,7 @@ export default function Home() {
       try {
         setDash(await api('dashboard'));
 
-        if (me.user?.role === 'PROJECT_MANAGER') {
+        if (['PROJECT_MANAGER', 'PROJECT_DIRECTOR'].includes(me.user?.role)) {
           setManagerDash(await api('project_manager_dashboard'));
         }
       } catch {
@@ -188,7 +190,7 @@ export default function Home() {
         setError(e.message || 'تعذر تحميل لوحة التحكم');
       }
 
-      if (m.user?.role === 'PROJECT_MANAGER') {
+      if (['PROJECT_MANAGER', 'PROJECT_DIRECTOR'].includes(m.user?.role)) {
         try {
           setManagerDash(await api('project_manager_dashboard'));
         } catch (e: any) {
@@ -197,7 +199,7 @@ export default function Home() {
       }
 
       if (
-        ['SUPER_ADMIN', 'HR_MANAGER', 'PROJECT_MANAGER'].includes(
+        ['SUPER_ADMIN', 'HR_MANAGER', 'PROJECT_DIRECTOR', 'PROJECT_MANAGER'].includes(
           m.user?.role,
         )
       ) {
@@ -220,7 +222,7 @@ export default function Home() {
         }
       }
 
-      if (m.user?.role === 'SUPER_ADMIN') {
+      if (['SUPER_ADMIN', 'HR_MANAGER'].includes(m.user?.role)) {
         try {
           setUsers(await api('users'));
         } catch (e: any) {
@@ -598,6 +600,28 @@ export default function Home() {
     }
   }
 
+  async function assignSectorManagerProjects() {
+    if (!selectedSectorManager || !selectedSectorProjects.length) {
+      return setError('اختر مدير القطاع والمشروعات');
+    }
+    setBusy(true);
+    setError('');
+    try {
+      await api('assign_sector_manager_projects', {
+        user_id: selectedSectorManager,
+        project_ids: selectedSectorProjects,
+      });
+      setNotice('تم تحديث مشروعات مدير القطاع بنجاح');
+      setSelectedSectorProjects([]);
+      setSelectedSectorManager('');
+      await refreshSection('users');
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function createAccount() {
     setNotice('');
     setError('');
@@ -611,6 +635,7 @@ export default function Home() {
     if (
       (newRole === 'EMPLOYEE' ||
         newRole === 'PROJECT_MANAGER' ||
+        newRole === 'PROJECT_DIRECTOR' ||
         newRole === 'SITE_SUPERVISOR') &&
       !newEmployee
     ) {
@@ -628,6 +653,10 @@ export default function Home() {
       );
     }
 
+    if (newRole === 'PROJECT_DIRECTOR' && !selectedSectorProjects.length) {
+      return setError('اختر مشروعًا واحدًا على الأقل لمدير القطاع');
+    }
+
     setBusy(true);
 
     try {
@@ -636,18 +665,24 @@ export default function Home() {
         password: newPassword,
         role: newRole,
         employee_id:
-          (newRole === 'EMPLOYEE' || newRole === 'PROJECT_MANAGER' || newRole === 'SITE_SUPERVISOR')
+          (newRole === 'EMPLOYEE' || newRole === 'PROJECT_MANAGER' || newRole === 'PROJECT_DIRECTOR' || newRole === 'SITE_SUPERVISOR')
             ? newEmployee
             : '',
         project_id:
           (newRole === 'PROJECT_MANAGER' || newRole === 'SITE_SUPERVISOR')
             ? newProject
             : '',
+        project_ids:
+          newRole === 'PROJECT_DIRECTOR'
+            ? selectedSectorProjects
+            : [],
         status: 'ACTIVE',
       });
 
       setNotice(
-        newRole === 'PROJECT_MANAGER'
+        newRole === 'PROJECT_DIRECTOR'
+          ? 'تم إنشاء حساب مدير القطاع وربطه بالمشروعات المحددة بنجاح'
+          : newRole === 'PROJECT_MANAGER'
           ? 'تم إنشاء حساب مدير المشروع وربطه بالمشروع بنجاح'
           : newRole === 'SITE_SUPERVISOR'
             ? 'تم إنشاء حساب مشرف الموقع وربطه بالمشروع بنجاح'
@@ -660,6 +695,8 @@ export default function Home() {
       setNewPassword('');
       setNewEmployee('');
       setNewProject('');
+      setSelectedSectorProjects([]);
+      setSelectedSectorManager('');
       setNewRole('EMPLOYEE');
 
       const [
@@ -988,7 +1025,7 @@ export default function Home() {
 
           {section === 'employees' && (
             <EmployeesPage
-              managerMode={['PROJECT_MANAGER', 'SITE_SUPERVISOR'].includes(me.user?.role)}
+              managerMode={['PROJECT_DIRECTOR', 'PROJECT_MANAGER'].includes(me.user?.role)}
               employees={employees}
               projects={projects}
               shifts={shifts}
@@ -1020,7 +1057,7 @@ export default function Home() {
 
           {section === 'shifts' && (
             <ShiftsPage
-              managerMode={['PROJECT_MANAGER', 'SITE_SUPERVISOR'].includes(me.user?.role)}
+              managerMode={['PROJECT_DIRECTOR', 'PROJECT_MANAGER'].includes(me.user?.role)}
               shifts={shifts}
               rows={rows}
               shiftForm={shiftForm}
@@ -1032,7 +1069,7 @@ export default function Home() {
 
           {section === 'projects' && (
             <ProjectsPage
-              managerMode={['PROJECT_MANAGER', 'SITE_SUPERVISOR'].includes(me.user?.role)}
+              managerMode={['PROJECT_DIRECTOR', 'PROJECT_MANAGER'].includes(me.user?.role)}
               projects={projects}
               employees={employees}
               projectForm={projectForm}
@@ -1156,6 +1193,9 @@ export default function Home() {
               }
               assignManager={
                 assignManager
+              }
+              assignSectorManagerProjects={
+                assignSectorManagerProjects
               }
               createAccount={
                 createAccount

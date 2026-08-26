@@ -93,6 +93,7 @@ export default function Dashboard({
             </span>
           </div>
 
+          {['EMPLOYEE', 'PROJECT_MANAGER', 'PROJECT_DIRECTOR', 'SITE_SUPERVISOR'].includes(me?.user?.role) && (
           <div className="attendance-actions">
             <button
               className="attendance-btn in"
@@ -122,6 +123,7 @@ export default function Dashboard({
               </small>
             </button>
           </div>
+          )}
 
           <div className="quick-links">
             <button
