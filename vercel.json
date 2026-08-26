@@ -1,3 +1,8 @@
 {
-  "crons": [{"path":"/api/cron/auto-checkout","schedule":"*/15 * * * *"}]
+  "crons": [
+    {
+      "path": "/api/my-cron",
+      "schedule": "0 0 * * *"
+    }
+  ]
 }
