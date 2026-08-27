@@ -220,7 +220,7 @@ export async function createLeave(session: SessionContext, body: Record<string, 
       const safeName = String(document.name || "medical-document").replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0,100);
       const path = `${employeeId}/${requestId}-${safeName}`;
       uploadedPath = path;
-      const upload = await supabase.storage.from("hr-leave-documents").upload(path, buffer, {contentType:mime,upsert:false});
+      const upload = await publicSupabase.storage.from("hr-leave-documents").upload(path, buffer, {contentType:mime,upsert:false});
       if (upload.error) throw upload.error;
       const { error: docError } = await supabase.from("leave_request_documents").insert({
         document_id: generateId("DOC"), request_id: requestId, employee_id: employeeId,
@@ -230,7 +230,7 @@ export async function createLeave(session: SessionContext, body: Record<string, 
       if (docError) throw docError;
     }
   } catch (documentError: any) {
-    if (uploadedPath) await supabase.storage.from("hr-leave-documents").remove([uploadedPath]);
+    if (uploadedPath) await publicSupabase.storage.from("hr-leave-documents").remove([uploadedPath]);
     await supabase.from("leave_requests").delete().eq("request_id", requestId);
     return errorResponse(documentError?.message || "تعذر حفظ المستند الطبي", 400);
   }
@@ -284,7 +284,7 @@ export async function getLeaveDocument(session: SessionContext, body: Record<str
   if (!["SYSTEM_ADMIN","HR_MANAGER"].includes(session.user.role) && request.employee_id !== session.user.employee_id) return errorResponse("ليس لديك صلاحية عرض المستند",403);
   const { data: doc } = await supabase.from("leave_request_documents").select("*").eq("request_id",requestId).maybeSingle();
   if (!doc) return errorResponse("لا يوجد مستند لهذا الطلب",404);
-  const { data: signed, error } = await supabase.storage.from("hr-leave-documents").createSignedUrl(doc.storage_path, 300);
+  const { data: signed, error } = await publicSupabase.storage.from("hr-leave-documents").createSignedUrl(doc.storage_path, 300);
   if (error) return errorResponse("تعذر فتح المستند",500);
   return success({ ...doc, signed_url: signed?.signedUrl });
 }
