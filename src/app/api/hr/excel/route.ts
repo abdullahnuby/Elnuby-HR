@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   try {
     const buffer = action === "template" ? templateExcel(table) : await exportExcel(session, table);
     const filename = action === "template" ? `ELNUBY-${table}-template.xlsx` : `ELNUBY-HR-${table}-${new Date().toISOString().slice(0,10)}.xlsx`;
-    return new Response(buffer, {
+    return new Response(buffer as unknown as BodyInit, {
       status: 200,
       headers: {
         "Content-Type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
