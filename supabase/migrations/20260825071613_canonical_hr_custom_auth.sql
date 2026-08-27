@@ -150,8 +150,33 @@ SELECT al.audit_id,u.id,al.action,coalesce(al.entity_type,'unknown'),al.entity_i
 FROM public.audit_logs al LEFT JOIN hr.users u ON u.legacy_user_id=al.actor_user_id
 ON CONFLICT (log_id) DO NOTHING;
 
+-- The API uses public.app_sessions for its custom cookie sessions.
+CREATE TABLE IF NOT EXISTS public.app_sessions (
+  session_id text PRIMARY KEY,
+  token_hash text NOT NULL UNIQUE,
+  user_id text NOT NULL,
+  expires_at timestamptz NOT NULL,
+  last_used_at timestamptz,
+  revoked_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_app_sessions_user_id ON public.app_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_app_sessions_expires_at ON public.app_sessions(expires_at);
+
+ALTER TABLE public.app_sessions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS deny_direct_client_access ON public.app_sessions;
+CREATE POLICY deny_direct_client_access ON public.app_sessions
+  FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
+
 DELETE FROM public.app_sessions;
-DELETE FROM public.hr_app_sessions;
+
+DO $$
+BEGIN
+  IF to_regclass('public.hr_app_sessions') IS NOT NULL THEN
+    DELETE FROM public.hr_app_sessions;
+  END IF;
+END $$;
 
 CREATE VIEW hr.project_assignments_view AS
 SELECT pa.assignment_id,pa.employee_id,e.name employee_name,pa.project_id,p.name project_name,pa.start_date,pa.end_date,pa.is_current,

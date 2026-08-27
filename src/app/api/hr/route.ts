@@ -17,6 +17,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  let requestAction = "";
   try {
     const contentType = request.headers.get("content-type") || "";
     let body: Record<string, unknown>;
@@ -31,6 +32,7 @@ export async function POST(request: Request) {
       body = (await request.json()) as Record<string, unknown>;
     }
     const action = String(body.action || "").trim();
+    requestAction = action;
     if (!action) return errorResponse("action is required");
 
     let session = null;
@@ -68,7 +70,10 @@ if (session && AUDITED_ACTIONS.has(action)) {
 
 return response;
   } catch (error) {
-    console.error("ELNUBY HR API ERROR:", error);
+    console.error("ELNUBY HR API ERROR:", {
+      action: requestAction || undefined,
+      error,
+    });
     return errorResponse("حدث خطأ داخلي في الخادم", 500);
   }
 }
