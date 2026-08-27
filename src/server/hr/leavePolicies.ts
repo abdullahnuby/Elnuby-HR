@@ -69,7 +69,8 @@ export async function createLeavePolicy(session: SessionContext, body: Record<st
   if (residency && !RESIDENCY.includes(residency)) return errorResponse("نوع الإقامة غير صحيح");
   if (!METHODS.includes(method) || !BASES.includes(basis)) return errorResponse("طريقة احتساب اللائحة غير صحيحة");
 
-  const period = body.accrual_period_days === "" || body.accrual_period_days == null ? null : Number(body.accrual_period_days);
+  const periodRaw = body.accrual_period_days === "" || body.accrual_period_days == null ? null : Number(body.accrual_period_days);
+  const period = periodRaw == null ? 0 : periodRaw;
   const accrualDays = Number(body.accrual_days || 0);
   const annual = Number(body.annual_entitlement || 0);
   if (method === "PERIODIC" && (!Number.isFinite(period) || period <= 0 || accrualDays <= 0)) {
