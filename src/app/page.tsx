@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { api, apiMultipart } from '@/lib/api';
-import { cacheGet, cacheSet, syncAttendanceQueue, pendingAttendanceCount } from '@/lib/offline';
+import { cacheGet, cacheSet, syncAttendanceQueue, pendingAttendanceCount, clearOfflineData } from '@/lib/offline';
 import { navByRole, roleLabels } from '@/components/hr/constants';
 import ManagerDashboard from '@/components/hr/Dashboard';
 import DashboardHome from '@/components/hr/DashboardHome';
@@ -225,6 +225,35 @@ export default function Home() {
     return () => clearInterval(timer);
   }, [me]);
 
+  async function performLogout() {
+    setBusy(true);
+    try {
+      // The API logout is idempotent and clears the httpOnly cookie even if
+      // the server-side session has already expired.
+      await api('logout');
+    } catch {
+      // Local cleanup must still happen if the server is unreachable.
+    } finally {
+      await clearOfflineData();
+      setMe(null);
+      setDash(null);
+      setManagerDash(null);
+      setUsers([]);
+      setEmployees([]);
+      setProjects([]);
+      setShifts([]);
+      setRows([]);
+      setSidebar(false);
+      setSection('dashboard');
+      setBusy(false);
+
+      // Replace the current page so a refresh can never restore stale React/cache state.
+      if (typeof window !== 'undefined') {
+        window.location.replace('/');
+      }
+    }
+  }
+
   async function load() {
     setError('');
 
@@ -287,6 +316,7 @@ export default function Home() {
         );
 
       if (authError) {
+        void clearOfflineData();
         setMe(null);
         setDash(null);
         setManagerDash(null);
@@ -311,6 +341,10 @@ export default function Home() {
     setError('');
 
     try {
+      // A new login is a new security context; never reuse cached data from
+      // a previous account on this browser.
+      await clearOfflineData();
+
       const r: any = await api('login', {
         username,
         password,
@@ -1025,15 +1059,7 @@ export default function Home() {
 
           <button
             className="logout"
-            onClick={async () => {
-              try {
-                await api('logout');
-              } finally {
-                setMe(null);
-                setSidebar(false);
-                setSection('dashboard');
-              }
-            }}
+            onClick={performLogout}
           >
             <Icon name="logout" size={16} />
             تسجيل الخروج
@@ -1090,7 +1116,7 @@ export default function Home() {
               )}
             </span>
 
-            <details className="profile-menu"><summary className="avatar top-avatar" aria-label="قائمة الحساب">{(me.employee?.name||me.user?.username||'U').slice(0,1)}</summary><div className="profile-menu-card"><strong>{me.employee?.name||me.user?.username}</strong><span>{roleLabels[me.user?.role]||me.user?.role}</span><button className="secondary" onClick={async()=>{try{await api('logout')}finally{setMe(null);setSidebar(false);setSection('dashboard')}}}>تسجيل الخروج</button></div></details>
+            <details className="profile-menu"><summary className="avatar top-avatar" aria-label="قائمة الحساب">{(me.employee?.name||me.user?.username||'U').slice(0,1)}</summary><div className="profile-menu-card"><strong>{me.employee?.name||me.user?.username}</strong><span>{roleLabels[me.user?.role]||me.user?.role}</span><button className="secondary" onClick={performLogout}>تسجيل الخروج</button></div></details>
           </div>
         </header>
 

@@ -121,3 +121,45 @@ export async function syncAttendanceQueue(sender: (action: string, payload: Reco
 export function apiCacheKey(action: string, payload: Record<string, unknown>) {
   return `api:${action}:${JSON.stringify(payload || {})}`;
 }
+
+
+/**
+ * Clear all locally cached HR data when a user signs out or the server
+ * rejects the current session. This prevents data from one account being
+ * displayed to another account on the same browser.
+ */
+export async function clearOfflineData() {
+  try {
+    const db = await openDb();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction([CACHE_STORE, QUEUE_STORE], 'readwrite');
+      tx.objectStore(CACHE_STORE).clear();
+      tx.objectStore(QUEUE_STORE).clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error('IndexedDB transaction aborted'));
+    });
+    db.close();
+  } catch {
+    // Local cleanup must never prevent logout.
+  }
+
+  try {
+    if (typeof window !== 'undefined') {
+      const keys = Object.keys(window.localStorage);
+      for (const key of keys) {
+        if (/elnuby|hr|session|auth|user/i.test(key)) {
+          window.localStorage.removeItem(key);
+        }
+      }
+      const sessionKeys = Object.keys(window.sessionStorage);
+      for (const key of sessionKeys) {
+        if (/elnuby|hr|session|auth|user/i.test(key)) {
+          window.sessionStorage.removeItem(key);
+        }
+      }
+    }
+  } catch {
+    // Storage cleanup is best-effort.
+  }
+}

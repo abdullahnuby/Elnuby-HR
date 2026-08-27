@@ -1,4 +1,4 @@
-import { apiCacheKey, cacheGet, cacheSet, queueAttendance } from './offline';
+import { apiCacheKey, cacheGet, cacheSet, queueAttendance, clearOfflineData } from './offline';
 
 export type ApiResponse<T = unknown> = {
   ok: boolean;
@@ -54,19 +54,37 @@ export async function api<T = unknown>(
     }
 
     if (!result.ok) {
-      throw new Error(
+      const message =
         result.error ||
-          (res.status === 401
-            ? 'انتهت جلسة الدخول، برجاء تسجيل الدخول مرة أخرى.'
-            : res.status === 403
-              ? 'ليس لديك صلاحية لتنفيذ هذا الإجراء.'
-              : 'فشل تنفيذ الطلب.'),
-      );
+        (res.status === 401
+          ? 'انتهت جلسة الدخول، برجاء تسجيل الدخول مرة أخرى.'
+          : res.status === 403
+            ? 'ليس لديك صلاحية لتنفيذ هذا الإجراء.'
+            : 'فشل تنفيذ الطلب.');
+
+      // Never fall back to cached authenticated data after an auth failure.
+      // Otherwise logout/expired sessions can appear logged in again on refresh.
+      if (res.status === 401 || /الجلسة غير صالحة|انتهت جلسة|Authentication required|Invalid session|Session expired|User inactive/i.test(message)) {
+        await clearOfflineData();
+      }
+
+      throw new Error(message);
     }
 
     if (CACHEABLE_ACTIONS.has(action)) await cacheSet(key, result.data);
     return result.data as T;
   } catch (error: any) {
+    const message = String(error?.message || '');
+
+    // Auth failures must never be replaced by stale cached user data.
+    const authFailure =
+      /الجلسة غير صالحة|انتهت جلسة|Authentication required|Invalid session|Session expired|User inactive|401/i.test(message);
+
+    if (authFailure) {
+      await clearOfflineData();
+      throw error;
+    }
+
     if (CACHEABLE_ACTIONS.has(action)) {
       const cached = await cacheGet<T>(key);
       if (cached !== undefined) return cached;
