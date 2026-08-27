@@ -140,8 +140,8 @@ export async function leaveList(session: SessionContext, body: Record<string, un
     employeeIds.length ? supabase.from("employees").select("employee_id,name,job_title,department,residency_type").in("employee_id", employeeIds) : Promise.resolve({data:[],error:null} as any),
     typeIds.length ? supabase.from("leave_types").select("*").in("leave_type_id", typeIds) : Promise.resolve({data:[],error:null} as any),
   ]);
-  const em = new Map((employeesResult.data || []).map((x:any)=>[x.employee_id,x]));
-  const tm = new Map((typesResult.data || []).map((x:any)=>[x.leave_type_id,x]));
+  const em = new Map<string, any>((employeesResult.data || []).map((x: any) => [String(x.employee_id), x] as [string, any]));
+  const tm = new Map<string, any>((typesResult.data || []).map((x: any) => [String(x.leave_type_id), x] as [string, any]));
   const enriched = [];
   for (const r of rows) {
     let balance = null;
