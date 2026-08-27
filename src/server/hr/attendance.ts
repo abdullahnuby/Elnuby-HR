@@ -203,9 +203,26 @@ export async function attendanceAction(
     );
   }
 
-  const today=riyadhDate(); const currentTime=riyadhTime();
+  const clientEventId = String(body.client_event_id || '').trim() || null;
+  const clientRecordedAt = String(body.client_recorded_at || '').trim() || null;
+  const offlineSource = String(body.offline_source || '').toUpperCase() === 'OFFLINE_SYNC';
+
+  let eventDate = riyadhDate();
+  let eventTime = riyadhTime();
+  if (offlineSource && clientRecordedAt) {
+    const parsed = new Date(clientRecordedAt);
+    if (!Number.isNaN(parsed.getTime())) {
+      const ageMs = Date.now() - parsed.getTime();
+      if (ageMs < -5 * 60 * 1000 || ageMs > 7 * 24 * 60 * 60 * 1000) {
+        return errorResponse('وقت التسجيل غير صالح أو أقدم من الحد المسموح للمزامنة');
+      }
+      eventDate = new Intl.DateTimeFormat('en-CA', { timeZone: process.env.APP_TIMEZONE || 'Africa/Cairo', year:'numeric', month:'2-digit', day:'2-digit' }).format(parsed);
+      eventTime = new Intl.DateTimeFormat('en-GB', { timeZone: process.env.APP_TIMEZONE || 'Africa/Cairo', hour:'2-digit', minute:'2-digit', hour12:false }).format(parsed);
+    }
+  }
+
   const overnightAttendance=timeToMinutes(String(shift.attendance_close))<timeToMinutes(String(shift.attendance_open));
-  const attendanceDate=overnightAttendance&&timeToMinutes(currentTime)<timeToMinutes(String(shift.attendance_open))?previousRiyadhDate(today):today;
+  const attendanceDate=overnightAttendance&&timeToMinutes(eventTime)<timeToMinutes(String(shift.attendance_open))?previousRiyadhDate(eventDate):eventDate;
   const {data:existing}=await supabase.from("attendance").select("*").eq("employee_id",employeeId).eq("date",attendanceDate).maybeSingle();
 
   /* ======================
@@ -215,6 +232,10 @@ export async function attendanceAction(
   if (
     action === "check_in"
   ) {
+    if (clientEventId) {
+      const { data: alreadySynced } = await supabase.from('attendance').select('*').eq('client_event_id', clientEventId).maybeSingle();
+      if (alreadySynced) return success(alreadySynced);
+    }
     if (
       existing?.check_in
     ) {
@@ -225,7 +246,7 @@ export async function attendanceAction(
 
     const current =
       timeToMinutes(
-        currentTime
+        eventTime
       );
 
     const open =
@@ -238,7 +259,7 @@ export async function attendanceAction(
         shift.attendance_close
       );
 
-    if (!isTimeWithinWindow(currentTime, shift.attendance_open, shift.attendance_close)) {
+    if (!isTimeWithinWindow(eventTime, shift.attendance_open, shift.attendance_close)) {
       return errorResponse(
         "الحضور غير متاح في هذا الوقت"
       );
@@ -269,7 +290,7 @@ export async function attendanceAction(
           date:
             attendanceDate,
           check_in:
-            currentTime,
+            eventTime,
           check_in_lat:
             latitude,
           check_in_lng:
@@ -284,6 +305,9 @@ export async function attendanceAction(
               : "PRESENT",
           late_minutes:
             lateMinutes,
+          client_event_id: clientEventId,
+          source: offlineSource ? 'OFFLINE_SYNC' : 'ONLINE',
+          client_recorded_at: clientRecordedAt,
           created_at:
             nowISO(),
         })
@@ -309,6 +333,11 @@ export async function attendanceAction(
      CHECK OUT
   ====================== */
 
+  if (clientEventId) {
+    const { data: alreadyClosed } = await supabase.from('attendance').select('*').eq('check_out_event_id', clientEventId).maybeSingle();
+    if (alreadyClosed) return success(alreadyClosed);
+  }
+
   if (!existing?.check_in) {
     return errorResponse(
       "لم يتم تسجيل الحضور"
@@ -325,7 +354,7 @@ export async function attendanceAction(
 
   const current =
     timeToMinutes(
-      currentTime
+      eventTime
     );
 
   const open =
@@ -338,7 +367,7 @@ export async function attendanceAction(
       shift.checkout_close
     );
 
-  if (!isTimeWithinWindow(currentTime, shift.checkout_open, shift.checkout_close)) {
+  if (!isTimeWithinWindow(eventTime, shift.checkout_open, shift.checkout_close)) {
     return errorResponse(
       "الانصراف غير متاح في هذا الوقت"
     );
@@ -349,7 +378,7 @@ export async function attendanceAction(
       String(
         existing.check_in
       ),
-      currentTime
+      eventTime
     );
 
   const { data, error } =
@@ -357,7 +386,7 @@ export async function attendanceAction(
       .from("attendance")
       .update({
         check_out:
-          currentTime,
+          eventTime,
         check_out_lat:
           latitude,
         check_out_lng:
@@ -368,6 +397,9 @@ export async function attendanceAction(
           ),
         worked_minutes:
           workedMinutes,
+        check_out_event_id: clientEventId,
+        source: offlineSource ? 'OFFLINE_SYNC' : existing.source || 'ONLINE',
+        client_recorded_at: clientRecordedAt || existing.client_recorded_at || null,
         updated_at:
           nowISO(),
       })

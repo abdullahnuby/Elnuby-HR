@@ -17,6 +17,12 @@ export const EXCEL_TABLES: Record<string, TableConfig> = {
     required: ["employee_id","name","job_title","residency_type"],
     key: "employee_id", importable: true,
   },
+  employee_residency_history: {
+    label: "تاريخ نوع إقامة الموظفين",
+    columns: ["id","employee_id","residency_type","effective_from","effective_to","created_at"],
+    required: ["id","employee_id","residency_type","effective_from"],
+    key: "id", importable: true,
+  },
   projects: {
     label: "المشروعات",
     columns: ["project_id","name","client","location_name","latitude","longitude","geofence_radius_m","status"],
@@ -43,7 +49,7 @@ export const EXCEL_TABLES: Record<string, TableConfig> = {
   },
   attendance: {
     label: "الحضور والانصراف",
-    columns: ["attendance_id","employee_id","project_id","shift_id","date","check_in","check_out","status","late_minutes","worked_minutes","auto_closed","manual_modified","modification_reason","created_at","updated_at"],
+    columns: ["attendance_id","employee_id","project_id","shift_id","date","check_in","check_out","status","late_minutes","worked_minutes","auto_closed","manual_modified","modification_reason","source","client_event_id","check_out_event_id","client_recorded_at","created_at","updated_at"],
     required: ["attendance_id","employee_id","project_id","shift_id","date"],
     key: "attendance_id", importable: true,
   },

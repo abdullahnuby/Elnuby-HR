@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { api, apiMultipart } from '@/lib/api';
+import { cacheGet, cacheSet, syncAttendanceQueue, pendingAttendanceCount } from '@/lib/offline';
 import { navByRole, roleLabels } from '@/components/hr/constants';
 import ManagerDashboard from '@/components/hr/Dashboard';
 import DashboardHome from '@/components/hr/DashboardHome';
@@ -98,6 +99,8 @@ export default function Home() {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
   const [notice, setNotice] = useState('');
+  const [isOffline, setIsOffline] = useState(false);
+  const [pendingSync, setPendingSync] = useState(0);
 
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -153,6 +156,38 @@ export default function Home() {
   const [permissionStart, setPermissionStart] = useState('');
   const [permissionEnd, setPermissionEnd] = useState('');
   const [permissionReason, setPermissionReason] = useState('');
+
+  useEffect(() => {
+    const updateNetwork = async () => {
+      setIsOffline(!navigator.onLine);
+      setPendingSync(await pendingAttendanceCount().catch(() => 0));
+    };
+    updateNetwork();
+
+    const sync = async () => {
+      if (!navigator.onLine) return;
+      const result = await syncAttendanceQueue(async (action, payload) => api(action, payload));
+      setPendingSync(result.pending);
+      if (result.synced > 0) {
+        setNotice(`تمت مزامنة ${result.synced} عملية حضور وانصراف`);
+        try { await load(); } catch {}
+      }
+    };
+
+    const online = () => { setIsOffline(false); void sync(); };
+    const offline = () => { setIsOffline(true); void updateNetwork(); };
+    window.addEventListener('online', online);
+    window.addEventListener('offline', offline);
+    const syncTimer = window.setInterval(() => { void sync(); }, 30000);
+    void sync();
+
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+    return () => {
+      window.removeEventListener('online', online);
+      window.removeEventListener('offline', offline);
+      window.clearInterval(syncTimer);
+    };
+  }, []);
 
   useEffect(() => {
     load();
@@ -301,18 +336,40 @@ export default function Home() {
     navigator.geolocation.getCurrentPosition(
       async (p) => {
         try {
-          await api(action, {
+          const clientEventId = crypto.randomUUID();
+          const recordedAt = new Date().toISOString();
+          const result: any = await api(action, {
             latitude: p.coords.latitude,
             longitude: p.coords.longitude,
+            client_event_id: clientEventId,
+            client_recorded_at: recordedAt,
+            offline_source: navigator.onLine ? 'ONLINE' : 'OFFLINE_SYNC',
           });
 
-          setNotice(
-            action === 'check_in'
-              ? 'تم تسجيل الحضور بنجاح'
-              : 'تم تسجيل الانصراف بنجاح',
-          );
-
-          await load();
+          if (result?.offlineQueued) {
+            setPendingSync(await pendingAttendanceCount());
+            setNotice(action === 'check_in'
+              ? 'تم حفظ الحضور على الجهاز وسيتم مزامنته تلقائيًا عند عودة الإنترنت'
+              : 'تم حفظ الانصراف على الجهاز وسيتم مزامنته تلقائيًا عند عودة الإنترنت');
+            setDash((prev: any) => {
+              const current = prev?.selfAttendance || {};
+              const time = new Date(recordedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+              const next = { ...(prev || {}), selfAttendance: action === 'check_in' ? { ...current, check_in: time, check_out: null, source: 'OFFLINE_SYNC', pending_sync: true } : { ...current, check_out: time, source: 'OFFLINE_SYNC', pending_sync: true } };
+              void cacheSet('api:dashboard:{}', next);
+              void cacheGet<any[]>('api:attendance_list:{}').then((list) => {
+                const rows = Array.isArray(list) ? [...list] : [];
+                const localDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(recordedAt));
+                const idx = rows.findIndex((r: any) => r.employee_id === me?.user?.employee_id && r.date === localDate);
+                if (idx >= 0) rows[idx] = { ...rows[idx], ...(action === 'check_in' ? { check_in: time, check_out: null, source: 'OFFLINE_SYNC', pending_sync: true } : { check_out: time, source: 'OFFLINE_SYNC', pending_sync: true }) };
+                else if (action === 'check_in') rows.unshift({ attendance_id: clientEventId, employee_id: me?.user?.employee_id, date: localDate, check_in: time, check_out: null, status: 'PENDING_SYNC', source: 'OFFLINE_SYNC', pending_sync: true });
+                void cacheSet('api:attendance_list:{}', rows);
+              });
+              return next;
+            });
+          } else {
+            setNotice(action === 'check_in' ? 'تم تسجيل الحضور بنجاح' : 'تم تسجيل الانصراف بنجاح');
+            await load();
+          }
         } catch (e: any) {
           setError(e.message);
         } finally {
@@ -962,8 +1019,8 @@ export default function Home() {
         </nav>
 
         <div className="side-bottom">
-          <div className="secure">
-            ● النظام متصل
+          <div className={`secure ${isOffline ? 'offline' : ''}`}>
+            ● {isOffline ? 'وضع بدون إنترنت' : 'النظام متصل'}
           </div>
 
           <button
@@ -985,6 +1042,18 @@ export default function Home() {
       </aside>
 
       <section className="workspace">
+        {(isOffline || pendingSync > 0) && (
+          <div className={`offline-banner ${pendingSync > 0 && !isOffline ? 'pending' : ''}`} role="status">
+            <span className="offline-dot" />
+            {isOffline
+              ? `وضع العمل بدون إنترنت — البيانات المعروضة من آخر مزامنة${pendingSync ? ` • ${pendingSync} عملية حضور بانتظار المزامنة` : ''}`
+              : `${pendingSync} عملية حضور وانصراف بانتظار المزامنة`}
+            {!isOffline && pendingSync > 0 && (
+              <button type="button" onClick={async () => { const r = await syncAttendanceQueue(async (action, payload) => api(action, payload)); setPendingSync(r.pending); if (r.synced) { setNotice(`تمت مزامنة ${r.synced} عملية`); await load(); } }}>مزامنة الآن</button>
+            )}
+          </div>
+        )}
+
         <header className="topbar">
           <div className="top-left">
             <button

@@ -1,0 +1,14 @@
+{
+  "name": "ELNUBY HR Workforce",
+  "short_name": "ELNUBY HR",
+  "description": "ELNUBY HR Workforce Management — Offline-first attendance",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f7fb",
+  "theme_color": "#0f2747",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

@@ -1,6 +1,12 @@
 import './globals.css';
 import type {ReactNode} from 'react';
-import type {Viewport} from 'next';
+import type {Viewport, Metadata} from 'next';
+
+export const metadata: Metadata = {
+  title: 'ELNUBY HR',
+  description: 'ELNUBY HR Workforce Management',
+  manifest: '/manifest.webmanifest',
+};
 
 export const viewport: Viewport = {
   width: 'device-width',
