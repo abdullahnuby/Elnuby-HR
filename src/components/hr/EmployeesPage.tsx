@@ -157,6 +157,16 @@ export default function Employees({
                 })
               }
             />
+            <label>
+              <span>نوع الموظف للإجازات *</span>
+              <select
+                value={employeeForm.residency_type || 'RESIDENT'}
+                onChange={(e)=>setEmployeeForm({...employeeForm,residency_type:e.target.value})}
+              >
+                <option value="RESIDENT">مقيم — 21 يوم سنويًا حسب اللائحة</option>
+                <option value="EXPATRIATE">مغترب — 7 أيام لكل 35 يوم حسب اللائحة</option>
+              </select>
+            </label>
 
             <select
               value={
@@ -324,6 +334,7 @@ export default function Employees({
         headers={[
           'الرقم',
           'الاسم',
+          'نوع الإقامة',
           'الوظيفة',
           'المشروع الحالي',
           'الوردية',
@@ -335,6 +346,7 @@ export default function Employees({
         rows={employees.map((e) => [
           e.employee_id,
           e.name,
+          e.residency_type === 'EXPATRIATE' ? 'مغترب' : 'مقيم',
           e.job_title || '—',
           e.project_name ||
             'غير معين',

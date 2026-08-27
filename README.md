@@ -116,3 +116,16 @@ Required:
 Recommended:
 
 - `CRON_SECRET`
+
+
+## Leave Policy & Excel Operations (2026-08-26)
+
+- Employee records now carry `residency_type`: `EXPATRIATE` or `RESIDENT`.
+- Leave rules are configurable in `hr.leave_policies`.
+- Current seeded annual policy: residents = 21 days/year.
+- Current seeded expatriate policy: 7 days for every 35-day accrual period.
+- Sick leave is a separate policy and requires a private medical document in Supabase Storage.
+- Policy versions use effective dates so historical rules can remain auditable.
+- HR/System Admin have an Excel center with XLSX export, templates, validation preview and audited import.
+- Security-sensitive tables/fields such as password hashes and audit logs are intentionally excluded from Excel import.
+- Migration: `supabase/migrations/20260826_leave_policy_and_excel.sql`.

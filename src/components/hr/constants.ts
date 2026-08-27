@@ -17,5 +17,5 @@ export const navByRole = (role: string) => [
   { id: 'deductions', label: 'الخصومات', icon: 'deductions', roles: ['SYSTEM_ADMIN','HR_MANAGER','SECTOR_MANAGER','PROJECT_MANAGER'] },
   { id: 'users', label: 'حسابات المستخدمين', icon: 'users', roles: ['SYSTEM_ADMIN','HR_MANAGER'] },
   { id: 'reports', label: 'التقارير', icon: 'reports', roles: ['SYSTEM_ADMIN','HR_MANAGER','SECTOR_MANAGER','PROJECT_MANAGER'] },
-  { id: 'settings', label: 'إعدادات النظام', icon: 'settings', roles: ['SYSTEM_ADMIN'] },
+  { id: 'settings', label: 'إعدادات النظام', icon: 'settings', roles: ['SYSTEM_ADMIN','HR_MANAGER'] },
 ].filter(x => !x.roles || x.roles.includes(role));

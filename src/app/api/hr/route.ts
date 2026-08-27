@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { getSession, errorResponse, writeAudit } from "@/server/hr/core";
 import { handleAction } from "@/server/hr/router";
+import { createLeave } from "@/server/hr/leaves";
 import { SESSION_COOKIE } from "@/server/hr/auth";
 
 export const runtime = "nodejs";
@@ -17,7 +18,18 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as Record<string, unknown>;
+    const contentType = request.headers.get("content-type") || "";
+    let body: Record<string, unknown>;
+    if (contentType.includes("multipart/form-data")) {
+      const form = await request.formData();
+      body = {};
+      form.forEach((value, key) => {
+        if (key !== "medical_document") body[key] = typeof value === "string" ? value : value;
+      });
+      if (form.get("medical_document")) body.__document = form.get("medical_document");
+    } else {
+      body = (await request.json()) as Record<string, unknown>;
+    }
     const action = String(body.action || "").trim();
     if (!action) return errorResponse("action is required");
 
@@ -40,7 +52,7 @@ const response =
 if (session && AUDITED_ACTIONS.has(action)) {
   const safeDetails = Object.fromEntries(
     Object.entries(body).filter(
-      ([key]) => !["password", "token"].includes(key)
+      ([key]) => !["password", "token", "__document"].includes(key)
     )
   );
 

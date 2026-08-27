@@ -58,3 +58,26 @@
 .employee-quick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}.employee-quick-grid button{border:1px solid #e3eaf2;background:#fff;border-radius:15px;padding:13px 14px;display:grid;grid-template-columns:35px 1fr 14px;align-items:center;gap:10px;text-align:right;color:#65758a;cursor:pointer;box-shadow:0 5px 18px rgba(25,58,95,.035)}.employee-quick-grid button>svg:first-child{width:35px;height:35px;padding:9px;border-radius:10px;background:#edf4ff;color:#1769e0}.employee-quick-grid b,.employee-quick-grid small{display:block}.employee-quick-grid b{font-size:10px;color:#22344b}.employee-quick-grid small{font-size:8px;color:#919dac;margin-top:3px}.employee-quick-grid button:hover{border-color:#cdddf0;background:#f9fbfe}
 @media(max-width:1150px){.employee-attendance-card{grid-template-columns:1fr auto}.employee-attendance-actions{grid-column:1 / -1;justify-content:flex-end}.employee-kpi-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:800px){.employee-dashboard{gap:12px}.employee-hero{display:block;padding:20px;border-radius:17px}.employee-hero h1{font-size:23px}.employee-role-card{margin-top:16px;min-width:0}.employee-attendance-card{display:block;padding:15px}.employee-attendance-times{margin:15px 0;padding:12px 0;border-top:1px solid #edf1f5;border-bottom:1px solid #edf1f5;border-right:0}.employee-attendance-actions{justify-content:space-between;gap:7px}.employee-primary-action,.employee-secondary-action{flex:1}.employee-kpi-grid{grid-template-columns:1fr 1fr;gap:8px}.employee-kpi{padding:12px}.employee-quick-grid{grid-template-columns:1fr}.employee-meta{gap:8px}}
+
+
+/* =========================================================
+   Leave Policy + Excel Operations
+========================================================= */
+.policy-toolbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px}
+.policy-toolbar h3{margin:0 0 5px}.policy-toolbar p{margin:0;color:var(--muted,#64748b)}
+.policy-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding:18px;border:1px solid var(--line,#e2e8f0);border-radius:18px;background:var(--surface,#fff);margin-bottom:18px}
+.policy-form label{display:grid;gap:7px;font-weight:700;font-size:13px}.policy-form input,.policy-form select{min-height:44px}
+.policy-form .check-field{display:flex;align-items:center;gap:8px}.policy-form .check-field input{min-height:auto}
+.policy-form button{align-self:end;min-height:44px}
+.policy-list{display:grid;gap:10px}.policy-card{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:18px;padding:16px 18px;border:1px solid var(--line,#e2e8f0);border-radius:16px;background:var(--surface,#fff)}
+.policy-card h4{margin:5px 0;font-size:15px}.policy-card p{margin:0;color:var(--muted,#64748b);font-size:12px}.policy-code{font-size:10px;letter-spacing:.08em;color:var(--blue,#1769e0);font-weight:800}
+.policy-value{text-align:center;min-width:110px}.policy-value strong{display:block;font-size:19px}.policy-value small{color:var(--muted,#64748b)}
+.badge.success{background:#e8f7ee;color:#18794e}.badge.muted{background:#eef2f7;color:#64748b}
+.excel-center{display:grid;gap:16px}.excel-hero{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px;border:1px solid var(--line,#e2e8f0);border-radius:18px;background:linear-gradient(135deg,#f8fbff,#fff)}
+.excel-hero h3{margin:4px 0}.excel-hero p{margin:0;color:var(--muted,#64748b)}.excel-badge{padding:10px 14px;border-radius:12px;background:#eaf3ff;color:#1769e0;font-weight:900}
+.excel-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.excel-card{display:grid;gap:10px;padding:18px;border:1px solid var(--line,#e2e8f0);border-radius:18px;background:#fff}.excel-card label{font-weight:800;font-size:13px}.excel-card input,.excel-card select{min-height:44px}
+.excel-actions{display:flex;gap:8px;flex-wrap:wrap}.excel-help{font-size:12px;color:var(--muted,#64748b);margin:0}
+.excel-preview{border:1px solid var(--line,#e2e8f0);border-radius:18px;padding:18px;background:#fff}.excel-preview-head{display:flex;justify-content:space-between;align-items:center;gap:14px}.excel-preview-head strong{display:block}.excel-preview-head span{display:block;color:var(--muted,#64748b);font-size:12px;margin-top:4px}
+.excel-errors{display:grid;gap:7px;margin-top:14px}.excel-errors>div{display:flex;gap:12px;padding:10px 12px;border-radius:10px;background:#fff4f4;color:#9b1c1c}.excel-success{margin-top:14px;padding:12px;border-radius:10px;background:#edf9f1;color:#18794e}
+.leave-balance-strip{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}.leave-balance-strip>div{display:flex;gap:10px;align-items:center;padding:10px 13px;border-radius:12px;background:#f4f7fb;border:1px solid var(--line,#e2e8f0)}.leave-balance-strip span{color:var(--muted,#64748b);font-size:12px}.leave-balance-strip strong{font-size:15px}
+@media(max-width:900px){.policy-form,.excel-grid{grid-template-columns:1fr}.policy-card{grid-template-columns:1fr}.policy-value{text-align:start}.excel-preview-head{align-items:flex-start;flex-direction:column}}

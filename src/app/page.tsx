@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, apiMultipart } from '@/lib/api';
 import { navByRole, roleLabels } from '@/components/hr/constants';
 import ManagerDashboard from '@/components/hr/Dashboard';
 import DashboardHome from '@/components/hr/DashboardHome';
@@ -25,6 +25,7 @@ type Employee = {
   department?: string;
   phone?: string;
   status?: string;
+  residency_type?: 'EXPATRIATE'|'RESIDENT';
   project_id?: string;
   project_name?: string;
   assignment_start?: string;
@@ -114,6 +115,7 @@ export default function Home() {
     national_id: '',
     birth_date: '',
     hire_date: '',
+    residency_type: 'RESIDENT',
     project_id: '',
     shift_id: '',
   });
@@ -752,29 +754,30 @@ export default function Home() {
     try{setBusy(true);await api('close_attendance',{attendance_id:attendanceId});setNotice('تم إغلاق سجل الحضور');setRows(await api('attendance_list',{}));}catch(e:any){setError(e.message||'تعذر إغلاق سجل الحضور')}finally{setBusy(false)}
   }
 
-  async function createLeave() {
+  async function createLeave(medicalDocument?: File) {
     setBusy(true);
     setError('');
 
     try {
-      await api('create_leave', {
+      await apiMultipart('create_leave', {
         leave_type_id: leaveType,
         from_date: leaveFrom,
         to_date: leaveTo,
         reason: leaveReason,
-      });
+      }, medicalDocument);
 
-      setNotice('تم إرسال طلب الإجازة');
-
+      setNotice('تم إرسال طلب الإجازة للاعتماد');
       setLeaveFrom('');
       setLeaveTo('');
       setLeaveReason('');
+      await refreshSection('leaves');
     } catch (e: any) {
       setError(e.message);
     } finally {
       setBusy(false);
     }
   }
+
 
   async function createPermission() {
     setBusy(true);
@@ -1252,10 +1255,10 @@ export default function Home() {
           )}
 
           {section === 'settings' && (
-            me.user?.role === 'SYSTEM_ADMIN' ? (
-              <SystemAdminPanel />
+            ['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? (
+              <Settings role={me.user?.role} />
             ) : (
-              <Settings />
+              <SystemAdminPanel />
             )
           )}
 

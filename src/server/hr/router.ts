@@ -7,7 +7,8 @@ import { listProjects, createProject, updateProject } from "./projects";
 import { listShifts, createShift, updateShift } from "./shifts";
 import { listEmployeeShifts, assignEmployeeShift, assignEmployeeProject, assignManagerProject } from "./assignments";
 import { attendanceList, attendanceAction , closeAttendance} from "./attendance";
-import { leaveList, createLeave, decideLeaveManager, decideLeaveHR } from "./leaves";
+import { leaveList, createLeave, decideLeaveManager, decideLeaveHR, getLeaveDocument } from "./leaves";
+import { listLeavePolicies, listEmployeeLeaveBalances, listLeaveTypes, createLeavePolicy, updateLeavePolicy } from "./leavePolicies";
 import { permissionList, createPermission, decidePermission } from "./permissions";
 import { listDeductions, listUsers, createUser, updateUser, deleteUser, assignSectorManagerProjects, adminList, adminInsert, adminUpdate, adminDelete } from "./users";
 
@@ -349,6 +350,46 @@ export async function handleAction(
         session!,
         body
       );
+    }
+
+    case "leave_policies": {
+      const auth = requireRole(session, ADMIN_ROLES);
+      if (auth) return auth;
+      return listLeavePolicies();
+    }
+
+    case "leave_types": {
+      const auth = requireRole(session, ADMIN_ROLES);
+      if (auth) return auth;
+      return listLeaveTypes();
+    }
+
+    case "leave_balances": {
+      const auth = requireRole(session, ROLES);
+      if (auth) return auth;
+      const employeeId = body.employee_id ? String(body.employee_id) : undefined;
+      if (employeeId && !["SYSTEM_ADMIN","HR_MANAGER"].includes(session!.user.role) && employeeId !== session!.user.employee_id) {
+        return errorResponse("ليس لديك صلاحية عرض هذا الرصيد", 403);
+      }
+      return listEmployeeLeaveBalances(session!, employeeId);
+    }
+
+    case "create_leave_policy": {
+      const auth = requireRole(session, ADMIN_ROLES);
+      if (auth) return auth;
+      return createLeavePolicy(session!, body);
+    }
+
+    case "update_leave_policy": {
+      const auth = requireRole(session, ADMIN_ROLES);
+      if (auth) return auth;
+      return updateLeavePolicy(session!, body);
+    }
+
+    case "leave_document": {
+      const auth = requireRole(session, ROLES);
+      if (auth) return auth;
+      return getLeaveDocument(session!, body);
     }
 
     case "create_leave": {

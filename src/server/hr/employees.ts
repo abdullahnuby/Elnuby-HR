@@ -1,6 +1,10 @@
 import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, riyadhDate, riyadhTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift, writeAudit } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
+function startOfCurrentYear() {
+  return `${riyadhDate().slice(0, 4)}-01-01`;
+}
+
 export async function listEmployees(
   session: SessionContext,
   _body: Record<string, unknown> = {},
@@ -376,6 +380,8 @@ export async function createEmployee(
           body.birth_date || null,
         hire_date:
           body.hire_date || null,
+        residency_type:
+          body.residency_type || "RESIDENT",
         status:
           body.status || "ACTIVE",
       })
@@ -393,6 +399,15 @@ export async function createEmployee(
       500
     );
   }
+
+  await supabase.from("employee_residency_history").insert({
+    history_id: generateId("ERH"),
+    employee_id: employeeId,
+    residency_type: body.residency_type || "RESIDENT",
+    effective_from: body.hire_date || startOfCurrentYear(),
+    created_by: session.user.user_id,
+    created_at: nowISO(),
+  });
 
   const projectId = body.project_id
     ? String(body.project_id)
@@ -523,9 +538,23 @@ export async function createEmployee(
 
 export async function updateEmployee(session: SessionContext, body: Record<string, unknown>) {
   const employeeId=String(body.employee_id||'').trim(); if(!employeeId) return errorResponse('رقم الموظف مطلوب');
-  const changes:Record<string,unknown>={}; for(const k of ['name','job_title','department','phone','national_id','birth_date','hire_date','status']) if(body[k]!==undefined) changes[k]=body[k]===''?null:body[k];
+  const changes:Record<string,unknown>={}; for(const k of ['name','job_title','department','phone','national_id','birth_date','hire_date','residency_type','status']) if(body[k]!==undefined) changes[k]=body[k]===''?null:body[k];
   if(!Object.keys(changes).length) return errorResponse('لا توجد بيانات للتعديل');
   const {data,error}=await supabase.from('employees').update({...changes,updated_at:nowISO()}).eq('employee_id',employeeId).select('*').maybeSingle();
   if(error) return errorResponse(error.message,500); if(!data) return errorResponse('الموظف غير موجود',404);
+  if (changes.residency_type) {
+    await supabase.from("employee_residency_history")
+      .update({ effective_to: startOfCurrentYear() })
+      .eq("employee_id", employeeId)
+      .is("effective_to", null);
+    await supabase.from("employee_residency_history").insert({
+      history_id: generateId("ERH"),
+      employee_id: employeeId,
+      residency_type: String(changes.residency_type),
+      effective_from: startOfCurrentYear(),
+      created_by: session.user.user_id,
+      created_at: nowISO(),
+    });
+  }
   await writeAudit(session.user.user_id,'update_employee','employees',employeeId,{changes}); return success(data);
 }
