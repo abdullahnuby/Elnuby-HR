@@ -98,7 +98,13 @@ export async function login(body: Record<string, unknown>) {
     });
 
   if (sessionError) {
-    console.error("create session:", sessionError);
+    console.error("create session:", {
+      message: sessionError.message,
+      code: sessionError.code,
+      details: sessionError.details,
+      hint: sessionError.hint,
+      user_id: String(user.id),
+    });
     return errorResponse("تعذر إنشاء جلسة الدخول", 500);
   }
 
