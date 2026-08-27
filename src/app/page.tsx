@@ -190,7 +190,30 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    load();
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const status: any = await api('session_status');
+        if (cancelled || !status?.authenticated) {
+          await clearOfflineData();
+          if (!cancelled) {
+            setMe(null);
+            setDash(null);
+            setManagerDash(null);
+          }
+          return;
+        }
+        if (!cancelled) await load();
+      } catch {
+        if (!cancelled) {
+          await clearOfflineData();
+          setMe(null);
+        }
+      }
+    })();
+
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -259,6 +282,11 @@ export default function Home() {
 
     try {
       const m: any = await api('me');
+
+      if (!m?.user) {
+        setMe(null);
+        return;
+      }
 
       setMe(m);
 

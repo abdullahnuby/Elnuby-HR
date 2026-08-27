@@ -23,6 +23,9 @@ export async function handleAction(
     case "login":
       return login(body);
 
+    case "session_status":
+      return success({ authenticated: Boolean(session) });
+
     case "logout":
       return logout(session);
 

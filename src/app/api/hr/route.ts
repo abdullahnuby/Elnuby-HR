@@ -42,6 +42,14 @@ export async function POST(request: Request) {
     if (action !== "login") {
       session = await getSession(cookieToken);
 
+      // session_status is intentionally public and idempotent. It is used by
+      // the browser on first load so an unauthenticated refresh does not
+      // produce a noisy 401 or revive stale client state.
+      if (action === "session_status") {
+        if (!session && cookieToken) await clearSessionCookie();
+        return Response.json({ ok: true, data: { authenticated: Boolean(session) } });
+      }
+
       // Logout is intentionally idempotent: even if the server-side session
       // has already expired/revoked, always remove the browser cookie.
       if (!session && action !== "logout") {
