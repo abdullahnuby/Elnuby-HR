@@ -1,4 +1,4 @@
-import { apiCacheKey, cacheGet, cacheSet, queueAttendance, clearOfflineCache, setOfflineUserId } from './offline';
+import { apiCacheKey, cacheGet, cacheSet, queueAttendance, setOfflineUserId } from './offline';
 
 export type ApiResponse<T = unknown> = {
   ok: boolean;

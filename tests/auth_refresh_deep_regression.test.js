@@ -1,0 +1,21 @@
+const fs = require('fs');
+const path = require('path');
+const assert = require('assert');
+const root = path.resolve(__dirname, '..');
+const auth = fs.readFileSync(path.join(root,'src/server/hr/auth.ts'),'utf8');
+const core = fs.readFileSync(path.join(root,'src/server/hr/core.ts'),'utf8');
+const api = fs.readFileSync(path.join(root,'src/lib/api.ts'),'utf8');
+const page = fs.readFileSync(path.join(root,'src/app/page.tsx'),'utf8');
+const offline = fs.readFileSync(path.join(root,'src/lib/offline.ts'),'utf8');
+const vercel = JSON.parse(fs.readFileSync(path.join(root,'vercel.json'),'utf8'));
+
+assert.ok(auth.includes('response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions())'), 'login must set cookie on the actual response');
+assert.ok(auth.includes('maxAge: SESSION_MAX_AGE'), 'session cookie must be persistent');
+assert.ok(auth.includes('httpOnly: true'), 'session cookie must be HttpOnly');
+assert.ok(core.includes('SESSION_MAX_AGE * 1000'), 'sliding session must use shared session max age');
+assert.ok(api.includes("credentials: 'include'"), 'browser API calls must send cookies');
+assert.ok(api.includes("res = await fetch('/api/hr', requestInit)"), 'auth retry missing');
+assert.ok(page.includes('لم يتم تسجيل الخروج'), 'refresh/auth transient failure must not force logout');
+assert.ok(offline.includes('legacyAnonymousKey'), 'legacy offline cache migration missing');
+assert.equal(vercel.crons[0].schedule, '0 0 * * *', 'Hobby cron must run once per day');
+console.log('PASS deep auth refresh regression');

@@ -54,6 +54,10 @@ function scopedCacheKey(key: string) {
   return userId ? `user:${userId}:${key}` : `anonymous:${key}`;
 }
 
+function legacyAnonymousKey(key: string) {
+  return `anonymous:${key}`;
+}
+
 export async function cacheSet(key: string, value: unknown) {
   try {
     const db = await openDb();
@@ -72,9 +76,25 @@ export async function cacheGet<T = unknown>(key: string): Promise<T | undefined>
     const db = await openDb();
     const value = await new Promise<T | undefined>((resolve, reject) => {
       const tx = db.transaction(CACHE_STORE, 'readonly');
-      const req = tx.objectStore(CACHE_STORE).get(scopedCacheKey(key));
-      req.onsuccess = () => resolve(req.result?.value as T | undefined);
-      req.onerror = () => reject(req.error);
+      const store = tx.objectStore(CACHE_STORE);
+      const primaryReq = store.get(scopedCacheKey(key));
+      primaryReq.onsuccess = () => {
+        if (primaryReq.result?.value !== undefined) {
+          resolve(primaryReq.result.value as T);
+          return;
+        }
+        // One-time compatibility path for installs upgraded from the older
+        // anonymous-cache implementation. This is read-only; callers can
+        // immediately write the value under the authenticated namespace.
+        if (getOfflineUserId()) {
+          const legacyReq = store.get(legacyAnonymousKey(key));
+          legacyReq.onsuccess = () => resolve(legacyReq.result?.value as T | undefined);
+          legacyReq.onerror = () => reject(legacyReq.error);
+        } else {
+          resolve(undefined);
+        }
+      };
+      primaryReq.onerror = () => reject(primaryReq.error);
     });
     db.close();
     return value;

@@ -293,7 +293,7 @@ export async function getSession(
 
   // Sliding server-side session: refreshing/using the app keeps an active
   // session alive while the browser cookie remains valid.
-  const refreshedExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const refreshedExpiry = new Date(Date.now() + SESSION_MAX_AGE * 1000).toISOString();
   await publicSupabase
     .from("app_sessions")
     .update({

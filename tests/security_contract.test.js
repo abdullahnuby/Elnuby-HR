@@ -16,7 +16,7 @@ assert.ok(!api.includes('body.token'), 'body token accepted');
 
 const vercel = fs.readFileSync(path.join(root, 'vercel.json'), 'utf8');
 assert.ok(vercel.includes('/api/cron/auto-checkout'), 'Vercel must call the real auto-checkout route');
-assert.ok(vercel.includes('"schedule": "0 * * * *"'), 'Auto-checkout cron should run hourly');
+assert.ok(vercel.includes('"schedule": "0 0 * * *"'), 'Auto-checkout cron should run daily for Vercel Hobby');
 
 assert.ok(core.includes('process.env.APP_TIMEZONE || "Africa/Cairo"'), 'Egypt deployment timezone must default to Cairo');
 assert.ok(core.includes('status >= 500'), '5xx errors must be sanitized');
@@ -61,7 +61,7 @@ const offline = fs.readFileSync(path.join(root, 'src/lib/offline.ts'), 'utf8');
 assert.ok(offline.includes('userId: string'), 'Offline queue must be bound to a user');
 assert.ok(offline.includes('Never delete pending attendance'), 'Offline queue must survive session expiry');
 const apiClient = fs.readFileSync(path.join(root, 'src/lib/api.ts'), 'utf8');
-assert.ok(apiClient.includes('clearOfflineCache'), 'Auth failure may clear cache without destroying queued attendance');
+assert.ok(!apiClient.includes('clearOfflineData'), 'API client must never clear the offline queue on auth errors');
 assert.ok(apiClient.includes('X-Offline-Sync'), 'Offline synchronization must be explicitly marked at transport level');
 assert.ok(!apiClient.match(/clearOfflineData\(\)/), 'API client must not clear the offline queue on auth errors');
 const page = fs.readFileSync(path.join(root, 'src/app/page.tsx'), 'utf8');

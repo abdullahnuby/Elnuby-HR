@@ -19,7 +19,8 @@ assert.ok(auth.includes('maxAge: SESSION_MAX_AGE'));
 assert.ok(auth.includes('expires'));
 assert.ok(auth.includes('sameSite: "lax"'));
 assert.ok(route.includes('dynamic = "force-dynamic"'));
-assert.ok(auth.includes('SESSION_MAX_AGE = 7 * 24 * 60 * 60'));
+assert.ok(core.includes('SESSION_MAX_AGE = 7 * 24 * 60 * 60'));
+assert.ok(auth.includes('SESSION_MAX_AGE'));
 assert.ok(core.includes('app_sessions'));
 assert.ok(core.includes('refreshedExpiry'));
 
@@ -44,7 +45,7 @@ assert.ok(api.includes('class ApiRequestError'));
 assert.ok(page.includes('failedSync'));
 assert.ok(page.includes('تعذر تسجيل'));
 assert.ok(page.includes('تم رفض')); 
-assert.ok(api.includes('await clearOfflineCache()'));
+assert.ok(!api.includes('await clearOfflineData()'), 'API client must never clear the attendance queue');
 assert.ok(api.includes('// Establish the cache namespace BEFORE storing the response.'));
 assert.ok(!/authFailure[\s\S]{0,180}clearOfflineData\(\)/.test(api));
 

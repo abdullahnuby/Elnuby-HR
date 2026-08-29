@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { api, apiMultipart } from '@/lib/api';
-import { apiCacheKey, cacheGet, cacheSet, syncAttendanceQueue, pendingAttendanceCount, failedAttendanceCount, lastFailedAttendance, clearOfflineData, clearOfflineCache, getOfflineUserId, setOfflineUserId } from '@/lib/offline';
+import { apiCacheKey, cacheGet, cacheSet, syncAttendanceQueue, pendingAttendanceCount, failedAttendanceCount, lastFailedAttendance, clearOfflineData, getOfflineUserId, setOfflineUserId } from '@/lib/offline';
 import { navByRole, roleLabels } from '@/components/hr/constants';
 import ManagerDashboard from '@/components/hr/Dashboard';
 import DashboardHome from '@/components/hr/DashboardHome';
@@ -245,8 +245,13 @@ export default function Home() {
         const message = String(error?.message || '');
         const authFailure = /Authentication required|Invalid session|Session expired|User inactive|الجلسة غير صالحة|منتهية/i.test(message);
         if (authFailure) {
-          await clearOfflineCache();
-          setMe(null);
+          // A single 401 must not destroy the local authenticated shell. The
+          // session is only treated as logged out after an explicit logout or
+          // a verified server-side invalidation handled by the user.
+          const restored = await restoreCachedOfflineSession(!navigator.onLine);
+          if (!restored) {
+            setError('تعذر التحقق من جلسة الدخول حاليًا. لم يتم تسجيل الخروج.');
+          }
         } else if (!(await restoreCachedOfflineSession(true))) {
           setError(message || 'تعذر الاتصال بالخادم.');
         }

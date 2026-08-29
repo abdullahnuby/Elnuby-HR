@@ -13,7 +13,8 @@ const sw = fs.readFileSync(path.join(root, 'public/sw.js'), 'utf8');
 assert.ok(auth.includes('sameSite: "lax"'));
 assert.ok(auth.includes('expires = new Date(Date.now() + SESSION_MAX_AGE * 1000)'));
 assert.ok(route.includes('dynamic = "force-dynamic"'));
-assert.ok(route.includes('Do not clear a browser cookie during a passive status probe'));
+assert.ok(route.includes('session_status'));
+assert.ok(!route.includes('clearSessionCookie()'), 'passive session status must not clear the cookie');
 
 // Offline state must be stored and restored under the same exact user-scoped keys.
 assert.ok(page.includes("cacheGet(apiCacheKey('me', {}))"));
