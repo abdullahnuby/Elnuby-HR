@@ -256,7 +256,7 @@ export default function SystemAdminPanel() {
     finally { setBusy(false); }
   }
 
-  const groupLabels = { workforce: 'الموارد البشرية', operations: 'التشغيل والتعيينات', requests: 'المعاملات والطلبات', security: 'الحسابات والصلاحيات' } as const;
+  const groupLabels = { workforce: 'القوى العاملة', operations: 'التشغيل والتعيينات', requests: 'المعاملات والطلبات', security: 'الحسابات والصلاحيات' } as const;
 
   return (
     <section className="panel page-panel" style={{ minHeight: 650 }}>
@@ -264,7 +264,7 @@ export default function SystemAdminPanel() {
         <div>
           <div className="eyebrow">مركز التحكم بالنظام</div>
           <h2 style={{ fontSize: 22, marginTop: 5 }}>مركز إدارة النظام</h2>
-          <p>إدارة بيانات النظام بالكامل من داخل ELNUBY HR مع حماية العلاقات وسجل سجل التدقيق.</p>
+          <p>إدارة بيانات النظام بالكامل من داخل النُبي للموارد البشرية مع حماية العلاقات وسجل سجل التدقيق.</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span className="live"><b /> مدير النظام</span>

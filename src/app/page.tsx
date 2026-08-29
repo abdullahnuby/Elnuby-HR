@@ -1085,7 +1085,7 @@ export default function Home() {
           <div className="login-brand">
             <div className="brand-mark">N</div>
             <div>
-              <b>ELNUBY HR</b>
+              <b>النُبي للموارد البشرية</b>
               <span>نظام إدارة موارد بشرية للمشروعات</span>
             </div>
           </div>
@@ -1095,7 +1095,7 @@ export default function Home() {
             <p>يتم استعادة جلسة الدخول والبيانات المحلية. لن تحتاج إلى تسجيل الدخول مرة أخرى.</p>
             <div className="alert" role="status">جاري التحقق…</div>
           </section>
-          <small className="login-footer">ELNUBY HR • إدارة الموارد البشرية بالمشروعات</small>
+          <small className="login-footer">النُبي للموارد البشرية • إدارة القوى العاملة بالمشروعات</small>
         </div>
       </main>
     );
@@ -1114,7 +1114,7 @@ export default function Home() {
             </div>
 
             <div>
-              <b>ELNUBY HR</b>
+              <b>النُبي للموارد البشرية</b>
               <span>
                 نظام إدارة موارد بشرية للمشروعات
               </span>
@@ -1179,7 +1179,7 @@ export default function Home() {
           </section>
 
           <small className="login-footer">
-            ELNUBY HR • إدارة الموارد البشرية بالمشروعات
+            النُبي للموارد البشرية • إدارة القوى العاملة بالمشروعات
           </small>
         </div>
       </main>
@@ -1210,8 +1210,8 @@ export default function Home() {
           </div>
 
           <div>
-            <b>ELNUBY HR</b>
-            <small>إدارة الموارد البشرية</small>
+            <b>النُبي للموارد البشرية</b>
+            <small>إدارة القوى العاملة</small>
           </div>
         </div>
 

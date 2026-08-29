@@ -39,7 +39,7 @@ export default function Settings({role='HR_MANAGER'}:{role?:string}){
  }
 
  return <section className="panel page-panel hr-settings">
-  <div className="hr-settings-hero"><div><div className="eyebrow">ELNUBY HR • مركز التحكم</div><h2>إعدادات النظام</h2><p>قواعد التشغيل ولوائح الإجازات ومركز إكسل في مكان واحد.</p></div><div className="hr-system-status"><span className="status-dot"/> النظام متصل</div></div>
+  <div className="hr-settings-hero"><div><div className="eyebrow">النُبي للموارد البشرية • مركز التحكم</div><h2>إعدادات النظام</h2><p>قواعد التشغيل ولوائح الإجازات ومركز إكسل في مكان واحد.</p></div><div className="hr-system-status"><span className="status-dot"/> النظام متصل</div></div>
   <div className="hr-settings-tabs">
    {[
     ['overview','نظرة عامة','dashboard'],['attendance','الحضور والورديات','attendance'],

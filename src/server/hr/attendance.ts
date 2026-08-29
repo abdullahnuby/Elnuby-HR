@@ -2,6 +2,35 @@ import { parsePagination } from "./core";
 import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, appDate, previousAppDate, appTime, APP_TIMEZONE, timeToMinutes, minutesBetween, isTimeWithinWindow, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
+async function getApprovedLeave(employeeId: string, date: string) {
+  const { data, error } = await supabase
+    .from("leave_requests")
+    .select("request_id,leave_type_id,from_date,to_date,days,reason,status")
+    .eq("employee_id", employeeId)
+    .eq("status", "APPROVED")
+    .lte("from_date", date)
+    .gte("to_date", date)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+async function getApprovedEndOfDayPermission(employeeId: string, date: string, checkoutOpen: string) {
+  const { data, error } = await supabase
+    .from("permission_requests")
+    .select("request_id,permission_type,start_time,end_time,status")
+    .eq("employee_id", employeeId)
+    .eq("date", date)
+    .eq("status", "APPROVED")
+    .gte("end_time", checkoutOpen)
+    .order("end_time", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 export async function attendanceList(
   session: SessionContext,
   body: Record<string, unknown> = {},
@@ -71,9 +100,77 @@ export async function attendanceList(
     );
   }
 
-  return success(
-    data || []
-  );
+  let rows = data || [];
+
+  // Show approved leave days in the attendance registry so HR sees a complete daily status.
+  // Keep the window bounded to the current calendar month to avoid expanding a full year's leave days.
+  const todayForLeaves = appDate();
+  const monthStart = `${todayForLeaves.slice(0, 7)}-01`;
+  const nextMonth = new Date(`${monthStart}T00:00:00Z`);
+  nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
+  const monthEnd = new Date(nextMonth.getTime() - 86400000).toISOString().slice(0, 10);
+
+  let leaveQuery = supabase
+    .from("leave_requests")
+    .select("request_id,employee_id,project_id,leave_type_id,from_date,to_date,days,reason,status")
+    .eq("status", "APPROVED")
+    .lte("from_date", monthEnd)
+    .gte("to_date", monthStart);
+
+  if (session.user.role === "EMPLOYEE") {
+    if (!session.user.employee_id) return success(rows);
+    leaveQuery = leaveQuery.eq("employee_id", session.user.employee_id);
+  } else if (["SECTOR_MANAGER", "PROJECT_MANAGER"].includes(session.user.role)) {
+    const ids = await getManagedProjectIds(session.user);
+    if (!ids.length) return success(rows);
+    leaveQuery = leaveQuery.in("project_id", ids);
+  }
+
+  const { data: approvedLeaves, error: leaveError } = await leaveQuery;
+  if (leaveError) return errorResponse(leaveError.message, 500);
+
+  const leaveByDay = new Map<string, any>();
+  for (const leave of approvedLeaves || []) {
+    const start = new Date(`${leave.from_date}T00:00:00Z`);
+    const end = new Date(`${leave.to_date}T00:00:00Z`);
+    for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+      const day = d.toISOString().slice(0, 10);
+      if (day < monthStart || day > monthEnd) continue;
+      leaveByDay.set(`${leave.employee_id}|${day}`, leave);
+    }
+  }
+
+  const attendanceByKey = new Map(rows.map((r:any) => [`${r.employee_id}|${r.date}`, r]));
+  for (const [key, leave] of leaveByDay) {
+    const [employeeId, date] = key.split("|");
+    const existingRow = attendanceByKey.get(key);
+    const virtualRow = {
+      ...(existingRow || {}),
+      attendance_id: existingRow?.attendance_id || `LEAVE-${leave.request_id}-${date}`,
+      employee_id: employeeId,
+      project_id: leave.project_id || existingRow?.project_id || null,
+      date,
+      check_in: null,
+      check_out: null,
+      worked_minutes: null,
+      late_minutes: 0,
+      auto_closed: false,
+      manual_modified: false,
+      status: "LEAVE",
+      leave_request_id: leave.request_id,
+      leave_type_id: leave.leave_type_id,
+      leave_reason: leave.reason || null,
+    };
+    if (existingRow) {
+      const idx = rows.findIndex((r:any) => `${r.employee_id}|${r.date}` === key);
+      if (idx >= 0) rows[idx] = virtualRow;
+    } else {
+      rows.push(virtualRow);
+    }
+  }
+  rows.sort((a:any,b:any) => String(b.date).localeCompare(String(a.date)) || String(b.check_in || "").localeCompare(String(a.check_in || "")));
+
+  return success(rows);
 }
 
 /* =========================================================
@@ -148,6 +245,7 @@ export async function attendanceAction(
       "الوردية غير موجودة"
     );
   }
+
 
   const latitude = Number(body.latitude);
   const longitude = Number(body.longitude);
@@ -229,6 +327,11 @@ export async function attendanceAction(
   const overnightAttendance = timeToMinutes(String(shift.attendance_close)) < timeToMinutes(String(shift.attendance_open));
   const attendanceDate=overnightAttendance&&timeToMinutes(eventTime)<timeToMinutes(String(shift.attendance_open))?previousAppDate(eventDate):eventDate;
   const {data:existing}=await supabase.from("attendance").select("*").eq("employee_id",employeeId).eq("date",attendanceDate).maybeSingle();
+
+  const approvedLeave = await getApprovedLeave(employeeId, attendanceDate);
+  if (approvedLeave) {
+    return errorResponse(`اليوم ضمن إجازة معتمدة. لا يمكن تسجيل ${action === "check_in" ? "الحضور" : "الانصراف"}.`);
+  }
 
   /* ======================
      CHECK IN
@@ -364,6 +467,11 @@ export async function attendanceAction(
     timeToMinutes(
       shift.checkout_open
     );
+
+  const approvedEndPermission = await getApprovedEndOfDayPermission(employeeId, attendanceDate, String(shift.checkout_open));
+  if (approvedEndPermission) {
+    return errorResponse("يوجد إذن معتمد يغطي نهاية ساعات العمل، ولا يلزم تسجيل الانصراف لهذا اليوم.");
+  }
 
   const close =
     timeToMinutes(
