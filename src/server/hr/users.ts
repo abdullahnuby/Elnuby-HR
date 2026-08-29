@@ -1,6 +1,6 @@
 import { parsePagination } from "./core";
 import crypto from "crypto";
-import { supabase, success, errorResponse, generateId, sha256, passwordHash, securePasswordHash, nowISO, appDate, previousAppDate, appTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, ROLES, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift, writeسجل التدقيق } from "./core";
+import { supabase, success, errorResponse, generateId, sha256, passwordHash, securePasswordHash, nowISO, appDate, previousAppDate, appTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, ROLES, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift, writeAuditLog } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
 export async function listDeductions(
@@ -179,7 +179,7 @@ export async function createUser(
 
   // الموارد البشرية can manage workforce accounts, but only SYSTEM_ADMIN can create
   // another الموارد البشرية administrator or a full system administrator.
-  if (session.user.role === "الموارد البشرية_MANAGER" && ["SYSTEM_ADMIN", "الموارد البشرية_MANAGER"].includes(role)) {
+  if (session.user.role === "HR_MANAGER" && ["SYSTEM_ADMIN", "HR_MANAGER"].includes(role)) {
     return errorResponse("مدير الموارد البشرية لا يستطيع إنشاء حساب مدير نظام أو حساب الموارد البشرية إداري آخر", 403);
   }
 
@@ -532,7 +532,7 @@ export async function adminInsert(
   if (!Object.keys(safeRow).length) return errorResponse("لا توجد حقول آمنة للإدخال");
   const { data, error } = await supabase.from(table).insert(safeRow).select("*").single();
   if (error) return errorResponse(error.message, 500);
-  await writeسجل التدقيق(session.user.user_id, "ADMIN_INSERT", table, String((data as any)?.id || (data as any)?.employee_id || (data as any)?.project_id || ""), { row });
+  await writeAuditLog(session.user.user_id, "ADMIN_INSERT", table, String((data as any)?.id || (data as any)?.employee_id || (data as any)?.project_id || ""), { row });
   return success(data, 201);
 }
 
@@ -551,7 +551,7 @@ export async function adminUpdate(
   const { data, error } = await supabase.from(table).update(safeChanges).eq(idColumn, id).select("*").maybeSingle();
   if (error) return errorResponse(error.message, 500);
   if (!data) return errorResponse("السجل غير موجود", 404);
-  await writeسجل التدقيق(session.user.user_id, "ADMIN_UPDATE", table, id, { id_column: idColumn, changes });
+  await writeAuditLog(session.user.user_id, "ADMIN_UPDATE", table, id, { id_column: idColumn, changes });
   return success(data);
 }
 
@@ -569,7 +569,7 @@ export async function adminDelete(
     if (id === session.user.user_id) return errorResponse("لا يمكن لمدير النظام تعطيل حسابه الحالي");
     const { data, error } = await supabase.from("users").update({status:"INACTIVE",updated_at:nowISO()}).eq("id",id).select("id,employee_id,username,role,status").maybeSingle();
     if (error) return errorResponse(error.message,500); if (!data) return errorResponse("السجل غير موجود",404);
-    await writeسجل التدقيق(session.user.user_id,"ADMIN_DELETE","users",id,{soft_delete:true,status:"INACTIVE"}); return success(data);
+    await writeAuditLog(session.user.user_id,"ADMIN_DELETE","users",id,{soft_delete:true,status:"INACTIVE"}); return success(data);
   }
 
   if (table === "employees") {
@@ -588,7 +588,7 @@ export async function adminDelete(
   const { data, error } = await supabase.from(table).delete().eq(idColumn, id).select("*").maybeSingle();
   if (error) return errorResponse(error.message, 500);
   if (!data) return errorResponse("السجل غير موجود", 404);
-  await writeسجل التدقيق(session.user.user_id, "ADMIN_DELETE", table, id, { id_column: idColumn, deleted: data });
+  await writeAuditLog(session.user.user_id, "ADMIN_DELETE", table, id, { id_column: idColumn, deleted: data });
   return success(data);
 }
 
@@ -598,9 +598,9 @@ export async function updateUser(session: SessionContext, body: Record<string, u
  if(body.status!==undefined){const status=String(body.status).toUpperCase();if(!['ACTIVE','INACTIVE'].includes(status))return errorResponse('حالة الحساب غير صحيحة');if(userId===session.user.user_id&&status!=='ACTIVE')return errorResponse('لا يمكن تعطيل حسابك الحالي');changes.status=status;}
  if(body.password!==undefined){const password=String(body.password||'');if(password.length<8)return errorResponse('كلمة المرور يجب أن تكون 8 أحرف على الأقل');changes.password_hash=securePasswordHash(password);}
  if(!Object.keys(changes).length)return errorResponse('لا توجد بيانات للتعديل'); const {data,error}=await supabase.from('users').update({...changes,updated_at:nowISO()}).eq('id',userId).select('id,employee_id,username,role,status,last_login,created_at,updated_at').maybeSingle();
- if(error)return errorResponse(error.message,500);if(!data)return errorResponse('المستخدم غير موجود',404);await writeسجل التدقيق(session.user.user_id,'update_user','users',userId,{changes:Object.fromEntries(Object.entries(changes).map(([k,v])=>[k,k==='password_hash'?'[REDACTED]':v]))});return success({...data,user_id:data.id});
+ if(error)return errorResponse(error.message,500);if(!data)return errorResponse('المستخدم غير موجود',404);await writeAuditLog(session.user.user_id,'update_user','users',userId,{changes:Object.fromEntries(Object.entries(changes).map(([k,v])=>[k,k==='password_hash'?'[REDACTED]':v]))});return success({...data,user_id:data.id});
 }
 
 export async function deleteUser(session: SessionContext, body: Record<string, unknown>) {
- const userId=String(body.user_id||'').trim();if(!userId)return errorResponse('معرف المستخدم مطلوب');if(userId===session.user.user_id)return errorResponse('لا يمكن تعطيل حسابك الحالي');const {data,error}=await supabase.from('users').update({status:'INACTIVE',updated_at:nowISO()}).eq('id',userId).select('id,employee_id,username,role,status').maybeSingle();if(error)return errorResponse(error.message,500);if(!data)return errorResponse('المستخدم غير موجود',404);await writeسجل التدقيق(session.user.user_id,'delete_user','users',userId,{soft_delete:true,status:'INACTIVE'});return success({...data,user_id:data.id});
+ const userId=String(body.user_id||'').trim();if(!userId)return errorResponse('معرف المستخدم مطلوب');if(userId===session.user.user_id)return errorResponse('لا يمكن تعطيل حسابك الحالي');const {data,error}=await supabase.from('users').update({status:'INACTIVE',updated_at:nowISO()}).eq('id',userId).select('id,employee_id,username,role,status').maybeSingle();if(error)return errorResponse(error.message,500);if(!data)return errorResponse('المستخدم غير موجود',404);await writeAuditLog(session.user.user_id,'delete_user','users',userId,{soft_delete:true,status:'INACTIVE'});return success({...data,user_id:data.id});
 }

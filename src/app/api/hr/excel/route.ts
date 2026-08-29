@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { getSession, errorResponse } from "@/server/hr/core";
-import { exportإكسل, importإكسل, parseإكسل, templateإكسل } from "@/server/hr/excel";
+import { exportExcel, importExcel, parseExcel, templateExcel } from "@/server/hr/excel";
 import { SESSION_COOKIE } from "@/server/hr/auth";
 
 export const runtime = "nodejs";
@@ -9,14 +9,14 @@ export async function GET(request: Request) {
   const token = (await cookies()).get(SESSION_COOKIE)?.value || "";
   const session = await getSession(token);
   if (!session) return errorResponse("الجلسة غير صالحة أو منتهية", 401);
-  if (!["SYSTEM_ADMIN","الموارد البشرية_MANAGER"].includes(session.user.role)) return errorResponse("ليس لديك صلاحية لاستخدام مركز إكسل",403);
+  if (!["SYSTEM_ADMIN","HR_MANAGER"].includes(session.user.role)) return errorResponse("ليس لديك صلاحية لاستخدام مركز إكسل",403);
 
   const url = new URL(request.url);
   const action = url.searchParams.get("action") || "export";
   const table = url.searchParams.get("table") || "all";
 
   try {
-    const buffer = action === "template" ? templateإكسل(table) : await exportإكسل(session, table);
+    const buffer = action === "template" ? templateExcel(table) : await exportExcel(session, table);
     const filename = action === "template" ? `ELNUBY-${table}-template.xlsx` : `ELNUBY-الموارد البشرية-${table}-${new Date().toISOString().slice(0,10)}.xlsx`;
     return new Response(buffer as unknown as BodyInit, {
       status: 200,
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   const token = (await cookies()).get(SESSION_COOKIE)?.value || "";
   const session = await getSession(token);
   if (!session) return errorResponse("الجلسة غير صالحة أو منتهية", 401);
-  if (!["SYSTEM_ADMIN","الموارد البشرية_MANAGER"].includes(session.user.role)) return errorResponse("ليس لديك صلاحية لاستخدام مركز إكسل",403);
+  if (!["SYSTEM_ADMIN","HR_MANAGER"].includes(session.user.role)) return errorResponse("ليس لديك صلاحية لاستخدام مركز إكسل",403);
 
   try {
     const form = await request.formData();
@@ -47,9 +47,9 @@ export async function POST(request: Request) {
     if (file.size > 20 * 1024 * 1024) return errorResponse("حجم الملف يجب ألا يتجاوز 20 ميجابايت");
     const name = file.name.toLowerCase();
     if (!name.endsWith(".xlsx") && !name.endsWith(".xls")) return errorResponse("ارفع ملف إكسل بصيغة مدعومة");
-    const result = parseإكسل(Buffer.from(await file.arrayBuffer()), table);
+    const result = parseExcel(Buffer.from(await file.arrayBuffer()), table);
     if (!commit) return Response.json({ok:true,data:{table,total:result.valid.length+result.errors.length,valid:result.valid.length,errors:result.errors.slice(0,100),preview:result.valid.slice(0,10)}});
-    return importإكسل(session, table, result.valid, true);
+    return importExcel(session, table, result.valid, true);
   } catch (e:any) {
     return errorResponse(e?.message || "تعذر قراءة ملف إكسل",400);
   }

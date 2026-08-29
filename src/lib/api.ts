@@ -145,7 +145,7 @@ export async function apiFile(action: string, payload: Record<string, unknown>, 
   return result.data;
 }
 
-export async function downloadإكسل(action: 'export' | 'template', table: string) {
+export async function downloadExcel(action: 'export' | 'template', table: string) {
   if (typeof navigator !== 'undefined' && !navigator.onLine) throw offlineError();
   const res = await fetch(`/api/hr/excel?action=${action}&table=${encodeURIComponent(table)}`, { credentials: 'include', cache: 'no-store' });
   if (!res.ok) {

@@ -397,8 +397,8 @@ export default function Home() {
 
       const role = String(m.user?.role || '');
       const isManager = ['PROJECT_MANAGER', 'SECTOR_MANAGER'].includes(role);
-      const canManagePeople = ['SYSTEM_ADMIN', 'الموارد البشرية_MANAGER', 'SECTOR_MANAGER', 'PROJECT_MANAGER'].includes(role);
-      const canManageUsers = ['SYSTEM_ADMIN', 'الموارد البشرية_MANAGER'].includes(role);
+      const canManagePeople = ['SYSTEM_ADMIN', 'HR_MANAGER', 'SECTOR_MANAGER', 'PROJECT_MANAGER'].includes(role);
+      const canManageUsers = ['SYSTEM_ADMIN', 'HR_MANAGER'].includes(role);
 
       // The dashboard and reference data are independent requests. Fetch them
       // concurrently so initial app load is bounded by the slowest request,
@@ -951,7 +951,7 @@ export default function Home() {
           ? 'تم إنشاء حساب مدير القطاع وربطه بالمشروعات المحددة بنجاح'
           : newRole === 'PROJECT_MANAGER'
           ? 'تم إنشاء حساب مدير المشروع وربطه بالمشروع بنجاح'
-          : newRole === 'الموارد البشرية_MANAGER'
+          : newRole === 'HR_MANAGER'
             ? 'تم إنشاء حساب مدير الموارد البشرية بدون ربطه بموظف أو مشروع'
             : 'تم إنشاء الحساب بنجاح',
       );
@@ -1317,7 +1317,7 @@ export default function Home() {
               )}
             </span>
 
-            <details className="profile-menu"><summary className="avatar top-avatar" aria-label="قائمة الحساب">{(me.employee?.name||me.user?.username||'U').slice(0,1)}</summary><div className="profile-menu-card"><strong>{me.employee?.name||me.user?.username}</strong><span>{roleLabels[me.user?.role]||me.user?.role}</span><button className="secondary" onClick={performLogout}>تسجيل الخروج</button></div></details>
+            <details className="profile-menu"><summary className="avatar top-avatar" aria-label="قائمة الحساب">{(me.employee?.name||me.user?.username||'U').slice(0,1)}</summary><div className="profile-menu-card"><strong>{me.employee?.name||me.user?.username}</strong><span>{roleLabels[me.user?.role]||'دور غير محدد'}</span><button className="secondary" onClick={performLogout}>تسجيل الخروج</button></div></details>
           </div>
         </header>
 
@@ -1374,7 +1374,7 @@ export default function Home() {
               assignProject={assignProject}
               busy={busy}
             
-              onEdit={['SYSTEM_ADMIN','الموارد البشرية_MANAGER'].includes(me.user?.role) ? (employeeId:string) => { const record=employees.find(e=>e.employee_id===employeeId); if(record) setAdminEdit({entity:'employee',record}); } : undefined}/>
+              onEdit={['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? (employeeId:string) => { const record=employees.find(e=>e.employee_id===employeeId); if(record) setAdminEdit({entity:'employee',record}); } : undefined}/>
           )}
 
           {section === 'shifts' && (
@@ -1387,7 +1387,7 @@ export default function Home() {
               createShift={createShift}
               busy={busy}
             
-              onEdit={['SYSTEM_ADMIN','الموارد البشرية_MANAGER'].includes(me.user?.role) ? (shiftId:string) => { const record=shifts.find(s=>s.shift_id===shiftId); if(record) setAdminEdit({entity:'shift',record}); } : undefined}/>
+              onEdit={['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? (shiftId:string) => { const record=shifts.find(s=>s.shift_id===shiftId); if(record) setAdminEdit({entity:'shift',record}); } : undefined}/>
           )}
 
           {section === 'projects' && (
@@ -1402,7 +1402,7 @@ export default function Home() {
               createProject={createProject}
               busy={busy}
             
-              onEdit={['SYSTEM_ADMIN','الموارد البشرية_MANAGER'].includes(me.user?.role) ? (projectId:string) => { const record=projects.find(p=>p.project_id===projectId); if(record) setAdminEdit({entity:'project',record}); } : undefined}/>
+              onEdit={['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? (projectId:string) => { const record=projects.find(p=>p.project_id===projectId); if(record) setAdminEdit({entity:'project',record}); } : undefined}/>
           )}
 
           {section === 'attendance' && (
@@ -1411,7 +1411,7 @@ export default function Home() {
               subtitle="متابعة الحضور وتعديلات السجلات"
               rows={rows}
               type="attendance"
-              onCloseAttendance={['SYSTEM_ADMIN','الموارد البشرية_MANAGER'].includes(me.user?.role) ? closeAttendanceRecord : undefined}
+              onCloseAttendance={['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? closeAttendanceRecord : undefined}
               busy={busy}
             />
           )}
@@ -1552,7 +1552,7 @@ export default function Home() {
           )}
 
           {section === 'settings' && (
-            ['SYSTEM_ADMIN','الموارد البشرية_MANAGER'].includes(me.user?.role) ? (
+            ['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? (
               <Settings role={me.user?.role} />
             ) : (
               <SystemAdminPanel />

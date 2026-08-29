@@ -181,7 +181,7 @@ export default function AdminEditModal({ entity, record, busy = false, onClose, 
                 <Field label="اسم الموقع" wide><input value={String(form.location_name || '')} onChange={e => set('location_name', e.target.value)} /></Field>
                 <Field label="خط العرض" hint="مثال: 30.0444"><input type="number" step="any" value={String(form.latitude ?? '')} onChange={e => set('latitude', e.target.value)} /></Field>
                 <Field label="خط الطول" hint="مثال: 31.2357"><input type="number" step="any" value={String(form.longitude ?? '')} onChange={e => set('longitude', e.target.value)} /></Field>
-                <Field label="نطاق الحضور بالمتر" hint="يُستخدم مع دقة جهاز الـGPS"><input type="number" min="50" step="10" value={String(form.geofence_radius_m ?? 200)} onChange={e => set('geofence_radius_m', e.target.value)} /></Field>
+                <Field label="نطاق الحضور بالمتر" hint="يُستخدم مع دقة تحديد الموقع"><input type="number" min="50" step="10" value={String(form.geofence_radius_m ?? 200)} onChange={e => set('geofence_radius_m', e.target.value)} /></Field>
                 <Field label="حالة المشروع"><select value={String(form.status)} onChange={e => set('status', e.target.value)}>{statusOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></Field>
               </div>
               <div className="admin-edit-location-card"><div><span>نقطة الموقع</span><strong>{String(form.latitude || '—')} ، {String(form.longitude || '—')}</strong></div><div><span>نطاق الحضور</span><strong>{String(form.geofence_radius_m || 200)} متر</strong></div></div>

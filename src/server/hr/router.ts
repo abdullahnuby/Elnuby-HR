@@ -7,7 +7,7 @@ import { listProjects, createProject, updateProject } from "./projects";
 import { listShifts, createShift, updateShift } from "./shifts";
 import { listEmployeeShifts, assignEmployeeShift, assignEmployeeProject, assignManagerProject } from "./assignments";
 import { attendanceList, attendanceAction , closeAttendance} from "./attendance";
-import { leaveList, createLeave, decideLeaveManager, decideLeaveالموارد البشرية, cancelLeave, getLeaveDocument } from "./leaves";
+import { leaveList, createLeave, decideLeaveManager, decideLeaveHR, cancelLeave, getLeaveDocument } from "./leaves";
 import { listLeavePolicies, listEmployeeLeaveBalances, listLeaveTypes, createLeavePolicy, updateLeavePolicy } from "./leavePolicies";
 import { permissionList, createPermission, decidePermission, cancelPermission } from "./permissions";
 import { listDeductions, listUsers, createUser, updateUser, deleteUser, assignSectorManagerProjects, adminList, adminInsert, adminUpdate, adminDelete } from "./users";
@@ -371,7 +371,7 @@ export async function handleAction(
       const auth = requireRole(session, ROLES);
       if (auth) return auth;
       const employeeId = body.employee_id ? String(body.employee_id) : undefined;
-      if (employeeId && !["SYSTEM_ADMIN","الموارد البشرية_MANAGER"].includes(session!.user.role) && employeeId !== session!.user.employee_id) {
+      if (employeeId && !["SYSTEM_ADMIN","HR_MANAGER"].includes(session!.user.role) && employeeId !== session!.user.employee_id) {
         return errorResponse("ليس لديك صلاحية عرض هذا الرصيد", 403);
       }
       return listEmployeeLeaveBalances(session!, employeeId);
@@ -426,7 +426,7 @@ export async function handleAction(
     }
 
     case "cancel_leave": {
-      const auth = requireRole(session, ["EMPLOYEE","PROJECT_MANAGER","الموارد البشرية_MANAGER","SYSTEM_ADMIN"]);
+      const auth = requireRole(session, ["EMPLOYEE","PROJECT_MANAGER","HR_MANAGER","SYSTEM_ADMIN"]);
       if (auth) return auth;
       return cancelLeave(session!, body);
     }
@@ -440,7 +440,7 @@ export async function handleAction(
 
       if (auth) return auth;
 
-      return decideLeaveالموارد البشرية(
+      return decideLeaveHR(
         session!,
         body
       );
@@ -479,7 +479,7 @@ export async function handleAction(
     }
 
     case "cancel_permission": {
-      const auth = requireRole(session, ["EMPLOYEE","PROJECT_MANAGER","الموارد البشرية_MANAGER","SYSTEM_ADMIN"]);
+      const auth = requireRole(session, ["EMPLOYEE","PROJECT_MANAGER","HR_MANAGER","SYSTEM_ADMIN"]);
       if (auth) return auth;
       return cancelPermission(session!, body);
     }

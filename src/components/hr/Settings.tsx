@@ -1,25 +1,25 @@
 import { useEffect, useState } from 'react';
 import Icon from './Icon';
-import إكسلCenter from './إكسلCenter';
+import ExcelCenter from './ExcelCenter';
 import { api } from '@/lib/api';
 
 type Policy = any;
 const roleCards=[
  {role:'SYSTEM_ADMIN',title:'مدير النظام',tone:'blue',text:'تحكم كامل في النظام والبيانات الحساسة.'},
- {role:'الموارد البشرية_MANAGER',title:'مدير الموارد البشرية',tone:'green',text:'إدارة الموظفين والإجازات واللوائح والأذونات والخصومات.'},
+ {role:'HR_MANAGER',title:'مدير الموارد البشرية',tone:'green',text:'إدارة الموظفين والإجازات واللوائح والأذونات والخصومات.'},
  {role:'SECTOR_MANAGER',title:'مدير القطاع',tone:'amber',text:'إدارة المشروعات المسندة إليه ومتابعة مديري المشاريع والطلبات.'},
  {role:'PROJECT_MANAGER',title:'مدير المشروع',tone:'navy',text:'إدارة فريق مشروعاته والحضور والطلبات داخل نطاقه.'},
  {role:'EMPLOYEE',title:'الموظف',tone:'slate',text:'الحضور والانصراف وطلبات الإجازات والأذونات الخاصة به.'},
 ];
 
-export default function Settings({role='الموارد البشرية_MANAGER'}:{role?:string}){
+export default function Settings({role='HR_MANAGER'}:{role?:string}){
  const [tab,setTab]=useState<'overview'|'attendance'|'leaves'|'excel'|'roles'>('overview');
  const [policies,setPolicies]=useState<Policy[]>([]);
  const [types,setTypes]=useState<any[]>([]);
  const [busy,setBusy]=useState(false);
  const [editingId,setEditingId]=useState<string|null>(null);
  const [form,setForm]=useState<any>({name:'',leave_type_id:'LT-ANNUAL',residency_type:'RESIDENT',accrual_method:'ANNUAL',accrual_basis:'CALENDAR_DAYS',accrual_period_days:'',accrual_days:'',annual_entitlement:'21',max_carryover_days:'0',requires_document:false,allow_partial:false,effective_from:new Date().toISOString().slice(0,10),status:'ACTIVE'});
- const canEdit=['SYSTEM_ADMIN','الموارد البشرية_MANAGER'].includes(role);
+ const canEdit=['SYSTEM_ADMIN','HR_MANAGER'].includes(role);
 
  async function loadPolicies(){
    try{const [p,t]=await Promise.all([api<any[]>('leave_policies'),api<any[]>('leave_types')]);setPolicies(p||[]);setTypes(t||[]);}
@@ -67,7 +67,7 @@ export default function Settings({role='الموارد البشرية_MANAGER'}:
    </div>
    <div className="policy-list">{policies.map((p:any)=><article className="policy-card" key={p.policy_id}><div><span className="policy-code">{p.policy_id}</span><h4>{p.name}</h4><p>{p.residency_type==='EXPATRIATE'?'مغترب':p.residency_type==='RESIDENT'?'مقيم':'كل الفئات'} • {p.leave_types?.name||p.leave_type_id}</p></div><div className="policy-value">{p.accrual_method==='PERIODIC'?<><strong>{p.accrual_days} يوم</strong><small>كل {p.accrual_period_days} يوم</small></>:p.accrual_method==='ANNUAL'?<><strong>{p.annual_entitlement} يوم</strong><small>سنويًا</small></>:<><strong>يدوي</strong><small>يحدده الموارد البشرية</small></>}</div><div className="policy-card-actions"><span className={`badge ${p.status==='ACTIVE'?'success':'muted'}`}>{p.status==='ACTIVE'?'فعالة':'غير فعالة'}</span><button className="tiny secondary" onClick={()=>{setEditingId(p.policy_id);setForm({name:p.name,leave_type_id:p.leave_type_id,residency_type:p.residency_type||'RESIDENT',accrual_method:p.accrual_method,accrual_basis:p.accrual_basis,accrual_period_days:p.accrual_period_days??'',accrual_days:p.accrual_days??'',annual_entitlement:p.annual_entitlement??'',max_carryover_days:p.max_carryover_days??0,requires_document:!!p.requires_document,allow_partial:!!p.allow_partial,effective_from:p.effective_from,status:p.status})}}>تعديل</button></div></article>)}</div>
   </div>}
-  {tab==='excel'&&<div className="hr-settings-body"><إكسلCenter/></div>}
+  {tab==='excel'&&<div className="hr-settings-body"><ExcelCenter/></div>}
   {tab==='roles'&&<div className="hr-settings-body"><div className="hr-role-grid">{roleCards.map(c=><article className={`hr-role-card ${c.tone}`} key={c.role}><div className="role-code">{c.role}</div><h3>{c.title}</h3><p>{c.text}</p></article>)}</div></div>}
  </section>
 }

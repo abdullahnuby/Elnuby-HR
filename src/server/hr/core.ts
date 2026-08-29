@@ -41,24 +41,24 @@ export type SessionContext = {
 
 export const ROLES = [
   "SYSTEM_ADMIN",
-  "الموارد البشرية_MANAGER",
+  "HR_MANAGER",
   "PROJECT_MANAGER",
   "SECTOR_MANAGER",
   "EMPLOYEE",
 ];
 
-export const ADMIN_ROLES = ["SYSTEM_ADMIN", "الموارد البشرية_MANAGER"];
+export const ADMIN_ROLES = ["SYSTEM_ADMIN", "HR_MANAGER"];
 
 export const MANAGEMENT_ROLES = [
   "SYSTEM_ADMIN",
-  "الموارد البشرية_MANAGER",
+  "HR_MANAGER",
   "SECTOR_MANAGER",
   "PROJECT_MANAGER",
 ];
 
 export const PROJECT_VIEW_ROLES = [
   "SYSTEM_ADMIN",
-  "الموارد البشرية_MANAGER",
+  "HR_MANAGER",
   "SECTOR_MANAGER",
   "PROJECT_MANAGER",
   "EMPLOYEE",
@@ -66,7 +66,7 @@ export const PROJECT_VIEW_ROLES = [
 
 export const PROJECT_MANAGE_ROLES = [
   "SYSTEM_ADMIN",
-  "الموارد البشرية_MANAGER",
+  "HR_MANAGER",
   "SECTOR_MANAGER",
   "PROJECT_MANAGER",
 ];
@@ -352,7 +352,7 @@ export function requireRole(
    AUDIT
 ========================================================= */
 
-export async function writeسجل التدقيق(
+export async function writeAuditLog(
   actorUserId: string | null,
   action: string,
   entity = "api",
@@ -385,7 +385,7 @@ export async function getManagedProjectIds(
 ): Promise<string[]> {
   if (
     user.role === "SYSTEM_ADMIN" ||
-    user.role === "الموارد البشرية_MANAGER"
+    user.role === "HR_MANAGER"
   ) {
     const { data } = await supabase
       .from("projects")
@@ -443,7 +443,7 @@ export async function canManageProject(
 ) {
   if (
     user.role === "SYSTEM_ADMIN" ||
-    user.role === "الموارد البشرية_MANAGER"
+    user.role === "HR_MANAGER"
   ) {
     return true;
   }

@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { getSession, errorResponse, writeسجل التدقيق } from "@/server/hr/core";
+import { getSession, errorResponse, writeAuditLog } from "@/server/hr/core";
 import { handleAction } from "@/server/hr/router";
 import { createLeave } from "@/server/hr/leaves";
 import { SESSION_COOKIE } from "@/server/hr/auth";
@@ -85,7 +85,7 @@ if (session && AUDITED_ACTIONS.has(action)) {
     )
   );
 
-  await writeسجل التدقيق(
+  await writeAuditLog(
     session.user.user_id,
     action,
     "api",

@@ -71,7 +71,7 @@ export default function LeaveSection(props: Props) {
   const [decisionBusy, setDecisionBusy] = useState(false);
 
   const manager = role === 'PROJECT_MANAGER' || role === 'SECTOR_MANAGER';
-  const hr = role === 'الموارد البشرية_MANAGER' || role === 'SYSTEM_ADMIN';
+  const hr = role === 'HR_MANAGER' || role === 'SYSTEM_ADMIN';
 
   useEffect(() => setLocalRows(rows), [rows]);
 

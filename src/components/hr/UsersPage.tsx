@@ -114,7 +114,7 @@ export default function Users({
               مدير قطاع / مدير مشروعات
             </option>
 
-            <option value="الموارد البشرية_MANAGER">
+            <option value="HR_MANAGER">
               مدير الموارد البشرية
             </option>
 
@@ -192,7 +192,7 @@ export default function Users({
           )}
 
           {newRole ===
-            'الموارد البشرية_MANAGER' && (
+            'HR_MANAGER' && (
             <div className="empty-note">
               حساب إداري مركزي للموارد البشرية: لا يحتاج
               موظفاً مرتبطاً ولا يتم تعيينه على
@@ -213,7 +213,7 @@ export default function Users({
           <div className="empty-note">
             لا توجد سجلات موظفين محملة. اضغط
             «تحديث الموظفين» وتأكد أن الموظف موجود
-            في جدول EMPLOYEES.
+            في جدول الموظفين.
           </div>
         )}
 
