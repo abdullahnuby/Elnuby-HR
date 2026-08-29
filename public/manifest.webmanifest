@@ -1,7 +1,7 @@
 {
-  "name": "ELNUBY HR Workforce",
+  "name": "ELNUBY HR",
   "short_name": "ELNUBY HR",
-  "description": "ELNUBY HR Workforce Management — Offline-first attendance",
+  "description": "نظام إدارة الموارد البشرية والحضور والانصراف",
   "lang": "ar",
   "dir": "rtl",
   "start_url": "/",

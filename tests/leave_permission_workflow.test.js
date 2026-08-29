@@ -20,4 +20,7 @@ assert.ok(router.includes('case "cancel_leave"'));
 assert.ok(router.includes('case "cancel_permission"'));
 assert.ok(migration.includes('cancelled_at'));
 assert.ok(migration.includes("'CANCELLED'"));
+const permissionTypeMigration = fs.readFileSync('supabase/migrations/20260829030000_permission_type.sql','utf8');
+assert.ok(permissionTypeMigration.includes('add column if not exists permission_type'));
+assert.ok(permsServer.includes('permission_type: String(body.permission_type'));
 console.log('PASS leave/permission workflow upgrade regression');

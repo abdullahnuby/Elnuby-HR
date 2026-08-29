@@ -97,7 +97,7 @@ if (session && AUDITED_ACTIONS.has(action)) {
 
 return response;
   } catch (error) {
-    console.error("النُبي للموارد البشرية API ERROR:", {
+    console.error("ELNUBY HR API ERROR:", {
       action: requestAction || undefined,
       error,
     });
