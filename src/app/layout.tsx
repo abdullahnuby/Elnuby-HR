@@ -3,8 +3,8 @@ import type {ReactNode} from 'react';
 import type {Viewport, Metadata} from 'next';
 
 export const metadata: Metadata = {
-  title: 'ELNUBY HR',
-  description: 'ELNUBY HR Workforce Management',
+  title: 'نظام النُبي للموارد البشرية',
+  description: 'نظام إدارة الموارد البشرية والقوى العاملة بالمشروعات',
   manifest: '/manifest.webmanifest',
 };
 

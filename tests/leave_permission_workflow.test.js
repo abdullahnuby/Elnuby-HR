@@ -9,7 +9,7 @@ const migration = fs.readFileSync('supabase/migrations/20260830_leave_permission
 assert.ok(leave.includes('leave_balances'));
 assert.ok(leave.includes('statusFilter'));
 assert.ok(leave.includes('cancel_leave'));
-assert.ok(leave.includes('REQUEST DETAILS'));
+assert.ok(leave.includes('تفاصيل الطلب'));
 assert.ok(perm.includes('PERMISSION_TYPES'));
 assert.ok(perm.includes('cancel_permission'));
 assert.ok(permsServer.includes('status:"CANCELLED"'));

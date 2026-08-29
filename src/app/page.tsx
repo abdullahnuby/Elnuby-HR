@@ -17,6 +17,7 @@ import Reports from '@/components/hr/Reports';
 import Settings from '@/components/hr/Settings';
 import SystemAdminPanel from '@/components/hr/SystemAdminPanel';
 import Icon from '@/components/hr/Icon';
+import AdminEditModal from '@/components/hr/AdminEditModal';
 
 
 type Employee = {
@@ -103,6 +104,7 @@ export default function Home() {
   const [isOffline, setIsOffline] = useState(false);
   const [pendingSync, setPendingSync] = useState(0);
   const [failedSync, setFailedSync] = useState(0);
+  const [adminEdit, setAdminEdit] = useState<{ entity: 'employee'|'project'|'shift'|'user-password'; record: any } | null>(null);
   const APP_TIMEZONE = 'Africa/Cairo';
 
   const [newUsername, setNewUsername] = useState('');
@@ -395,8 +397,8 @@ export default function Home() {
 
       const role = String(m.user?.role || '');
       const isManager = ['PROJECT_MANAGER', 'SECTOR_MANAGER'].includes(role);
-      const canManagePeople = ['SYSTEM_ADMIN', 'HR_MANAGER', 'SECTOR_MANAGER', 'PROJECT_MANAGER'].includes(role);
-      const canManageUsers = ['SYSTEM_ADMIN', 'HR_MANAGER'].includes(role);
+      const canManagePeople = ['SYSTEM_ADMIN', 'الموارد البشرية_MANAGER', 'SECTOR_MANAGER', 'PROJECT_MANAGER'].includes(role);
+      const canManageUsers = ['SYSTEM_ADMIN', 'الموارد البشرية_MANAGER'].includes(role);
 
       // The dashboard and reference data are independent requests. Fetch them
       // concurrently so initial app load is bounded by the slowest request,
@@ -467,7 +469,7 @@ export default function Home() {
 
       if (authError) {
         // Do not destroy local cache/queue on a single authentication race.
-        // Only explicit Logout clears local HR data.
+        // Only explicit Logout clears local الموارد البشرية data.
         const restored = await (async () => {
           try {
             const cachedMe: any = await cacheGet(apiCacheKey('me', {}));
@@ -520,7 +522,7 @@ export default function Home() {
     setError('');
 
     if (!navigator.geolocation) {
-      return setError('المتصفح لا يدعم GPS');
+      return setError('المتصفح لا يدعم الموقع الجغرافي');
     }
 
     setBusy(true);
@@ -949,8 +951,8 @@ export default function Home() {
           ? 'تم إنشاء حساب مدير القطاع وربطه بالمشروعات المحددة بنجاح'
           : newRole === 'PROJECT_MANAGER'
           ? 'تم إنشاء حساب مدير المشروع وربطه بالمشروع بنجاح'
-          : newRole === 'HR_MANAGER'
-            ? 'تم إنشاء حساب HR بدون ربطه بموظف أو مشروع'
+          : newRole === 'الموارد البشرية_MANAGER'
+            ? 'تم إنشاء حساب مدير الموارد البشرية بدون ربطه بموظف أو مشروع'
             : 'تم إنشاء الحساب بنجاح',
       );
 
@@ -982,24 +984,35 @@ export default function Home() {
     }
   }
 
-  async function updateEmployeeRecord(employeeId: string) {
-    const current = employees.find(e => e.employee_id === employeeId); if (!current) return;
-    const name=window.prompt('اسم الموظف',current.name||''); if(name===null)return; const job_title=window.prompt('الوظيفة',current.job_title||''); if(job_title===null)return; const phone=window.prompt('رقم الهاتف',current.phone||''); if(phone===null)return; const status=window.prompt('الحالة ACTIVE / INACTIVE',current.status||'ACTIVE'); if(status===null)return;
-    try{setBusy(true);await api('update_employee',{employee_id:employeeId,name,job_title,phone,status:status.toUpperCase()});setNotice('تم تعديل بيانات الموظف');setEmployees(await api('employees'));}catch(e:any){setError(e.message)}finally{setBusy(false)}
-  }
-
-  async function updateProjectRecord(projectId: string) {
-    const current=projects.find(p=>p.project_id===projectId);if(!current)return; const name=window.prompt('اسم المشروع',current.name||'');if(name===null)return;const client=window.prompt('العميل',current.client||'');if(client===null)return;const location_name=window.prompt('اسم الموقع',current.location_name||'');if(location_name===null)return;const radius=window.prompt('نطاق GPS بالمتر',String(current.geofence_radius_m??200));if(radius===null)return;
-    try{setBusy(true);await api('update_project',{project_id:projectId,name,client,location_name,geofence_radius_m:Number(radius)});setNotice('تم تعديل المشروع');setProjects(await api('projects'));}catch(e:any){setError(e.message)}finally{setBusy(false)}
-  }
-
-  async function updateShiftRecord(shiftId: string) {
-    const current=shifts.find(s=>s.shift_id===shiftId);if(!current)return; const fields=['name','start_time','attendance_open','attendance_close','checkout_open','checkout_close','auto_checkout_time']; const values:any={}; for(const f of fields){const v=window.prompt(f,current[f as keyof typeof current] as string||'');if(v===null)return;values[f]=v;}
-    try{setBusy(true);await api('update_shift',{shift_id:shiftId,...values});setNotice('تم تعديل الوردية');setShifts(await api('shifts'));}catch(e:any){setError(e.message)}finally{setBusy(false)}
+  async function saveAdminEdit(payload: Record<string, unknown>) {
+    try {
+      setBusy(true);
+      if (adminEdit?.entity === 'employee') {
+        await api('update_employee', payload);
+        setEmployees(await api<Employee[]>('employees'));
+        setNotice('تم حفظ تعديلات الموظف بنجاح');
+      } else if (adminEdit?.entity === 'project') {
+        await api('update_project', payload);
+        setProjects(await api<Project[]>('projects'));
+        setNotice('تم حفظ تعديلات المشروع بنجاح');
+      } else if (adminEdit?.entity === 'shift') {
+        await api('update_shift', payload);
+        setShifts(await api<Shift[]>('shifts'));
+        setNotice('تم حفظ تعديلات الوردية بنجاح');
+      } else if (adminEdit?.entity === 'user-password') {
+        await api('update_user', payload);
+        setNotice('تم تغيير كلمة مرور الحساب بنجاح');
+      }
+      setAdminEdit(null);
+    } catch (e: any) {
+      setError(e.message || 'تعذر حفظ التعديلات');
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function toggleUser(userId:string,status:string){try{setBusy(true);if(status==='ACTIVE')await api('delete_user',{user_id:userId});else await api('update_user',{user_id:userId,status:'ACTIVE'});setNotice(status==='ACTIVE'?'تم تعطيل الحساب':'تم تفعيل الحساب');setUsers(await api('users'));}catch(e:any){setError(e.message)}finally{setBusy(false)}}
-  async function resetUserPassword(userId:string){const password=window.prompt('كلمة المرور الجديدة');if(password===null)return;try{setBusy(true);await api('update_user',{user_id:userId,password});setNotice('تم تغيير كلمة المرور');}catch(e:any){setError(e.message)}finally{setBusy(false)}}
+  async function resetUserPassword(userId:string){const current=users.find(u=>u.user_id===userId);if(current)setAdminEdit({entity:'user-password',record:current});}
 
   async function closeAttendanceRecord(attendanceId:string){
     if(!window.confirm('هل تريد إغلاق سجل الحضور هذا الآن؟')) return;
@@ -1072,7 +1085,7 @@ export default function Home() {
           <div className="login-brand">
             <div className="brand-mark">N</div>
             <div>
-              <b>ELNUBY HR</b>
+              <b>النُبي للموارد البشرية</b>
               <span>نظام إدارة موارد بشرية للمشروعات</span>
             </div>
           </div>
@@ -1082,7 +1095,7 @@ export default function Home() {
             <p>يتم استعادة جلسة الدخول والبيانات المحلية. لن تحتاج إلى تسجيل الدخول مرة أخرى.</p>
             <div className="alert" role="status">جاري التحقق…</div>
           </section>
-          <small className="login-footer">ELNUBY HR • Site Workforce Management</small>
+          <small className="login-footer">النُبي للموارد البشرية • إدارة القوى العاملة بالمشروعات</small>
         </div>
       </main>
     );
@@ -1101,7 +1114,7 @@ export default function Home() {
             </div>
 
             <div>
-              <b>ELNUBY HR</b>
+              <b>النُبي للموارد البشرية</b>
               <span>
                 نظام إدارة موارد بشرية للمشروعات
               </span>
@@ -1129,7 +1142,7 @@ export default function Home() {
               onChange={(e) =>
                 setUsername(e.target.value)
               }
-              placeholder="abdullah"
+              placeholder="أدخل اسم المستخدم"
             />
 
             <label>
@@ -1166,7 +1179,7 @@ export default function Home() {
           </section>
 
           <small className="login-footer">
-            ELNUBY HR • Site Workforce Management
+            النُبي للموارد البشرية • إدارة القوى العاملة بالمشروعات
           </small>
         </div>
       </main>
@@ -1197,8 +1210,8 @@ export default function Home() {
           </div>
 
           <div>
-            <b>ELNUBY HR</b>
-            <small>WORKFORCE</small>
+            <b>النُبي للموارد البشرية</b>
+            <small>إدارة القوى العاملة</small>
           </div>
         </div>
 
@@ -1361,7 +1374,7 @@ export default function Home() {
               assignProject={assignProject}
               busy={busy}
             
-              onEdit={['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? updateEmployeeRecord : undefined}/>
+              onEdit={['SYSTEM_ADMIN','الموارد البشرية_MANAGER'].includes(me.user?.role) ? (employeeId:string) => { const record=employees.find(e=>e.employee_id===employeeId); if(record) setAdminEdit({entity:'employee',record}); } : undefined}/>
           )}
 
           {section === 'shifts' && (
@@ -1374,7 +1387,7 @@ export default function Home() {
               createShift={createShift}
               busy={busy}
             
-              onEdit={['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? updateShiftRecord : undefined}/>
+              onEdit={['SYSTEM_ADMIN','الموارد البشرية_MANAGER'].includes(me.user?.role) ? (shiftId:string) => { const record=shifts.find(s=>s.shift_id===shiftId); if(record) setAdminEdit({entity:'shift',record}); } : undefined}/>
           )}
 
           {section === 'projects' && (
@@ -1389,7 +1402,7 @@ export default function Home() {
               createProject={createProject}
               busy={busy}
             
-              onEdit={['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? updateProjectRecord : undefined}/>
+              onEdit={['SYSTEM_ADMIN','الموارد البشرية_MANAGER'].includes(me.user?.role) ? (projectId:string) => { const record=projects.find(p=>p.project_id===projectId); if(record) setAdminEdit({entity:'project',record}); } : undefined}/>
           )}
 
           {section === 'attendance' && (
@@ -1398,7 +1411,7 @@ export default function Home() {
               subtitle="متابعة الحضور وتعديلات السجلات"
               rows={rows}
               type="attendance"
-              onCloseAttendance={['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? closeAttendanceRecord : undefined}
+              onCloseAttendance={['SYSTEM_ADMIN','الموارد البشرية_MANAGER'].includes(me.user?.role) ? closeAttendanceRecord : undefined}
               busy={busy}
             />
           )}
@@ -1539,7 +1552,7 @@ export default function Home() {
           )}
 
           {section === 'settings' && (
-            ['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? (
+            ['SYSTEM_ADMIN','الموارد البشرية_MANAGER'].includes(me.user?.role) ? (
               <Settings role={me.user?.role} />
             ) : (
               <SystemAdminPanel />
@@ -1556,6 +1569,16 @@ export default function Home() {
             <div className="alert success global-alert">
               {notice}
             </div>
+          )}
+
+          {adminEdit && (
+            <AdminEditModal
+              entity={adminEdit.entity}
+              record={adminEdit.record}
+              busy={busy}
+              onClose={() => !busy && setAdminEdit(null)}
+              onSave={saveAdminEdit}
+            />
           )}
         </div>
       </section>

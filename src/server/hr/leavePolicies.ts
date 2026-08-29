@@ -1,4 +1,4 @@
-import { supabase, success, errorResponse, generateId, nowISO, appDate, writeAudit } from "./core";
+import { supabase, success, errorResponse, generateId, nowISO, appDate, writeسجل التدقيق } from "./core";
 import type { SessionContext } from "./core";
 
 const RESIDENCY = ["EXPATRIATE", "RESIDENT"];
@@ -51,7 +51,7 @@ export async function listEmployeeLeaveBalances(session: SessionContext, employe
     let used=0,pending=0;
     for(const r of requests||[]){
       if(policy.accrual_method==="ANNUAL" && String(r.from_date)<yearStart) continue;
-      if(r.status==="APPROVED") used+=Number(r.days||0); else if(["PENDING_MANAGER","PENDING_HR"].includes(r.status)) pending+=Number(r.days||0);
+      if(r.status==="APPROVED") used+=Number(r.days||0); else if(["PENDING_MANAGER","PENDING_الموارد البشرية"].includes(r.status)) pending+=Number(r.days||0);
     }
     result.push({id:`LIVE-${id}-${policy.leave_type_id}`,employee_id:id,leave_type_id:policy.leave_type_id,year:Number(today.slice(0,4)),entitlement,used,pending,remaining:Math.max(0,entitlement-used-pending),next_accrual_date:next,leave_types:policy.leave_types,leave_policies:policy});
   }
@@ -100,7 +100,7 @@ export async function createLeavePolicy(session: SessionContext, body: Record<st
     updated_at: nowISO(),
   }).select("*,leave_types(name)").single();
   if (error) return errorResponse(error.message, 500);
-  await writeAudit(session.user.user_id, "create_leave_policy", "leave_policies", data.policy_id, data);
+  await writeسجل التدقيق(session.user.user_id, "create_leave_policy", "leave_policies", data.policy_id, data);
   return success(data, 201);
 }
 
@@ -116,7 +116,7 @@ export async function updateLeavePolicy(session: SessionContext, body: Record<st
   if (changes.accrual_method && !METHODS.includes(String(changes.accrual_method))) return errorResponse("طريقة الاستحقاق غير صحيحة");
   const { data, error } = await supabase.from("leave_policies").update({...changes,updated_at:nowISO()}).eq("policy_id", id).select("*,leave_types(name)").single();
   if (error) return errorResponse(error.message, 500);
-  await writeAudit(session.user.user_id, "update_leave_policy", "leave_policies", id, {changes});
+  await writeسجل التدقيق(session.user.user_id, "update_leave_policy", "leave_policies", id, {changes});
   return success(data);
 }
 

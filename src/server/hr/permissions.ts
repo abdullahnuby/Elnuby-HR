@@ -1,5 +1,5 @@
 import { parsePagination } from "./core";
-import { supabase, success, errorResponse, generateId, nowISO, appDate, appTime, timeToMinutes, minutesBetween, getManagedProjectIds, canManageProject, getCurrentAssignment, normalizeTimeInput, writeAudit } from "./core";
+import { supabase, success, errorResponse, generateId, nowISO, appDate, appTime, timeToMinutes, minutesBetween, getManagedProjectIds, canManageProject, getCurrentAssignment, normalizeTimeInput, writeسجل التدقيق } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
 export async function permissionList(
@@ -295,7 +295,7 @@ export async function cancelPermission(
   const { data: request } = await supabase.from("permission_requests")
     .select("request_id,employee_id,status").eq("request_id",requestId).maybeSingle();
   if (!request) return errorResponse("طلب الإذن غير موجود",404);
-  if (request.employee_id !== session.user.employee_id && !["SYSTEM_ADMIN","HR_MANAGER"].includes(session.user.role)) {
+  if (request.employee_id !== session.user.employee_id && !["SYSTEM_ADMIN","الموارد البشرية_MANAGER"].includes(session.user.role)) {
     return errorResponse("ليس لديك صلاحية إلغاء هذا الطلب",403);
   }
   if (request.status !== "PENDING") return errorResponse("لا يمكن إلغاء الطلب بعد اتخاذ القرار");
@@ -303,7 +303,7 @@ export async function cancelPermission(
     status:"CANCELLED", cancellation_reason:reason, cancelled_by:session.user.user_id, cancelled_at:nowISO(), updated_at:nowISO()
   }).eq("request_id",requestId).eq("status","PENDING").select("*").single();
   if (error) return errorResponse(error.message,500);
-  await writeAudit(session.user.user_id,"cancel_permission","permission_requests",requestId,{reason});
+  await writeسجل التدقيق(session.user.user_id,"cancel_permission","permission_requests",requestId,{reason});
   return success(data);
 }
 

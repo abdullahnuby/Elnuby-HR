@@ -58,7 +58,7 @@ export default function DashboardHome({
             <div>
               <span className="employee-kicker">الحضور والانصراف</span>
               <h2>سجّل حضورك من موقع العمل</h2>
-              <p>سيتم التحقق من GPS ونطاق موقع المشروع قبل اعتماد التسجيل.</p>
+              <p>سيتم التحقق من الموقع الجغرافي ونطاق موقع المشروع قبل اعتماد التسجيل.</p>
             </div>
           </div>
 

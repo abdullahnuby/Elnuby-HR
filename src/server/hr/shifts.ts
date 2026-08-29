@@ -1,4 +1,4 @@
-import { supabase, success, errorResponse, generateId, nowISO, writeAudit } from "./core";
+import { supabase, success, errorResponse, generateId, nowISO, writeسجل التدقيق } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
 export async function listShifts(session: SessionContext, _body: Record<string, unknown> = {}) {
@@ -121,5 +121,5 @@ export async function updateShift(session: SessionContext, body: Record<string, 
   const shiftId=String(body.shift_id||'').trim(); if(!shiftId) return errorResponse('رقم الوردية مطلوب'); const changes:Record<string,unknown>={};
   for(const k of ['name','start_time','attendance_open','attendance_close','checkout_open','checkout_close','auto_checkout_time','status']) if(body[k]!==undefined) changes[k]=body[k];
   if(!Object.keys(changes).length) return errorResponse('لا توجد بيانات للتعديل'); const {data,error}=await supabase.from('shifts').update(changes).eq('shift_id',shiftId).select('*').maybeSingle();
-  if(error) return errorResponse(error.message,500); if(!data) return errorResponse('الوردية غير موجودة',404); await writeAudit(session.user.user_id,'update_shift','shifts',shiftId,{changes}); return success(data);
+  if(error) return errorResponse(error.message,500); if(!data) return errorResponse('الوردية غير موجودة',404); await writeسجل التدقيق(session.user.user_id,'update_shift','shifts',shiftId,{changes}); return success(data);
 }

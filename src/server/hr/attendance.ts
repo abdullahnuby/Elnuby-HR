@@ -77,7 +77,7 @@ export async function attendanceList(
 }
 
 /* =========================================================
-   GPS ATTENDANCE
+   الموقع الجغرافي ATTENDANCE
 ========================================================= */
 
 export async function attendanceAction(
@@ -154,14 +154,14 @@ export async function attendanceAction(
   const gpsAccuracy = Number(body.gps_accuracy_m);
 
   if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-    return errorResponse('إحداثيات GPS خارج النطاق الصحيح');
+    return errorResponse('إحداثيات الموقع الجغرافي خارج النطاق الصحيح');
   }
   if (!Number.isFinite(gpsAccuracy) || gpsAccuracy < 0 || gpsAccuracy > 500) {
-    return errorResponse('دقة GPS غير كافية. فعّل تحديد الموقع بدقة عالية وحاول مرة أخرى.');
+    return errorResponse('دقة الموقع الجغرافي غير كافية. فعّل تحديد الموقع بدقة عالية وحاول مرة أخرى.');
   }
 
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-    return errorResponse('إحداثيات GPS غير صحيحة');
+    return errorResponse('إحداثيات الموقع الجغرافي غير صحيحة');
   }
 
   if (
@@ -187,7 +187,7 @@ export async function attendanceAction(
   );
 
   if (radius <= 0 || radius < 1) {
-    return errorResponse('نطاق GPS للمشروع غير مضبوط بشكل صحيح');
+    return errorResponse('نطاق الموقع الجغرافي للمشروع غير مضبوط بشكل صحيح');
   }
 
   if (distance + gpsAccuracy > radius) {
@@ -205,10 +205,10 @@ export async function attendanceAction(
 
   if (gpsTimestamp) {
     const gpsParsed = new Date(gpsTimestamp);
-    if (Number.isNaN(gpsParsed.getTime())) return errorResponse('وقت GPS غير صالح');
+    if (Number.isNaN(gpsParsed.getTime())) return errorResponse('وقت الموقع الجغرافي غير صالح');
     const gpsAge = Date.now() - gpsParsed.getTime();
     if (gpsAge < -5 * 60 * 1000 || gpsAge > 7 * 24 * 60 * 60 * 1000) {
-      return errorResponse('وقت GPS غير صالح أو خارج المدة المسموح بها');
+      return errorResponse('وقت الموقع الجغرافي غير صالح أو خارج المدة المسموح بها');
     }
   }
 

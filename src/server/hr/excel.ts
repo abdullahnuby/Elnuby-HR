@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx-republish";
-import { supabase, errorResponse, success, generateId, nowISO, writeAudit } from "./core";
+import { supabase, errorResponse, success, generateId, nowISO, writeسجل التدقيق } from "./core";
 import type { SessionContext } from "./core";
 
 type TableConfig = {
@@ -173,7 +173,7 @@ async function fetchTable(table: string) {
   return data || [];
 }
 
-export async function exportExcel(session: SessionContext, table = "all") {
+export async function exportإكسل(session: SessionContext, table = "all") {
   const workbook = XLSX.utils.book_new();
   const tables = table === "all" ? Object.keys(EXCEL_TABLES) : [table];
   for (const name of tables) {
@@ -184,19 +184,19 @@ export async function exportExcel(session: SessionContext, table = "all") {
     XLSX.utils.book_append_sheet(workbook, sheet, cfg.label.slice(0, 31));
   }
   const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "buffer" }) as Buffer;
-  await writeAudit(session.user.user_id, "excel_export", "excel", table, {tables});
+  await writeسجل التدقيق(session.user.user_id, "excel_export", "excel", table, {tables});
   return buffer;
 }
 
-export function parseExcel(buffer: Buffer, table: string) {
+export function parseإكسل(buffer: Buffer, table: string) {
   const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
   const sheetName = workbook.SheetNames[0];
-  if (!sheetName) throw new Error("ملف Excel لا يحتوي على ورقة بيانات");
+  if (!sheetName) throw new Error("ملف إكسل لا يحتوي على ورقة بيانات");
   const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: null });
   return validateRows(table, rows);
 }
 
-export async function importExcel(session: SessionContext, table: string, rows: any[], commit: boolean) {
+export async function importإكسل(session: SessionContext, table: string, rows: any[], commit: boolean) {
   const cfg = NAME_TO_CONFIG.get(table);
   if (!cfg || !cfg.importable) return errorResponse("هذا الجدول غير متاح للاستيراد",403);
   const validation = validateRows(table, rows);
@@ -213,11 +213,11 @@ export async function importExcel(session: SessionContext, table: string, rows: 
       rowErrors.push({row: imported + 2, message: e?.message || "فشل حفظ السجل"});
     }
   }
-  await writeAudit(session.user.user_id, "excel_import", table, table, {total:rows.length, imported, errors:rowErrors.length});
+  await writeسجل التدقيق(session.user.user_id, "excel_import", table, table, {total:rows.length, imported, errors:rowErrors.length});
   return success({table,total:rows.length,imported,errors:rowErrors});
 }
 
-export function templateExcel(table: string) {
+export function templateإكسل(table: string) {
   const cfg = NAME_TO_CONFIG.get(table);
   if (!cfg) throw new Error("الجدول غير مسموح به");
   const workbook = XLSX.utils.book_new();

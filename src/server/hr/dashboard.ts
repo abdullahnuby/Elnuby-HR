@@ -151,7 +151,7 @@ export async function getProjectManagerDashboard(
         .from("leave_requests")
         .select("*")
         .in("project_id", projectIds)
-        .in("status", ["PENDING_MANAGER", "PENDING_HR", "APPROVED"]),
+        .in("status", ["PENDING_MANAGER", "PENDING_الموارد البشرية", "APPROVED"]),
       supabase
         .from("permission_requests")
         .select("*")

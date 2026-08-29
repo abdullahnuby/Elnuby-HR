@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { getSession, errorResponse, writeAudit } from "@/server/hr/core";
+import { getSession, errorResponse, writeسجل التدقيق } from "@/server/hr/core";
 import { handleAction } from "@/server/hr/router";
 import { createLeave } from "@/server/hr/leaves";
 import { SESSION_COOKIE } from "@/server/hr/auth";
@@ -85,7 +85,7 @@ if (session && AUDITED_ACTIONS.has(action)) {
     )
   );
 
-  await writeAudit(
+  await writeسجل التدقيق(
     session.user.user_id,
     action,
     "api",
@@ -97,7 +97,7 @@ if (session && AUDITED_ACTIONS.has(action)) {
 
 return response;
   } catch (error) {
-    console.error("ELNUBY HR API ERROR:", {
+    console.error("النُبي للموارد البشرية API ERROR:", {
       action: requestAction || undefined,
       error,
     });

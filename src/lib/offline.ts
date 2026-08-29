@@ -233,7 +233,7 @@ export function offlineCacheKey(action: string, payload: Record<string, unknown>
 
 
 /**
- * Clear all locally cached HR data when a user signs out or the server
+ * Clear all locally cached الموارد البشرية data when a user signs out or the server
  * rejects the current session. This prevents data from one account being
  * displayed to another account on the same browser.
  */

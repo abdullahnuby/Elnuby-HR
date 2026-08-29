@@ -1,4 +1,4 @@
-import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, appDate, appTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift, writeAudit } from "./core";
+import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, appDate, appTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift, writeسجل التدقيق } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
 function startOfCurrentYear() {
@@ -561,5 +561,5 @@ export async function updateEmployee(session: SessionContext, body: Record<strin
       created_at: nowISO(),
     });
   }
-  await writeAudit(session.user.user_id,'update_employee','employees',employeeId,{changes}); return success(data);
+  await writeسجل التدقيق(session.user.user_id,'update_employee','employees',employeeId,{changes}); return success(data);
 }

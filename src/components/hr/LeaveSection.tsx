@@ -20,7 +20,7 @@ type Props = {
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING_MANAGER: 'في انتظار مدير المشروع',
-  PENDING_HR: 'في انتظار HR',
+  PENDING_HR: 'في انتظار الموارد البشرية',
   APPROVED: 'معتمد',
   REJECTED: 'مرفوض',
   CANCELLED: 'ملغي',
@@ -32,6 +32,23 @@ const TYPE_LABELS: Record<string, string> = {
   'LT-SICK': 'مرضية',
   'LT-UNPAID': 'بدون أجر',
 };
+const ARABIC_LEAVE_TYPE_LABELS: Record<string, string> = {
+  'LT-ANNUAL': 'إجازة سنوية',
+  'LT-CASUAL': 'إجازة عارضة',
+  'LT-SICK': 'إجازة مرضية',
+  'LT-UNPAID': 'إجازة بدون أجر',
+  'LT-EMERGENCY': 'إجازة طارئة',
+  'LT-MATERNITY': 'إجازة وضع',
+  'LT-PATERNITY': 'إجازة أبوة',
+};
+
+function leaveTypeLabel(value: any, name?: any) {
+  const key = String(value ?? '');
+  const supplied = String(name ?? '').trim();
+  if (supplied && /[؀-ۿ]/.test(supplied)) return supplied;
+  return ARABIC_LEAVE_TYPE_LABELS[key] || (supplied ? 'نوع إجازة' : 'نوع إجازة');
+}
+
 
 function daysInclusive(from: string, to: string) {
   if (!from || !to || from > to) return 0;
@@ -54,7 +71,7 @@ export default function LeaveSection(props: Props) {
   const [decisionBusy, setDecisionBusy] = useState(false);
 
   const manager = role === 'PROJECT_MANAGER' || role === 'SECTOR_MANAGER';
-  const hr = role === 'HR_MANAGER' || role === 'SYSTEM_ADMIN';
+  const hr = role === 'الموارد البشرية_MANAGER' || role === 'SYSTEM_ADMIN';
 
   useEffect(() => setLocalRows(rows), [rows]);
 
@@ -142,7 +159,7 @@ export default function LeaveSection(props: Props) {
     <section className="panel page-panel hr-workflow-panel">
       <div className="panel-head">
         <div>
-          <div className="eyebrow">LEAVE WORKFLOW</div>
+          <div className="eyebrow">إدارة الإجازات</div>
           <h2>الإجازات</h2>
           <p>رصيد الإجازات، الطلبات، مسار الاعتماد، المستندات، وسجل القرار في مكان واحد.</p>
         </div>
@@ -160,11 +177,11 @@ export default function LeaveSection(props: Props) {
         <div className="request-card hr-request-composer">
           <div className="hr-request-composer-head"><div><h3>إنشاء طلب إجازة</h3><p>حدد النوع والفترة، وسيتم حساب الأيام والرصيد قبل الإرسال.</p></div><span className="live">طلب جديد</span></div>
           <div className="hr-leave-form-grid">
-            <label><span>نوع الإجازة</span><select value={leaveType} onChange={(e) => { setLeaveType(e.target.value); setMedicalDocument(null); }}><option value="">اختر النوع</option>{leaveTypes.map((t) => <option key={t.leave_type_id} value={t.leave_type_id}>{t.name || TYPE_LABELS[t.leave_type_id] || t.leave_type_id}</option>)}</select></label>
+            <label><span>نوع الإجازة</span><select value={leaveType} onChange={(e) => { setLeaveType(e.target.value); setMedicalDocument(null); }}><option value="">اختر النوع</option>{leaveTypes.map((t) => <option key={t.leave_type_id} value={t.leave_type_id}>{leaveTypeLabel(t.leave_type_id, t.name)}</option>)}</select></label>
             <label><span>من</span><input type="date" min={new Date().toISOString().slice(0,10)} value={leaveFrom} onChange={(e) => setLeaveFrom(e.target.value)} /></label>
             <label><span>إلى</span><input type="date" min={leaveFrom || new Date().toISOString().slice(0,10)} value={leaveTo} onChange={(e) => setLeaveTo(e.target.value)} /></label>
             <label className="wide"><span>سبب الطلب</span><textarea rows={2} placeholder="اكتب سببًا مختصرًا وواضحًا" value={leaveReason} onChange={(e) => setLeaveReason(e.target.value)} /></label>
-            {selectedType?.requires_document && <label><span>المستند المؤيد *</span><input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={(e) => setMedicalDocument(e.target.files?.[0] || null)} /><small>PDF أو صورة — حتى 10 ميجابايت</small></label>}
+            {selectedType?.requires_document && <label><span>المستند المؤيد *</span><input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={(e) => setMedicalDocument(e.target.files?.[0] || null)} /><small>ملف مستندي أو صورة — حتى 10 ميجابايت</small></label>}
           </div>
 
           <div className="hr-leave-preview">
@@ -178,14 +195,14 @@ export default function LeaveSection(props: Props) {
 
       {employeeMode && balances.length > 0 && (
         <div className="hr-balance-grid">
-          {balances.map((b) => <div className="hr-balance-card" key={b.id}><div><span>{b.leave_types?.name || TYPE_LABELS[b.leave_type_id] || b.leave_type_id}</span><small>استحقاق {b.entitlement} • مستخدم {b.used} • محجوز {b.pending}</small></div><strong>{b.remaining}</strong><em>يوم متاح</em></div>)}
+          {balances.map((b) => <div className="hr-balance-card" key={b.id}><div><span>{leaveTypeLabel(b.leave_type_id, b.leave_types?.name)}</span><small>استحقاق {b.entitlement} • مستخدم {b.used} • محجوز {b.pending}</small></div><strong>{b.remaining}</strong><em>يوم متاح</em></div>)}
         </div>
       )}
 
       <div className="hr-list-toolbar">
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="بحث باسم الموظف، الكود، المشروع أو السبب" />
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}><option value="ALL">كل الحالات</option>{Object.entries(STATUS_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select>
-        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}><option value="ALL">كل الأنواع</option>{leaveTypes.map((t) => <option key={t.leave_type_id} value={t.leave_type_id}>{t.name || TYPE_LABELS[t.leave_type_id] || t.leave_type_id}</option>)}</select>
+        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}><option value="ALL">كل الأنواع</option>{leaveTypes.map((t) => <option key={t.leave_type_id} value={t.leave_type_id}>{leaveTypeLabel(t.leave_type_id, t.name)}</option>)}</select>
       </div>
 
       <div className="table-wrap hr-leave-table"><table><thead><tr>{['الموظف','النوع','الفترة','الأيام','الرصيد','الحالة','مسار الاعتماد','إجراء'].map((h) => <th key={h}>{h}</th>)}</tr></thead><tbody>
@@ -200,15 +217,15 @@ export default function LeaveSection(props: Props) {
             <td>{r.leave_balance?.remaining ?? '—'}</td>
             <td><Badge status={r.status} /></td>
             <td><span className="workflow-step">{approvalStep}</span></td>
-            <td><div className="table-actions"><button className="table-action" onClick={() => setDetail(r)}>التفاصيل</button>{r.document_required && <button className="table-action" onClick={async () => { try { const d = await api<any>('leave_document',{request_id:r.request_id}); window.open(d.signed_url,'_blank','noopener,noreferrer'); } catch (e:any) { window.dispatchEvent(new CustomEvent('hr:toast',{detail:{message:e.message || 'تعذر فتح المستند',type:'error'}})); } }}>المستند</button>}{manager && r.status === 'PENDING_MANAGER' && <><button className="table-action" onClick={() => openDecision(r,'APPROVE','manager')}>اعتماد</button><button className="table-action danger" onClick={() => openDecision(r,'REJECT','manager')}>رفض</button></>}{hr && r.status === 'PENDING_HR' && <><button className="table-action" onClick={() => openDecision(r,'APPROVE','hr')}>اعتماد HR</button><button className="table-action danger" onClick={() => openDecision(r,'REJECT','hr')}>رفض</button></>}{canCancel && <button className="table-action danger" disabled={cancelBusy === r.request_id} onClick={() => void cancel(r.request_id)}>{cancelBusy === r.request_id ? 'جاري الإلغاء' : 'إلغاء'}</button>}</div></td>
+            <td><div className="table-actions"><button className="table-action" onClick={() => setDetail(r)}>التفاصيل</button>{r.document_required && <button className="table-action" onClick={async () => { try { const d = await api<any>('leave_document',{request_id:r.request_id}); window.open(d.signed_url,'_blank','noopener,noreferrer'); } catch (e:any) { window.dispatchEvent(new CustomEvent('hr:toast',{detail:{message:e.message || 'تعذر فتح المستند',type:'error'}})); } }}>المستند</button>}{manager && r.status === 'PENDING_MANAGER' && <><button className="table-action" onClick={() => openDecision(r,'APPROVE','manager')}>اعتماد</button><button className="table-action danger" onClick={() => openDecision(r,'REJECT','manager')}>رفض</button></>}{hr && r.status === 'PENDING_HR' && <><button className="table-action" onClick={() => openDecision(r,'APPROVE','hr')}>اعتماد الموارد البشرية</button><button className="table-action danger" onClick={() => openDecision(r,'REJECT','hr')}>رفض</button></>}{canCancel && <button className="table-action danger" disabled={cancelBusy === r.request_id} onClick={() => void cancel(r.request_id)}>{cancelBusy === r.request_id ? 'جاري الإلغاء' : 'إلغاء'}</button>}</div></td>
           </tr>;
         })}
       </tbody></table></div>
       {!filteredRows.length && <Empty text="لا توجد طلبات تطابق الفلاتر الحالية." />}
 
-      {detail && <div className="hr-modal-backdrop" onClick={() => setDetail(null)}><div className="hr-modal" onClick={(e) => e.stopPropagation()}><div className="hr-modal-head"><div><span className="eyebrow">REQUEST DETAILS</span><h3>{detail.employee_name || detail.employee_id}</h3></div><button onClick={() => setDetail(null)}>×</button></div><div className="hr-detail-grid"><div><span>الحالة</span><strong><Badge status={detail.status}/></strong></div><div><span>نوع الإجازة</span><strong>{detail.leave_type_name || detail.leave_type_id}</strong></div><div><span>الفترة</span><strong>{detail.from_date} → {detail.to_date}</strong></div><div><span>الأيام</span><strong>{detail.days} يوم</strong></div><div><span>المشروع</span><strong>{detail.project_name || detail.project_id}</strong></div><div><span>سبب الطلب</span><strong>{detail.reason || '—'}</strong></div></div><div className="hr-timeline"><div className={detail.status !== 'PENDING_MANAGER' ? 'done' : 'current'}><b>1</b><span>إرسال الطلب</span></div><div className={['PENDING_HR','APPROVED','REJECTED'].includes(detail.status) ? 'done' : 'current'}><b>2</b><span>اعتماد مدير المشروع</span></div><div className={['APPROVED','REJECTED'].includes(detail.status) ? 'done' : 'current'}><b>3</b><span>قرار HR</span></div></div>{detail.manager_comment && <div className="hr-comment"><b>ملاحظة المدير</b><p>{detail.manager_comment}</p></div>}{detail.hr_comment && <div className="hr-comment"><b>ملاحظة HR</b><p>{detail.hr_comment}</p></div>}{detail.cancellation_reason && <div className="hr-comment danger"><b>سبب الإلغاء</b><p>{detail.cancellation_reason}</p></div>}</div></div>}
+      {detail && <div className="hr-modal-backdrop" onClick={() => setDetail(null)}><div className="hr-modal" onClick={(e) => e.stopPropagation()}><div className="hr-modal-head"><div><span className="eyebrow">تفاصيل الطلب</span><h3>{detail.employee_name || detail.employee_id}</h3></div><button onClick={() => setDetail(null)}>×</button></div><div className="hr-detail-grid"><div><span>الحالة</span><strong><Badge status={detail.status}/></strong></div><div><span>نوع الإجازة</span><strong>{leaveTypeLabel(detail.leave_type_id, detail.leave_type_name)}</strong></div><div><span>الفترة</span><strong>{detail.from_date} → {detail.to_date}</strong></div><div><span>الأيام</span><strong>{detail.days} يوم</strong></div><div><span>المشروع</span><strong>{detail.project_name || detail.project_id}</strong></div><div><span>سبب الطلب</span><strong>{detail.reason || '—'}</strong></div></div><div className="hr-timeline"><div className={detail.status !== 'PENDING_MANAGER' ? 'done' : 'current'}><b>1</b><span>إرسال الطلب</span></div><div className={['PENDING_HR','APPROVED','REJECTED'].includes(detail.status) ? 'done' : 'current'}><b>2</b><span>اعتماد مدير المشروع</span></div><div className={['APPROVED','REJECTED'].includes(detail.status) ? 'done' : 'current'}><b>3</b><span>قرار الموارد البشرية</span></div></div>{detail.manager_comment && <div className="hr-comment"><b>ملاحظة المدير</b><p>{detail.manager_comment}</p></div>}{detail.hr_comment && <div className="hr-comment"><b>ملاحظة الموارد البشرية</b><p>{detail.hr_comment}</p></div>}{detail.cancellation_reason && <div className="hr-comment danger"><b>سبب الإلغاء</b><p>{detail.cancellation_reason}</p></div>}</div></div>}
 
-      {decisionModal && <div className="hr-modal-backdrop" onClick={() => !decisionBusy && setDecisionModal(null)}><div className="hr-modal hr-decision-modal" onClick={(e) => e.stopPropagation()}><div className="hr-modal-head"><div><span className="eyebrow">{decisionModal.stage === 'manager' ? 'MANAGER REVIEW' : 'HR REVIEW'}</span><h3>{decisionModal.decision === 'APPROVE' ? 'اعتماد طلب الإجازة' : 'رفض طلب الإجازة'}</h3></div><button disabled={decisionBusy} onClick={() => setDecisionModal(null)}>×</button></div><div className="hr-decision-summary"><div><span>الموظف</span><strong>{decisionModal.request.employee_name || decisionModal.request.employee_id}</strong></div><div><span>نوع الإجازة</span><strong>{decisionModal.request.leave_type_name || decisionModal.request.leave_type_id}</strong></div><div><span>الفترة</span><strong>{decisionModal.request.from_date} → {decisionModal.request.to_date}</strong></div><div><span>المدة</span><strong>{decisionModal.request.days} يوم</strong></div><div><span>الرصيد</span><strong>{decisionModal.request.leave_balance?.remaining ?? '—'} يوم</strong></div><div><span>المشروع</span><strong>{decisionModal.request.project_name || decisionModal.request.project_id}</strong></div></div><div className="hr-decision-reason"><span>سبب الطلب</span><p>{decisionModal.request.reason || 'لم يذكر الموظف سببًا.'}</p></div><label className="hr-decision-field"><span>{decisionModal.decision === 'REJECT' ? 'سبب الرفض *' : 'ملاحظة القرار'}</span><textarea rows={4} autoFocus value={decisionComment} onChange={(e) => setDecisionComment(e.target.value)} placeholder={decisionModal.decision === 'REJECT' ? 'اكتب سبب الرفض بوضوح ليظهر للموظف...' : 'اكتب ملاحظة القرار (اختياري)...'} /></label><div className="hr-decision-actions"><button className="table-action" disabled={decisionBusy} onClick={() => setDecisionModal(null)}>إلغاء</button><button className={decisionModal.decision === 'REJECT' ? 'table-action danger hr-primary-decision' : 'table-action hr-primary-decision'} disabled={decisionBusy || (decisionModal.decision === 'REJECT' && decisionComment.trim().length < 3)} onClick={() => void submitDecision()}>{decisionBusy ? 'جاري التنفيذ...' : decisionModal.decision === 'REJECT' ? 'تأكيد الرفض' : 'تأكيد الاعتماد'}</button></div></div></div>}
+      {decisionModal && <div className="hr-modal-backdrop" onClick={() => !decisionBusy && setDecisionModal(null)}><div className="hr-modal hr-decision-modal" onClick={(e) => e.stopPropagation()}><div className="hr-modal-head"><div><span className="eyebrow">{decisionModal.stage === 'manager' ? 'مراجعة المدير' : 'مراجعة الموارد البشرية'}</span><h3>{decisionModal.decision === 'APPROVE' ? 'اعتماد طلب الإجازة' : 'رفض طلب الإجازة'}</h3></div><button disabled={decisionBusy} onClick={() => setDecisionModal(null)}>×</button></div><div className="hr-decision-summary"><div><span>الموظف</span><strong>{decisionModal.request.employee_name || decisionModal.request.employee_id}</strong></div><div><span>نوع الإجازة</span><strong>{leaveTypeLabel(decisionModal.request.leave_type_id, decisionModal.request.leave_type_name)}</strong></div><div><span>الفترة</span><strong>{decisionModal.request.from_date} → {decisionModal.request.to_date}</strong></div><div><span>المدة</span><strong>{decisionModal.request.days} يوم</strong></div><div><span>الرصيد</span><strong>{decisionModal.request.leave_balance?.remaining ?? '—'} يوم</strong></div><div><span>المشروع</span><strong>{decisionModal.request.project_name || decisionModal.request.project_id}</strong></div></div><div className="hr-decision-reason"><span>سبب الطلب</span><p>{decisionModal.request.reason || 'لم يذكر الموظف سببًا.'}</p></div><label className="hr-decision-field"><span>{decisionModal.decision === 'REJECT' ? 'سبب الرفض *' : 'ملاحظة القرار'}</span><textarea rows={4} autoFocus value={decisionComment} onChange={(e) => setDecisionComment(e.target.value)} placeholder={decisionModal.decision === 'REJECT' ? 'اكتب سبب الرفض بوضوح ليظهر للموظف...' : 'اكتب ملاحظة القرار (اختياري)...'} /></label><div className="hr-decision-actions"><button className="table-action" disabled={decisionBusy} onClick={() => setDecisionModal(null)}>إلغاء</button><button className={decisionModal.decision === 'REJECT' ? 'table-action danger hr-primary-decision' : 'table-action hr-primary-decision'} disabled={decisionBusy || (decisionModal.decision === 'REJECT' && decisionComment.trim().length < 3)} onClick={() => void submitDecision()}>{decisionBusy ? 'جاري التنفيذ...' : decisionModal.decision === 'REJECT' ? 'تأكيد الرفض' : 'تأكيد الاعتماد'}</button></div></div></div>}
     </section>
   );
 }

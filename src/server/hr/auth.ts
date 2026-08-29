@@ -12,7 +12,7 @@ import {
   getCurrentEmployeeShift,
   verifyPassword,
   securePasswordHash,
-  writeAudit,
+  writeسجل التدقيق,
   SESSION_MAX_AGE,
 } from "./core";
 import type { SessionContext } from "./core";
@@ -68,7 +68,7 @@ export async function login(body: Record<string, unknown>) {
       .from("users")
       .update({ failed_attempts: failedAttempts, locked_until: lock, updated_at: nowISO() })
       .eq("id", user.id);
-    await writeAudit(String(user.id), "LOGIN_FAILED", "auth", String(user.id), { username }, false);
+    await writeسجل التدقيق(String(user.id), "LOGIN_FAILED", "auth", String(user.id), { username }, false);
     return errorResponse("اسم المستخدم أو كلمة المرور غير صحيحة", 401);
   }
 
@@ -109,7 +109,7 @@ export async function login(body: Record<string, unknown>) {
     })
     .eq("id", user.id);
 
-  await writeAudit(String(user.id), "LOGIN", "auth", String(user.id), { username, role: user.role });
+  await writeسجل التدقيق(String(user.id), "LOGIN", "auth", String(user.id), { username, role: user.role });
 
   // Set the persistent auth cookie on the actual Login response. This avoids
   // relying on implicit cookie mutations from a nested helper and makes the
@@ -135,7 +135,7 @@ export async function logout(session: SessionContext | null) {
       .update({ revoked_at: nowISO() })
       .eq("token_hash", sha256(session.token))
       .is("revoked_at", null);
-    await writeAudit(session.user.user_id, "LOGOUT", "auth", session.user.user_id);
+    await writeسجل التدقيق(session.user.user_id, "LOGOUT", "auth", session.user.user_id);
   }
   const response = success({ logged_out: true });
   response.cookies.set(SESSION_COOKIE, "", {
