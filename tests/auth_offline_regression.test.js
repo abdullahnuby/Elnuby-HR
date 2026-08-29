@@ -13,7 +13,10 @@ const sw = fs.readFileSync(path.join(root, 'public/sw.js'), 'utf8');
 assert.ok(auth.includes('sameSite: "lax"'));
 assert.ok(auth.includes('expires = new Date(Date.now() + SESSION_MAX_AGE * 1000)'));
 assert.ok(route.includes('dynamic = "force-dynamic"'));
-assert.ok(route.includes('Do not clear a browser cookie during a passive status probe'));
+assert.ok(page.includes('await load();'));
+assert.ok(page.includes('Give a transient\n          // auth-store/server response one retry'));
+assert.ok(api.includes('Do not clear cached application state here.'));
+assert.ok(!api.includes('await clearOfflineCache();'));
 
 // Offline state must be stored and restored under the same exact user-scoped keys.
 assert.ok(page.includes("cacheGet(apiCacheKey('me', {}))"));
@@ -27,6 +30,7 @@ assert.ok(offline.includes('throw new Error(\'لا توجد جلسة مستخد�
 // Network/auth failures may not delete pending attendance; they must remain replayable.
 assert.ok(offline.includes('Never delete pending attendance because of an expired session.'));
 assert.ok(!/authFailure[\s\S]{0,220}clearOfflineData\(\)/.test(api));
+assert.ok(!api.includes('await clearOfflineCache()'));
 
 // A refreshed deployment must invalidate stale SW shell code.
 assert.ok(sw.includes('elnuby-hr-shell-v3'));

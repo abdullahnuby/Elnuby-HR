@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { getSession, errorResponse, writeAudit } from "@/server/hr/core";
+import { getSession, errorResponse, writeAudit, SessionStoreError } from "@/server/hr/core";
 import { handleAction } from "@/server/hr/router";
 import { createLeave } from "@/server/hr/leaves";
 import { SESSION_COOKIE, clearSessionCookie } from "@/server/hr/auth";
@@ -48,9 +48,17 @@ export async function POST(request: Request) {
       // the browser on first load so an unauthenticated refresh does not
       // produce a noisy 401 or revive stale client state.
       if (action === "session_status") {
-        // Do not clear a browser cookie during a passive status probe. A
-        // transient session-store/network failure must never become a logout.
-        return Response.json({ ok: true, data: { authenticated: Boolean(session), user: session?.user || null } });
+        // A status probe is read-only. Most importantly, distinguish an
+        // actually missing/expired cookie from a temporary session-store
+        // outage. The latter must be retried, not treated as logout.
+        return Response.json({
+          ok: true,
+          data: {
+            authenticated: Boolean(session),
+            user: session?.user || null,
+            degraded: false,
+          },
+        }, { status: 200, headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } });
       }
 
       // Logout is intentionally idempotent: even if the server-side session
@@ -68,6 +76,26 @@ const response =
   result instanceof Response
     ? result
     : Response.json(result);
+
+// Re-issue the same valid session cookie on every authenticated request.
+// This refreshes the browser Max-Age/Expires and makes normal page refreshes
+// robust across browser cookie eviction policies while keeping the token
+// HttpOnly and server-side validated.
+if (session && action !== "logout") {
+  try {
+    const token = session.token;
+    (await cookies()).set(SESSION_COOKIE, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60,
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
+  } catch (cookieError) {
+    console.warn("session cookie refresh failed:", cookieError);
+  }
+}
 
 if (session && AUDITED_ACTIONS.has(action)) {
   const safeDetails = Object.fromEntries(
@@ -88,6 +116,16 @@ if (session && AUDITED_ACTIONS.has(action)) {
 
 return response;
   } catch (error) {
+    if (error instanceof SessionStoreError) {
+      console.warn("ELNUBY HR SESSION STORE UNAVAILABLE:", {
+        action: requestAction || undefined,
+      });
+      return Response.json(
+        { ok: false, error: "خدمة تسجيل الدخول غير متاحة مؤقتًا. لم يتم تسجيل الخروج.", code: "SESSION_STORE_UNAVAILABLE" },
+        { status: 503, headers: { "Cache-Control": "no-store, no-cache, must-revalidate", "Retry-After": "3" } },
+      );
+    }
+
     console.error("ELNUBY HR API ERROR:", {
       action: requestAction || undefined,
       error,

@@ -1,4 +1,4 @@
-import { apiCacheKey, cacheGet, cacheSet, queueAttendance, clearOfflineCache, setOfflineUserId } from './offline';
+import { apiCacheKey, cacheGet, cacheSet, queueAttendance, setOfflineUserId } from './offline';
 
 export type ApiResponse<T = unknown> = {
   ok: boolean;
@@ -77,12 +77,10 @@ export async function api<T = unknown>(
             ? 'ليس لديك صلاحية لتنفيذ هذا الإجراء.'
             : 'فشل تنفيذ الطلب.');
 
-      // Authentication failure invalidates cached views, but NEVER deletes the
-      // offline attendance queue. A later login must be able to resume sync.
-      if (res.status === 401 || /الجلسة غير صالحة|انتهت جلسة|Authentication required|Invalid session|Session expired|User inactive/i.test(message)) {
-        await clearOfflineCache();
-      }
-
+      // Do not clear cached application state here. A single 401 may be a
+      // transient server/auth-store response during a page refresh. The auth
+      // bootstrap decides when a session is definitively invalid, while the
+      // offline attendance queue is always preserved.
       throw new ApiRequestError(message, res.status);
     }
 
@@ -102,7 +100,6 @@ export async function api<T = unknown>(
       /الجلسة غير صالحة|انتهت جلسة|Authentication required|Invalid session|Session expired|User inactive|401/i.test(message);
 
     if (authFailure) {
-      await clearOfflineCache();
       throw error;
     }
 

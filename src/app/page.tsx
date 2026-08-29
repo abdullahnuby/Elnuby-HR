@@ -235,24 +235,33 @@ export default function Home() {
       if (!navigator.onLine && await restoreCachedOfflineSession()) return;
 
       try {
-        const status: any = await api('session_status');
-        if (cancelled) return;
-        if (!status?.authenticated) {
-          await clearOfflineCache();
-          setMe(null);
-          setDash(null);
-          setManagerDash(null);
-          return;
-        }
         await load();
       } catch (error: any) {
         if (cancelled) return;
         const message = String(error?.message || '');
         const authFailure = /Authentication required|Invalid session|Session expired|User inactive|الجلسة غير صالحة|منتهية/i.test(message);
         if (authFailure) {
+          // A protected /me request is the source of truth. Give a transient
+          // auth-store/server response one retry before declaring logout.
+          await new Promise((resolve) => setTimeout(resolve, 450));
+          try {
+            await load();
+            return;
+          } catch (retryError: any) {
+            const retryMessage = String(retryError?.message || '');
+            const retryAuthFailure = /Authentication required|Invalid session|Session expired|User inactive|الجلسة غير صالحة|منتهية/i.test(retryMessage);
+            if (!retryAuthFailure) {
+              if (!(await restoreCachedOfflineSession(true))) setError(retryMessage || message || 'تعذر الاتصال بالخادم.');
+              return;
+            }
+          }
           await clearOfflineCache();
           setMe(null);
-        } else if (!(await restoreCachedOfflineSession(true))) {
+          setDash(null);
+          setManagerDash(null);
+          return;
+        }
+        if (!(await restoreCachedOfflineSession(true))) {
           setError(message || 'تعذر الاتصال بالخادم.');
         }
       }

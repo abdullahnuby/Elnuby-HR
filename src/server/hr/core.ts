@@ -237,6 +237,13 @@ export function haversineDistance(
    AUTH / SESSION
 ========================================================= */
 
+export class SessionStoreError extends Error {
+  constructor(message = "Session store unavailable") {
+    super(message);
+    this.name = "SessionStoreError";
+  }
+}
+
 export async function getSession(
   token: string
 ): Promise<SessionContext | null> {
@@ -253,9 +260,17 @@ export async function getSession(
     .is("revoked_at", null)
     .maybeSingle();
 
-  if (sessionError || !session) {
-    return null;
+  // A database/network problem is NOT an invalid session. Never turn a
+  // transient auth-store outage into an application logout.
+  if (sessionError) {
+    console.error("session lookup failed:", {
+      code: sessionError.code,
+      message: sessionError.message,
+    });
+    throw new SessionStoreError();
   }
+
+  if (!session) return null;
 
   if (
     session.expires_at &&
@@ -272,24 +287,33 @@ export async function getSession(
     .eq("id", session.user_id)
     .maybeSingle();
 
-  if (userError || !user) {
-    return null;
+  if (userError) {
+    console.error("session user lookup failed:", {
+      code: userError.code,
+      message: userError.message,
+    });
+    throw new SessionStoreError();
   }
 
-  if (user.status !== "ACTIVE") {
-    return null;
-  }
+  if (!user || user.status !== "ACTIVE") return null;
 
-  // Sliding server-side session: refreshing/using the app keeps an active
-  // session alive while the browser cookie remains valid.
-  const refreshedExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-  await publicSupabase
+  // Sliding server-side session. Failure to refresh the expiry must not log
+  // the user out because the currently valid session is still authenticated.
+  const refreshedExpiry = new Date(Date.now() + SESSION_MAX_AGE * 1000).toISOString();
+  const { error: refreshError } = await publicSupabase
     .from("app_sessions")
     .update({
       last_used_at: nowISO(),
       expires_at: refreshedExpiry,
     })
     .eq("session_id", session.session_id);
+
+  if (refreshError) {
+    console.warn("session sliding refresh failed:", {
+      code: refreshError.code,
+      message: refreshError.message,
+    });
+  }
 
   return {
     token,
