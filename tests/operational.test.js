@@ -26,7 +26,7 @@ assert.ok(core.includes('refreshedExpiry'));
 
 // 2) Browser refresh while offline restores last authenticated state instead of logging out.
 assert.ok(page.includes('restoreCachedOfflineSession'));
-assert.ok(page.includes("if (!navigator.onLine && await restoreCachedOfflineSession()) return;"));
+assert.ok(page.includes("if (!navigator.onLine && await restoreCachedOfflineSession()) {"));
 assert.ok(page.includes("cacheGet(apiCacheKey('me', {}))"));
 assert.ok(page.includes("cacheGet(apiCacheKey('dashboard', {}))"));
 assert.ok(page.includes("cacheGet(apiCacheKey('project_manager_dashboard', {}))"));

@@ -87,6 +87,7 @@ export default function Home() {
   const [error, setError] = useState('');
 
   const [me, setMe] = useState<any>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [dash, setDash] = useState<any>(null);
   const [managerDash, setManagerDash] = useState<any>(null);
 
@@ -232,7 +233,10 @@ export default function Home() {
     (async () => {
       // A refresh while offline must restore the last authenticated app state,
       // not interpret network absence as logout.
-      if (!navigator.onLine && await restoreCachedOfflineSession()) return;
+      if (!navigator.onLine && await restoreCachedOfflineSession()) {
+        if (!cancelled) setAuthReady(true);
+        return;
+      }
 
       try {
         // /me is the authoritative authenticated-app check. A passive
@@ -255,9 +259,10 @@ export default function Home() {
         } else if (!(await restoreCachedOfflineSession(true))) {
           setError(message || 'تعذر الاتصال بالخادم.');
         }
+      } finally {
+        if (!cancelled) setAuthReady(true);
       }
     })();
-
     return () => { cancelled = true; };
   }, []);
 
@@ -986,6 +991,29 @@ export default function Home() {
       ),
     [me?.user?.role],
   );
+
+  if (!authReady) {
+    return (
+      <main className="login-page" dir="rtl" aria-busy="true">
+        <div className="login-shell">
+          <div className="login-brand">
+            <div className="brand-mark">N</div>
+            <div>
+              <b>ELNUBY HR</b>
+              <span>نظام إدارة موارد بشرية للمشروعات</span>
+            </div>
+          </div>
+          <section className="login-card">
+            <div className="eyebrow">التحقق من الجلسة</div>
+            <h1>جاري تحميل النظام</h1>
+            <p>يتم استعادة جلسة الدخول والبيانات المحلية. لن تحتاج إلى تسجيل الدخول مرة أخرى.</p>
+            <div className="alert" role="status">جاري التحقق…</div>
+          </section>
+          <small className="login-footer">ELNUBY HR • Site Workforce Management</small>
+        </div>
+      </main>
+    );
+  }
 
   if (!me) {
     return (
