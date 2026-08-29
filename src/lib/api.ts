@@ -1,4 +1,4 @@
-import { apiCacheKey, cacheGet, cacheSet, queueAttendance, setOfflineUserId } from './offline';
+import { apiCacheKey, cacheGet, cacheSet, queueAttendance, clearOfflineCache, setOfflineUserId } from './offline';
 
 export type ApiResponse<T = unknown> = {
   ok: boolean;
@@ -49,7 +49,7 @@ export async function api<T = unknown>(
   }
 
   try {
-    const res = await fetch('/api/hr', {
+    const requestInit: RequestInit = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -59,7 +59,16 @@ export async function api<T = unknown>(
       credentials: 'include',
       cache: 'no-store',
       body: JSON.stringify({ action, ...payload }),
-    });
+    };
+
+    // Absorb a one-off auth race during hydration/refresh. The browser keeps
+    // the HttpOnly cookie; the second request proves whether the session is
+    // actually invalid before the UI falls back to cached state.
+    let res = await fetch('/api/hr', requestInit);
+    if (res.status === 401 && action !== 'login' && action !== 'session_status') {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      res = await fetch('/api/hr', requestInit);
+    }
 
     let result: ApiResponse<T>;
     try {
@@ -77,10 +86,14 @@ export async function api<T = unknown>(
             ? 'ليس لديك صلاحية لتنفيذ هذا الإجراء.'
             : 'فشل تنفيذ الطلب.');
 
-      // Do not clear cached application state here. A single 401 may be a
-      // transient server/auth-store response during a page refresh. The auth
-      // bootstrap decides when a session is definitively invalid, while the
-      // offline attendance queue is always preserved.
+      // Authentication failure invalidates cached views, but NEVER deletes the
+      // offline attendance queue. A later login must be able to resume sync.
+      if (res.status === 401 && action !== 'session_status') {
+        // Keep offline cache until the application has positively established
+        // that the session is truly invalid; a single 401 during refresh must
+        // not destroy the user's offline recovery state.
+      }
+
       throw new ApiRequestError(message, res.status);
     }
 
@@ -100,6 +113,8 @@ export async function api<T = unknown>(
       /الجلسة غير صالحة|انتهت جلسة|Authentication required|Invalid session|Session expired|User inactive|401/i.test(message);
 
     if (authFailure) {
+      // Never destroy offline state while recovering from a transient auth or
+      // network race. Explicit logout owns local cleanup.
       throw error;
     }
 

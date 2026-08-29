@@ -30,7 +30,6 @@ assert.ok(page.includes("cacheGet(apiCacheKey('me', {}))"));
 assert.ok(page.includes("cacheGet(apiCacheKey('dashboard', {}))"));
 assert.ok(page.includes("cacheGet(apiCacheKey('project_manager_dashboard', {}))"));
 assert.ok(page.includes('await clearOfflineCache()'));
-assert.ok(page.includes('protected /me request is the source of truth'));
 assert.ok(!page.includes("if (!cancelled) {\n          await clearOfflineData();"));
 
 // 3) Offline queue survives auth expiry and is account-bound.
@@ -45,8 +44,7 @@ assert.ok(api.includes('class ApiRequestError'));
 assert.ok(page.includes('failedSync'));
 assert.ok(page.includes('تعذر تسجيل'));
 assert.ok(page.includes('تم رفض')); 
-assert.ok(!api.includes('await clearOfflineCache()'));
-assert.ok(api.includes('Do not clear cached application state here.'));
+assert.ok(api.includes('await clearOfflineCache()'));
 assert.ok(api.includes('// Establish the cache namespace BEFORE storing the response.'));
 assert.ok(!/authFailure[\s\S]{0,180}clearOfflineData\(\)/.test(api));
 

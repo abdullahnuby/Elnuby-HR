@@ -235,33 +235,19 @@ export default function Home() {
       if (!navigator.onLine && await restoreCachedOfflineSession()) return;
 
       try {
+        // /me is the authoritative authenticated-app check. A passive
+        // session_status probe can be temporarily unavailable and must not
+        // turn into a logout.
         await load();
+        if (cancelled) return;
       } catch (error: any) {
         if (cancelled) return;
         const message = String(error?.message || '');
         const authFailure = /Authentication required|Invalid session|Session expired|User inactive|الجلسة غير صالحة|منتهية/i.test(message);
         if (authFailure) {
-          // A protected /me request is the source of truth. Give a transient
-          // auth-store/server response one retry before declaring logout.
-          await new Promise((resolve) => setTimeout(resolve, 450));
-          try {
-            await load();
-            return;
-          } catch (retryError: any) {
-            const retryMessage = String(retryError?.message || '');
-            const retryAuthFailure = /Authentication required|Invalid session|Session expired|User inactive|الجلسة غير صالحة|منتهية/i.test(retryMessage);
-            if (!retryAuthFailure) {
-              if (!(await restoreCachedOfflineSession(true))) setError(retryMessage || message || 'تعذر الاتصال بالخادم.');
-              return;
-            }
-          }
           await clearOfflineCache();
           setMe(null);
-          setDash(null);
-          setManagerDash(null);
-          return;
-        }
-        if (!(await restoreCachedOfflineSession(true))) {
+        } else if (!(await restoreCachedOfflineSession(true))) {
           setError(message || 'تعذر الاتصال بالخادم.');
         }
       }
@@ -398,18 +384,26 @@ export default function Home() {
         );
 
       if (authError) {
-        void clearOfflineData();
-        setMe(null);
-        setDash(null);
-        setManagerDash(null);
-        setUsers([]);
-        setEmployees([]);
-        setProjects([]);
-        setShifts([]);
-
-        setError(
-          'انتهت جلسة الدخول، برجاء تسجيل الدخول مرة أخرى.',
-        );
+        // Do not destroy local cache/queue on a single authentication race.
+        // Only explicit Logout clears local HR data.
+        const restored = await (async () => {
+          try {
+            const cachedMe: any = await cacheGet(apiCacheKey('me', {}));
+            if (!cachedMe?.user?.user_id) return false;
+            setOfflineUserId(String(cachedMe.user.user_id));
+            setMe(cachedMe);
+            const cachedDashboard: any = await cacheGet(apiCacheKey('dashboard', {}));
+            const cachedManagerDashboard: any = await cacheGet(apiCacheKey('project_manager_dashboard', {}));
+            if (cachedDashboard) setDash(cachedDashboard);
+            if (cachedManagerDashboard) setManagerDash(cachedManagerDashboard);
+            setPendingSync(await pendingAttendanceCount(String(cachedMe.user.user_id)).catch(() => 0));
+            setIsOffline(!navigator.onLine);
+            return true;
+          } catch {
+            return false;
+          }
+        })();
+        if (!restored) setError('تعذر التحقق من جلسة الدخول حاليًا. لم يتم تسجيل الخروج، وسيتم إعادة المحاولة تلقائيًا.');
       } else {
         setError(
           message || 'تعذر الاتصال بالخادم، حاول مرة أخرى.',
