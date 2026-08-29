@@ -49,6 +49,9 @@ export default function LeaveSection(props: Props) {
   const [localRows, setLocalRows] = useState<any[]>(rows);
   const [cancelBusy, setCancelBusy] = useState<string | null>(null);
   const [detail, setDetail] = useState<any | null>(null);
+  const [decisionModal, setDecisionModal] = useState<{ request: any; decision: 'APPROVE' | 'REJECT'; stage: 'manager' | 'hr' } | null>(null);
+  const [decisionComment, setDecisionComment] = useState('');
+  const [decisionBusy, setDecisionBusy] = useState(false);
 
   const manager = role === 'PROJECT_MANAGER' || role === 'SECTOR_MANAGER';
   const hr = role === 'HR_MANAGER' || role === 'SYSTEM_ADMIN';
@@ -97,18 +100,28 @@ export default function LeaveSection(props: Props) {
     try { setLocalRows(await api<any[]>('leave_list', {})); } catch {}
   }
 
-  async function decide(requestId: string, decision: 'APPROVE' | 'REJECT', stage: 'manager' | 'hr') {
-    const comment = window.prompt(decision === 'REJECT' ? 'سبب الرفض (إلزامي):' : 'ملاحظة الاعتماد (اختياري):', '');
-    if (comment === null) return;
+  function openDecision(request: any, decision: 'APPROVE' | 'REJECT', stage: 'manager' | 'hr') {
+    setDecisionComment('');
+    setDecisionModal({ request, decision, stage });
+  }
+
+  async function submitDecision() {
+    if (!decisionModal) return;
+    if (decisionModal.decision === 'REJECT' && decisionComment.trim().length < 3) {
+      window.dispatchEvent(new CustomEvent('hr:toast', { detail: { message: 'سبب الرفض مطلوب (3 أحرف على الأقل)', type: 'error' } }));
+      return;
+    }
     try {
-      const action = stage === 'manager' ? 'decide_leave_manager' : 'decide_leave_hr';
-      await api(action, { request_id: requestId, decision, comment });
-      window.dispatchEvent(new CustomEvent('hr:toast', { detail: { message: decision === 'APPROVE' ? 'تم اعتماد الطلب' : 'تم رفض الطلب' } }));
+      setDecisionBusy(true);
+      const action = decisionModal.stage === 'manager' ? 'decide_leave_manager' : 'decide_leave_hr';
+      await api(action, { request_id: decisionModal.request.request_id, decision: decisionModal.decision, comment: decisionComment.trim() });
+      window.dispatchEvent(new CustomEvent('hr:toast', { detail: { message: decisionModal.decision === 'APPROVE' ? 'تم اعتماد الطلب بنجاح' : 'تم رفض الطلب' } }));
       await refresh();
       setDetail(null);
+      setDecisionModal(null);
     } catch (error: any) {
       window.dispatchEvent(new CustomEvent('hr:toast', { detail: { message: error?.message || 'تعذر تنفيذ القرار', type: 'error' } }));
-    }
+    } finally { setDecisionBusy(false); }
   }
 
   async function cancel(requestId: string) {
@@ -187,13 +200,15 @@ export default function LeaveSection(props: Props) {
             <td>{r.leave_balance?.remaining ?? '—'}</td>
             <td><Badge status={r.status} /></td>
             <td><span className="workflow-step">{approvalStep}</span></td>
-            <td><div className="table-actions"><button className="table-action" onClick={() => setDetail(r)}>التفاصيل</button>{r.document_required && <button className="table-action" onClick={async () => { try { const d = await api<any>('leave_document',{request_id:r.request_id}); window.open(d.signed_url,'_blank','noopener,noreferrer'); } catch (e:any) { window.dispatchEvent(new CustomEvent('hr:toast',{detail:{message:e.message || 'تعذر فتح المستند',type:'error'}})); } }}>المستند</button>}{manager && r.status === 'PENDING_MANAGER' && <><button className="table-action" onClick={() => void decide(r.request_id,'APPROVE','manager')}>اعتماد</button><button className="table-action danger" onClick={() => void decide(r.request_id,'REJECT','manager')}>رفض</button></>}{hr && r.status === 'PENDING_HR' && <><button className="table-action" onClick={() => void decide(r.request_id,'APPROVE','hr')}>اعتماد HR</button><button className="table-action danger" onClick={() => void decide(r.request_id,'REJECT','hr')}>رفض</button></>}{canCancel && <button className="table-action danger" disabled={cancelBusy === r.request_id} onClick={() => void cancel(r.request_id)}>{cancelBusy === r.request_id ? 'جاري الإلغاء' : 'إلغاء'}</button>}</div></td>
+            <td><div className="table-actions"><button className="table-action" onClick={() => setDetail(r)}>التفاصيل</button>{r.document_required && <button className="table-action" onClick={async () => { try { const d = await api<any>('leave_document',{request_id:r.request_id}); window.open(d.signed_url,'_blank','noopener,noreferrer'); } catch (e:any) { window.dispatchEvent(new CustomEvent('hr:toast',{detail:{message:e.message || 'تعذر فتح المستند',type:'error'}})); } }}>المستند</button>}{manager && r.status === 'PENDING_MANAGER' && <><button className="table-action" onClick={() => openDecision(r,'APPROVE','manager')}>اعتماد</button><button className="table-action danger" onClick={() => openDecision(r,'REJECT','manager')}>رفض</button></>}{hr && r.status === 'PENDING_HR' && <><button className="table-action" onClick={() => openDecision(r,'APPROVE','hr')}>اعتماد HR</button><button className="table-action danger" onClick={() => openDecision(r,'REJECT','hr')}>رفض</button></>}{canCancel && <button className="table-action danger" disabled={cancelBusy === r.request_id} onClick={() => void cancel(r.request_id)}>{cancelBusy === r.request_id ? 'جاري الإلغاء' : 'إلغاء'}</button>}</div></td>
           </tr>;
         })}
       </tbody></table></div>
       {!filteredRows.length && <Empty text="لا توجد طلبات تطابق الفلاتر الحالية." />}
 
       {detail && <div className="hr-modal-backdrop" onClick={() => setDetail(null)}><div className="hr-modal" onClick={(e) => e.stopPropagation()}><div className="hr-modal-head"><div><span className="eyebrow">REQUEST DETAILS</span><h3>{detail.employee_name || detail.employee_id}</h3></div><button onClick={() => setDetail(null)}>×</button></div><div className="hr-detail-grid"><div><span>الحالة</span><strong><Badge status={detail.status}/></strong></div><div><span>نوع الإجازة</span><strong>{detail.leave_type_name || detail.leave_type_id}</strong></div><div><span>الفترة</span><strong>{detail.from_date} → {detail.to_date}</strong></div><div><span>الأيام</span><strong>{detail.days} يوم</strong></div><div><span>المشروع</span><strong>{detail.project_name || detail.project_id}</strong></div><div><span>سبب الطلب</span><strong>{detail.reason || '—'}</strong></div></div><div className="hr-timeline"><div className={detail.status !== 'PENDING_MANAGER' ? 'done' : 'current'}><b>1</b><span>إرسال الطلب</span></div><div className={['PENDING_HR','APPROVED','REJECTED'].includes(detail.status) ? 'done' : 'current'}><b>2</b><span>اعتماد مدير المشروع</span></div><div className={['APPROVED','REJECTED'].includes(detail.status) ? 'done' : 'current'}><b>3</b><span>قرار HR</span></div></div>{detail.manager_comment && <div className="hr-comment"><b>ملاحظة المدير</b><p>{detail.manager_comment}</p></div>}{detail.hr_comment && <div className="hr-comment"><b>ملاحظة HR</b><p>{detail.hr_comment}</p></div>}{detail.cancellation_reason && <div className="hr-comment danger"><b>سبب الإلغاء</b><p>{detail.cancellation_reason}</p></div>}</div></div>}
+
+      {decisionModal && <div className="hr-modal-backdrop" onClick={() => !decisionBusy && setDecisionModal(null)}><div className="hr-modal hr-decision-modal" onClick={(e) => e.stopPropagation()}><div className="hr-modal-head"><div><span className="eyebrow">{decisionModal.stage === 'manager' ? 'MANAGER REVIEW' : 'HR REVIEW'}</span><h3>{decisionModal.decision === 'APPROVE' ? 'اعتماد طلب الإجازة' : 'رفض طلب الإجازة'}</h3></div><button disabled={decisionBusy} onClick={() => setDecisionModal(null)}>×</button></div><div className="hr-decision-summary"><div><span>الموظف</span><strong>{decisionModal.request.employee_name || decisionModal.request.employee_id}</strong></div><div><span>نوع الإجازة</span><strong>{decisionModal.request.leave_type_name || decisionModal.request.leave_type_id}</strong></div><div><span>الفترة</span><strong>{decisionModal.request.from_date} → {decisionModal.request.to_date}</strong></div><div><span>المدة</span><strong>{decisionModal.request.days} يوم</strong></div><div><span>الرصيد</span><strong>{decisionModal.request.leave_balance?.remaining ?? '—'} يوم</strong></div><div><span>المشروع</span><strong>{decisionModal.request.project_name || decisionModal.request.project_id}</strong></div></div><div className="hr-decision-reason"><span>سبب الطلب</span><p>{decisionModal.request.reason || 'لم يذكر الموظف سببًا.'}</p></div><label className="hr-decision-field"><span>{decisionModal.decision === 'REJECT' ? 'سبب الرفض *' : 'ملاحظة القرار'}</span><textarea rows={4} autoFocus value={decisionComment} onChange={(e) => setDecisionComment(e.target.value)} placeholder={decisionModal.decision === 'REJECT' ? 'اكتب سبب الرفض بوضوح ليظهر للموظف...' : 'اكتب ملاحظة القرار (اختياري)...'} /></label><div className="hr-decision-actions"><button className="table-action" disabled={decisionBusy} onClick={() => setDecisionModal(null)}>إلغاء</button><button className={decisionModal.decision === 'REJECT' ? 'table-action danger hr-primary-decision' : 'table-action hr-primary-decision'} disabled={decisionBusy || (decisionModal.decision === 'REJECT' && decisionComment.trim().length < 3)} onClick={() => void submitDecision()}>{decisionBusy ? 'جاري التنفيذ...' : decisionModal.decision === 'REJECT' ? 'تأكيد الرفض' : 'تأكيد الاعتماد'}</button></div></div></div>}
     </section>
   );
 }
