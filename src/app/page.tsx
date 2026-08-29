@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { api, apiMultipart } from '@/lib/api';
-import { apiCacheKey, cacheGet, cacheSet, syncAttendanceQueue, pendingAttendanceCount, clearOfflineData, clearOfflineCache, getOfflineUserId, setOfflineUserId } from '@/lib/offline';
+import { apiCacheKey, cacheGet, cacheSet, syncAttendanceQueue, pendingAttendanceCount, failedAttendanceCount, lastFailedAttendance, clearOfflineData, clearOfflineCache, getOfflineUserId, setOfflineUserId } from '@/lib/offline';
 import { navByRole, roleLabels } from '@/components/hr/constants';
 import ManagerDashboard from '@/components/hr/Dashboard';
 import DashboardHome from '@/components/hr/DashboardHome';
@@ -101,6 +101,7 @@ export default function Home() {
   const [notice, setNotice] = useState('');
   const [isOffline, setIsOffline] = useState(false);
   const [pendingSync, setPendingSync] = useState(0);
+  const [failedSync, setFailedSync] = useState(0);
   const APP_TIMEZONE = 'Africa/Cairo';
 
   const [newUsername, setNewUsername] = useState('');
@@ -161,7 +162,9 @@ export default function Home() {
   useEffect(() => {
     const updateNetwork = async () => {
       setIsOffline(!navigator.onLine);
-      setPendingSync(await pendingAttendanceCount(me?.user?.user_id || null).catch(() => 0));
+      const uid = me?.user?.user_id || null;
+      setPendingSync(await pendingAttendanceCount(uid).catch(() => 0));
+      setFailedSync(await failedAttendanceCount(uid).catch(() => 0));
     };
     void updateNetwork();
 
@@ -175,8 +178,14 @@ export default function Home() {
         currentUserId,
       );
       setPendingSync(result.pending);
+      setFailedSync(await failedAttendanceCount(currentUserId).catch(() => 0));
       if (result.synced > 0) {
-        setNotice(`تمت مزامنة ${result.synced} عملية حضور وانصراف`);
+        setNotice(`تمت مزامنة ${result.synced} عملية حضور وانصراف بنجاح`);
+        try { await load(); } catch {}
+      }
+      if (result.failed > 0) {
+        const failedItem = await lastFailedAttendance(currentUserId);
+        setError(`تعذر تسجيل ${failedItem?.action === 'check_out' ? 'الانصراف' : 'الحضور'} الذي تم حفظه دون اتصال: ${failedItem?.lastError || result.lastError || 'رفض الخادم العملية'}`);
         try { await load(); } catch {}
       }
     };
@@ -1141,8 +1150,11 @@ export default function Home() {
             {isOffline
               ? `وضع العمل بدون إنترنت — البيانات المعروضة من آخر مزامنة${pendingSync ? ` • ${pendingSync} عملية حضور بانتظار المزامنة` : ''}`
               : `${pendingSync} عملية حضور وانصراف بانتظار المزامنة`}
-            {!isOffline && pendingSync > 0 && (
-              <button type="button" onClick={async () => { const r = await syncAttendanceQueue(async (action, payload) => api(action, payload, { offlineSync: true }), getOfflineUserId()); setPendingSync(r.pending); if (r.synced) { setNotice(`تمت مزامنة ${r.synced} عملية`); await load(); } }}>مزامنة الآن</button>
+            {!isOffline && (pendingSync > 0 || failedSync > 0) && (
+              <button type="button" onClick={async () => { const r = await syncAttendanceQueue(async (action, payload) => api(action, payload, { offlineSync: true }), getOfflineUserId()); const uid = getOfflineUserId(); setPendingSync(r.pending); setFailedSync(await failedAttendanceCount(uid).catch(() => 0)); if (r.synced) setNotice(`تمت مزامنة ${r.synced} عملية حضور وانصراف بنجاح`); if (r.failed) setError(`تم رفض ${r.failed} عملية تمت أثناء عدم الاتصال: ${r.lastError || 'راجع تفاصيل العملية'}`); await load(); }}>مزامنة الآن</button>
+            )}
+            {!isOffline && failedSync > 0 && (
+              <span> • {failedSync} عملية مرفوضة تحتاج مراجعة</span>
             )}
           </div>
         )}

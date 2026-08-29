@@ -18,6 +18,17 @@ function offlineError() {
 
 export type ApiOptions = { offlineSync?: boolean };
 
+export class ApiRequestError extends Error {
+  status: number;
+  permanent: boolean;
+  constructor(message: string, status = 0) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.status = status;
+    this.permanent = [400, 403, 409, 422].includes(status);
+  }
+}
+
 export async function api<T = unknown>(
   action: string,
   payload: Record<string, unknown> = {},
@@ -72,7 +83,7 @@ export async function api<T = unknown>(
         await clearOfflineCache();
       }
 
-      throw new Error(message);
+      throw new ApiRequestError(message, res.status);
     }
 
     if (action === 'me' && (result.data as any)?.user?.user_id) {
