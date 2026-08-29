@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { getSession, errorResponse, writeAudit } from "@/server/hr/core";
 import { handleAction } from "@/server/hr/router";
 import { createLeave } from "@/server/hr/leaves";
-import { SESSION_COOKIE, clearSessionCookie } from "@/server/hr/auth";
+import { SESSION_COOKIE } from "@/server/hr/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
