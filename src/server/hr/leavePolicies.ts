@@ -1,4 +1,4 @@
-import { supabase, success, errorResponse, generateId, nowISO, riyadhDate, writeAudit } from "./core";
+import { supabase, success, errorResponse, generateId, nowISO, appDate, writeAudit } from "./core";
 import type { SessionContext } from "./core";
 
 const RESIDENCY = ["EXPATRIATE", "RESIDENT"];
@@ -21,7 +21,7 @@ export async function listEmployeeLeaveBalances(session: SessionContext, employe
   const { data: employee, error: employeeError } = await supabase.from("employees").select("employee_id,residency_type,hire_date").eq("employee_id", id).maybeSingle();
   if (employeeError) return errorResponse("تعذر تحميل بيانات الموظف",500);
   if (!employee) return errorResponse("الموظف غير موجود",404);
-  const today = riyadhDate();
+  const today = appDate();
   const residency = employee.residency_type || "RESIDENT";
   const { data: policies, error: policyError } = await supabase.from("leave_policies")
     .select("*,leave_types(name)")
@@ -64,7 +64,7 @@ export async function createLeavePolicy(session: SessionContext, body: Record<st
   const residency = body.residency_type ? String(body.residency_type) : null;
   const method = String(body.accrual_method || "ANNUAL");
   const basis = String(body.accrual_basis || "CALENDAR_DAYS");
-  const effectiveFrom = String(body.effective_from || riyadhDate());
+  const effectiveFrom = String(body.effective_from || appDate());
   if (!name || !leaveTypeId) return errorResponse("اسم اللائحة ونوع الإجازة مطلوبان");
   if (residency && !RESIDENCY.includes(residency)) return errorResponse("نوع الإقامة غير صحيح");
   if (!METHODS.includes(method) || !BASES.includes(basis)) return errorResponse("طريقة احتساب اللائحة غير صحيحة");

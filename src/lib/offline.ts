@@ -3,14 +3,17 @@
 type CacheEntry = { key: string; value: unknown; updatedAt: number };
 type QueueItem = {
   id: string;
+  userId: string;
   action: 'check_in' | 'check_out';
   payload: Record<string, unknown>;
   createdAt: number;
   attempts: number;
+  lastError?: string;
 };
 
 const DB_NAME = 'elnuby-hr-offline';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
+const ACTIVE_USER_KEY = 'elnuby_hr_offline_user_id';
 const CACHE_STORE = 'api_cache';
 const QUEUE_STORE = 'attendance_queue';
 
@@ -28,12 +31,34 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
+export function setOfflineUserId(userId: string | null) {
+  try {
+    if (typeof window === 'undefined') return;
+    if (userId) window.localStorage.setItem(ACTIVE_USER_KEY, userId);
+    else window.localStorage.removeItem(ACTIVE_USER_KEY);
+  } catch {}
+}
+
+export function getOfflineUserId(): string | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    return window.localStorage.getItem(ACTIVE_USER_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function scopedCacheKey(key: string) {
+  const userId = getOfflineUserId();
+  return userId ? `user:${userId}:${key}` : `anonymous:${key}`;
+}
+
 export async function cacheSet(key: string, value: unknown) {
   try {
     const db = await openDb();
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(CACHE_STORE, 'readwrite');
-      tx.objectStore(CACHE_STORE).put({ key, value, updatedAt: Date.now() } satisfies CacheEntry);
+      tx.objectStore(CACHE_STORE).put({ key: scopedCacheKey(key), value, updatedAt: Date.now() } satisfies CacheEntry);
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
@@ -46,7 +71,7 @@ export async function cacheGet<T = unknown>(key: string): Promise<T | undefined>
     const db = await openDb();
     const value = await new Promise<T | undefined>((resolve, reject) => {
       const tx = db.transaction(CACHE_STORE, 'readonly');
-      const req = tx.objectStore(CACHE_STORE).get(key);
+      const req = tx.objectStore(CACHE_STORE).get(scopedCacheKey(key));
       req.onsuccess = () => resolve(req.result?.value as T | undefined);
       req.onerror = () => reject(req.error);
     });
@@ -58,8 +83,10 @@ export async function cacheGet<T = unknown>(key: string): Promise<T | undefined>
 }
 
 export async function queueAttendance(action: 'check_in' | 'check_out', payload: Record<string, unknown>) {
+  const userId = getOfflineUserId();
+  if (!userId) throw new Error('لا توجد جلسة مستخدم محفوظة لإجراء الحضور دون اتصال. افتح التطبيق مع الإنترنت وسجّل الدخول أولًا.');
   const id = String(payload.client_event_id || crypto.randomUUID());
-  const item: QueueItem = { id, action, payload: { ...payload, client_event_id: id }, createdAt: Date.now(), attempts: 0 };
+  const item: QueueItem = { id, userId, action, payload: { ...payload, client_event_id: id }, createdAt: Date.now(), attempts: 0 }; 
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(QUEUE_STORE, 'readwrite');
@@ -71,12 +98,15 @@ export async function queueAttendance(action: 'check_in' | 'check_out', payload:
   return item;
 }
 
-export async function getQueuedAttendance(): Promise<QueueItem[]> {
+export async function getQueuedAttendance(userId?: string | null): Promise<QueueItem[]> {
   const db = await openDb();
   const rows = await new Promise<QueueItem[]>((resolve, reject) => {
     const tx = db.transaction(QUEUE_STORE, 'readonly');
     const req = tx.objectStore(QUEUE_STORE).getAll();
-    req.onsuccess = () => resolve((req.result || []).sort((a, b) => a.createdAt - b.createdAt));
+    req.onsuccess = () => {
+        const rows = (req.result || []) as QueueItem[];
+        resolve(rows.filter((row) => !userId || row.userId === userId).sort((a, b) => a.createdAt - b.createdAt));
+      };
     req.onerror = () => reject(req.error);
   });
   db.close();
@@ -94,13 +124,20 @@ async function removeQueueItem(id: string) {
   db.close();
 }
 
-export async function pendingAttendanceCount() {
-  return (await getQueuedAttendance()).length;
+export async function pendingAttendanceCount(userId?: string | null) {
+  return (await getQueuedAttendance(userId ?? getOfflineUserId())).length;
 }
 
-export async function syncAttendanceQueue(sender: (action: string, payload: Record<string, unknown>) => Promise<unknown>) {
-  if (typeof navigator !== 'undefined' && !navigator.onLine) return { synced: 0, pending: await pendingAttendanceCount() };
-  const items = await getQueuedAttendance();
+export async function syncAttendanceQueue(
+  sender: (action: QueueItem['action'], payload: Record<string, unknown>) => Promise<unknown>,
+  userId = getOfflineUserId(),
+) {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return { synced: 0, pending: await pendingAttendanceCount(userId) };
+  }
+  if (!userId) return { synced: 0, pending: 0 };
+
+  const items = await getQueuedAttendance(userId);
   let synced = 0;
   for (const item of items) {
     try {
@@ -108,14 +145,34 @@ export async function syncAttendanceQueue(sender: (action: string, payload: Reco
       await removeQueueItem(item.id);
       synced += 1;
     } catch (error: any) {
-      const message = String(error?.message || '');
-      // Keep authentication, validation and server errors visible to the user.
-      // We stop here to preserve strict chronological ordering (check-in before check-out).
-      if (/جلسة|مصادقة|Authentication|session|401|403/i.test(message)) break;
+      const message = String(error?.message || 'تعذر مزامنة العملية');
+      // Never delete pending attendance because of an expired session.
+      // The user can log back in and retry the exact same idempotent event.
+      await updateQueueItem(item.id, { attempts: item.attempts + 1, lastError: message.slice(0, 500) });
       break;
     }
   }
-  return { synced, pending: await pendingAttendanceCount() };
+  return { synced, pending: await pendingAttendanceCount(userId) };
+}
+
+async function updateQueueItem(id: string, patch: Partial<QueueItem>) {
+  const db = await openDb();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(QUEUE_STORE, 'readwrite');
+      const store = tx.objectStore(QUEUE_STORE);
+      const req = store.get(id);
+      req.onsuccess = () => {
+        const current = req.result as QueueItem | undefined;
+        if (current) store.put({ ...current, ...patch });
+      };
+      req.onerror = () => reject(req.error);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } finally {
+    db.close();
+  }
 }
 
 export function apiCacheKey(action: string, payload: Record<string, unknown>) {
@@ -128,6 +185,19 @@ export function apiCacheKey(action: string, payload: Record<string, unknown>) {
  * rejects the current session. This prevents data from one account being
  * displayed to another account on the same browser.
  */
+export async function clearOfflineCache() {
+  try {
+    const db = await openDb();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(CACHE_STORE, 'readwrite');
+      tx.objectStore(CACHE_STORE).clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  } catch {}
+}
+
 export async function clearOfflineData() {
   try {
     const db = await openDb();
@@ -159,6 +229,7 @@ export async function clearOfflineData() {
         }
       }
     }
+    try { window.localStorage.removeItem(ACTIVE_USER_KEY); } catch {}
   } catch {
     // Storage cleanup is best-effort.
   }

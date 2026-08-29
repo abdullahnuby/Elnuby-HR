@@ -82,10 +82,11 @@ export function success(data: unknown, status = 200) {
 }
 
 export function errorResponse(message: string, status = 400) {
+  const safeMessage = status >= 500 ? "حدث خطأ داخلي. حاول مرة أخرى." : message;
   return NextResponse.json(
     {
       ok: false,
-      error: message,
+      error: safeMessage,
     },
     { status }
   );
@@ -170,9 +171,17 @@ export function appTime() {
   }).format(new Date());
 }
 
-export const riyadhDate = appDate;
-export const previousRiyadhDate = previousAppDate;
-export const riyadhTime = appTime;
+
+export function normalizeTimeInput(value: unknown): string {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const match = raw.match(/(?:T|\s)?(\d{2}):(\d{2})/);
+  if (!match) return "";
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return "";
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
 
 export function isTimeWithinWindow(current: string, open: string, close: string) {
   const c = timeToMinutes(current), o = timeToMinutes(open), cl = timeToMinutes(close);
@@ -271,10 +280,14 @@ export async function getSession(
     return null;
   }
 
+  // Sliding server-side session: refreshing/using the app keeps an active
+  // session alive while the browser cookie remains valid.
+  const refreshedExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
   await publicSupabase
     .from("app_sessions")
     .update({
       last_used_at: nowISO(),
+      expires_at: refreshedExpiry,
     })
     .eq("session_id", session.session_id);
 
@@ -376,7 +389,7 @@ export async function getManagedProjectIds(
     return [];
   }
 
-  const today = riyadhDate();
+  const today = appDate();
 
   const tables = user.role === "SECTOR_MANAGER"
     ? ["sector_manager_projects"]
@@ -471,7 +484,7 @@ export async function getCurrentEmployeeShift(
   employeeId: string,
   projectId: string
 ) {
-  const today = riyadhDate();
+  const today = appDate();
 
   const { data, error } = await supabase
     .from("employee_shifts")

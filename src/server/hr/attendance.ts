@@ -1,5 +1,5 @@
 import { parsePagination } from "./core";
-import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, riyadhDate, previousRiyadhDate, riyadhTime, timeToMinutes, minutesBetween, isTimeWithinWindow, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift } from "./core";
+import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, appDate, previousAppDate, appTime, APP_TIMEZONE, timeToMinutes, minutesBetween, isTimeWithinWindow, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
 export async function attendanceList(
@@ -149,25 +149,19 @@ export async function attendanceAction(
     );
   }
 
-  const latitude = Number(
-    body.latitude
-  );
+  const latitude = Number(body.latitude);
+  const longitude = Number(body.longitude);
+  const gpsAccuracy = Number(body.gps_accuracy_m);
 
-  const longitude = Number(
-    body.longitude
-  );
+  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return errorResponse('إحداثيات GPS خارج النطاق الصحيح');
+  }
+  if (!Number.isFinite(gpsAccuracy) || gpsAccuracy < 0 || gpsAccuracy > 500) {
+    return errorResponse('دقة GPS غير كافية. فعّل تحديد الموقع بدقة عالية وحاول مرة أخرى.');
+  }
 
-  if (
-    !Number.isFinite(
-      latitude
-    ) ||
-    !Number.isFinite(
-      longitude
-    )
-  ) {
-    return errorResponse(
-      "إحداثيات GPS غير صحيحة"
-    );
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return errorResponse('إحداثيات GPS غير صحيحة');
   }
 
   if (
@@ -192,10 +186,11 @@ export async function attendanceAction(
       0
   );
 
-  if (
-    radius > 0 &&
-    distance > radius
-  ) {
+  if (radius <= 0 || radius < 1) {
+    return errorResponse('نطاق GPS للمشروع غير مضبوط بشكل صحيح');
+  }
+
+  if (distance + gpsAccuracy > radius) {
     return errorResponse(
       `أنت خارج نطاق موقع المشروع (${Math.round(
         distance
@@ -205,10 +200,20 @@ export async function attendanceAction(
 
   const clientEventId = String(body.client_event_id || '').trim() || null;
   const clientRecordedAt = String(body.client_recorded_at || '').trim() || null;
-  const offlineSource = String(body.offline_source || '').toUpperCase() === 'OFFLINE_SYNC';
+  const gpsTimestamp = String(body.gps_timestamp || '').trim() || clientRecordedAt;
+  const offlineSource = body.__offline_sync === true && String(body.offline_source || '').toUpperCase() === 'OFFLINE_SYNC';
 
-  let eventDate = riyadhDate();
-  let eventTime = riyadhTime();
+  if (gpsTimestamp) {
+    const gpsParsed = new Date(gpsTimestamp);
+    if (Number.isNaN(gpsParsed.getTime())) return errorResponse('وقت GPS غير صالح');
+    const gpsAge = Date.now() - gpsParsed.getTime();
+    if (gpsAge < -5 * 60 * 1000 || gpsAge > 7 * 24 * 60 * 60 * 1000) {
+      return errorResponse('وقت GPS غير صالح أو خارج المدة المسموح بها');
+    }
+  }
+
+  let eventDate = appDate();
+  let eventTime = appTime();
   if (offlineSource && clientRecordedAt) {
     const parsed = new Date(clientRecordedAt);
     if (!Number.isNaN(parsed.getTime())) {
@@ -216,13 +221,13 @@ export async function attendanceAction(
       if (ageMs < -5 * 60 * 1000 || ageMs > 7 * 24 * 60 * 60 * 1000) {
         return errorResponse('وقت التسجيل غير صالح أو أقدم من الحد المسموح للمزامنة');
       }
-      eventDate = new Intl.DateTimeFormat('en-CA', { timeZone: process.env.APP_TIMEZONE || 'Africa/Cairo', year:'numeric', month:'2-digit', day:'2-digit' }).format(parsed);
-      eventTime = new Intl.DateTimeFormat('en-GB', { timeZone: process.env.APP_TIMEZONE || 'Africa/Cairo', hour:'2-digit', minute:'2-digit', hour12:false }).format(parsed);
+      eventDate = new Intl.DateTimeFormat('en-CA', { timeZone: APP_TIMEZONE, year:'numeric', month:'2-digit', day:'2-digit' }).format(parsed);
+      eventTime = new Intl.DateTimeFormat('en-GB', { timeZone: APP_TIMEZONE, hour:'2-digit', minute:'2-digit', hour12:false }).format(parsed);
     }
   }
 
-  const overnightAttendance=timeToMinutes(String(shift.attendance_close))<timeToMinutes(String(shift.attendance_open));
-  const attendanceDate=overnightAttendance&&timeToMinutes(eventTime)<timeToMinutes(String(shift.attendance_open))?previousRiyadhDate(eventDate):eventDate;
+  const overnightAttendance = timeToMinutes(String(shift.attendance_close)) < timeToMinutes(String(shift.attendance_open));
+  const attendanceDate=overnightAttendance&&timeToMinutes(eventTime)<timeToMinutes(String(shift.attendance_open))?previousAppDate(eventDate):eventDate;
   const {data:existing}=await supabase.from("attendance").select("*").eq("employee_id",employeeId).eq("date",attendanceDate).maybeSingle();
 
   /* ======================
@@ -295,10 +300,8 @@ export async function attendanceAction(
             latitude,
           check_in_lng:
             longitude,
-          check_in_distance_m:
-            Math.round(
-              distance
-            ),
+          check_in_distance_m: Math.round(distance),
+          check_in_accuracy_m: Math.round(gpsAccuracy),
           status:
             isLate
               ? "LATE"
@@ -391,10 +394,8 @@ export async function attendanceAction(
           latitude,
         check_out_lng:
           longitude,
-        check_out_distance_m:
-          Math.round(
-            distance
-          ),
+        check_out_distance_m: Math.round(distance),
+        check_out_accuracy_m: Math.round(gpsAccuracy),
         worked_minutes:
           workedMinutes,
         check_out_event_id: clientEventId,
@@ -435,7 +436,7 @@ export async function attendanceAction(
 ========================================================= */
 
 export async function autoCheckoutOpenAttendance() {
-  const today=riyadhDate(); const previousDate=previousRiyadhDate(today); const currentTime=riyadhTime(); const currentMinutes=timeToMinutes(currentTime);
+  const today=appDate(); const previousDate=previousAppDate(today); const currentTime=appTime(); const currentMinutes=timeToMinutes(currentTime);
   const {data:rows,error}=await supabase.from("attendance")
     .select("attendance_id,employee_id,check_in,check_out,date,auto_closed,shift_id,shifts(auto_checkout_time,attendance_open,attendance_close)")
     .in("date",[today,previousDate])
@@ -451,7 +452,22 @@ export async function autoCheckoutOpenAttendance() {
   let closed = 0;
   for (const row of rows || []) {
     const autoTime = (row as any).shifts?.auto_checkout_time;
-    const autoMinutes=timeToMinutes(autoTime); if(!autoTime) continue; const rs=(row as any).shifts||{}; const overnight=timeToMinutes(String(rs.attendance_close||'00:00'))<timeToMinutes(String(rs.attendance_open||'23:59')); const eligible=overnight&&String(row.date)===previousDate?(currentMinutes<=autoMinutes||currentMinutes>=timeToMinutes(String(rs.attendance_open||'23:59'))):currentMinutes>=autoMinutes; if(!eligible) continue;
+    if (!autoTime) continue;
+
+    const rs = (row as any).shifts || {};
+    const autoMinutes = timeToMinutes(String(autoTime));
+    const shiftOvernight = timeToMinutes(String(rs.attendance_close || "00:00")) < timeToMinutes(String(rs.attendance_open || "23:59"));
+    const rowDate = String(row.date);
+
+    // For an overnight shift the auto-checkout time belongs to the following
+    // calendar day. A previous-day attendance is therefore eligible once the
+    // current clock reaches the auto-checkout time. Today's overnight record is
+    // intentionally left open until tomorrow's auto-checkout window.
+    const eligible = shiftOvernight
+      ? rowDate === previousDate && currentMinutes >= autoMinutes
+      : rowDate === today && currentMinutes >= autoMinutes;
+
+    if (!eligible) continue;
 
     const workedMinutes = minutesBetween(String(row.check_in), String(autoTime));
     const { error: updateError } = await supabase
@@ -463,7 +479,8 @@ export async function autoCheckoutOpenAttendance() {
         updated_at: nowISO(),
       })
       .eq("attendance_id", row.attendance_id)
-      .is("check_out", null);
+      .is("check_out", null)
+      .eq("auto_closed", false);
 
     if (updateError) {
       console.error("auto checkout update:", updateError);
@@ -493,11 +510,17 @@ export async function closeAttendance(
   if (!row) throw new Error('سجل الحضور غير موجود');
   if (row.check_out) return { ok: true, closed: false, already_closed: true };
 
+  const closeTime = appTime();
+  const workedMinutes = row.check_in ? minutesBetween(String(row.check_in), closeTime) : 0;
   const { error: updateError } = await supabase
     .from('attendance')
     .update({
-      check_out: riyadhTime(),
+      check_out: closeTime,
+      worked_minutes: workedMinutes,
       auto_closed: false,
+      manual_modified: true,
+      modified_by: session.user.user_id,
+      modified_at: nowISO(),
       status: 'MANUAL_CLOSED',
       updated_at: nowISO(),
     })

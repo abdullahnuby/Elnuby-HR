@@ -1,12 +1,21 @@
-import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, riyadhDate, riyadhTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift, writeAudit } from "./core";
+import { supabase, success, errorResponse, generateId, nowISO, writeAudit } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
-export async function listShifts(_body: Record<string, unknown> = {}) {
-  const { data, error } =
-    await supabase
-      .from("shifts")
-      .select("*")
-      .order("name");
+export async function listShifts(session: SessionContext, _body: Record<string, unknown> = {}) {
+  if (session.user.role === "EMPLOYEE") {
+    const { data: assignmentRows, error: assignmentError } = await supabase
+      .from("employee_shifts")
+      .select("shift_id")
+      .eq("employee_id", session.user.employee_id || "");
+    if (assignmentError) return errorResponse("تعذر تحميل ورديات الموظف", 500);
+    const ids = [...new Set((assignmentRows || []).map((r: any) => r.shift_id).filter(Boolean))];
+    if (!ids.length) return success([]);
+    const { data, error } = await supabase.from("shifts").select("*").in("shift_id", ids).order("name");
+    if (error) return errorResponse("تعذر تحميل الورديات", 500);
+    return success(data || []);
+  }
+
+  const { data, error } = await supabase.from("shifts").select("*").order("name");
 
   if (error) {
     return errorResponse(

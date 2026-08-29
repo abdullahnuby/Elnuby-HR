@@ -1,10 +1,10 @@
-import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, riyadhDate, riyadhTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift } from "./core";
+import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, appDate, appTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
 export async function getDashboard(
   session: SessionContext
 ) {
-  const today = riyadhDate();
+  const today = appDate();
 
   let employeeIds: string[] = [];
 
@@ -129,7 +129,7 @@ export async function getProjectManagerDashboard(
     });
   }
 
-  const today = riyadhDate();
+  const today = appDate();
 
   const [projectsResult, assignmentsResult, attendanceResult, leaveResult, permissionResult] =
     await Promise.all([

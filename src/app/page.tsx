@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { api, apiMultipart } from '@/lib/api';
-import { cacheGet, cacheSet, syncAttendanceQueue, pendingAttendanceCount, clearOfflineData } from '@/lib/offline';
+import { cacheGet, cacheSet, syncAttendanceQueue, pendingAttendanceCount, clearOfflineData, clearOfflineCache, getOfflineUserId, setOfflineUserId } from '@/lib/offline';
 import { navByRole, roleLabels } from '@/components/hr/constants';
 import ManagerDashboard from '@/components/hr/Dashboard';
 import DashboardHome from '@/components/hr/DashboardHome';
@@ -101,6 +101,7 @@ export default function Home() {
   const [notice, setNotice] = useState('');
   const [isOffline, setIsOffline] = useState(false);
   const [pendingSync, setPendingSync] = useState(0);
+  const APP_TIMEZONE = 'Africa/Cairo';
 
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -160,13 +161,19 @@ export default function Home() {
   useEffect(() => {
     const updateNetwork = async () => {
       setIsOffline(!navigator.onLine);
-      setPendingSync(await pendingAttendanceCount().catch(() => 0));
+      setPendingSync(await pendingAttendanceCount(me?.user?.user_id || null).catch(() => 0));
     };
-    updateNetwork();
+    void updateNetwork();
 
     const sync = async () => {
-      if (!navigator.onLine) return;
-      const result = await syncAttendanceQueue(async (action, payload) => api(action, payload));
+      // Never sync before the current authenticated identity is known.
+      // This prevents a device queue from being sent using another account.
+      const currentUserId = String(me?.user?.user_id || '');
+      if (!currentUserId || !navigator.onLine) return;
+      const result = await syncAttendanceQueue(
+        async (action, payload) => api(action, payload, { offlineSync: true }),
+        currentUserId,
+      );
       setPendingSync(result.pending);
       if (result.synced > 0) {
         setNotice(`تمت مزامنة ${result.synced} عملية حضور وانصراف`);
@@ -187,28 +194,57 @@ export default function Home() {
       window.removeEventListener('offline', offline);
       window.clearInterval(syncTimer);
     };
-  }, []);
+  }, [me?.user?.user_id]);
 
   useEffect(() => {
     let cancelled = false;
 
+    const restoreCachedOfflineSession = async (degradedNetwork = false) => {
+      const cachedMe: any = await cacheGet('me');
+      if (cancelled || !cachedMe?.user?.user_id) return false;
+      setOfflineUserId(String(cachedMe.user.user_id));
+      setMe(cachedMe);
+      const cachedDashboard: any = await cacheGet('dashboard');
+      const cachedManagerDashboard: any = await cacheGet('project_manager_dashboard');
+      if (!cancelled) {
+        if (cachedDashboard) setDash(cachedDashboard);
+        if (cachedManagerDashboard) setManagerDash(cachedManagerDashboard);
+        setPendingSync(await pendingAttendanceCount(String(cachedMe.user.user_id)).catch(() => 0));
+        setIsOffline(!navigator.onLine || degradedNetwork);
+        setNotice(
+          !navigator.onLine
+            ? 'أنت تعمل دون اتصال. البيانات المعروضة من آخر مزامنة محفوظة على الجهاز.'
+            : 'تعذر الوصول للخادم مؤقتًا. تم عرض آخر بيانات محفوظة، وستعود المزامنة تلقائيًا.'
+        );
+      }
+      return true;
+    };
+
     (async () => {
+      // A refresh while offline must restore the last authenticated app state,
+      // not interpret network absence as logout.
+      if (!navigator.onLine && await restoreCachedOfflineSession()) return;
+
       try {
         const status: any = await api('session_status');
-        if (cancelled || !status?.authenticated) {
-          await clearOfflineData();
-          if (!cancelled) {
-            setMe(null);
-            setDash(null);
-            setManagerDash(null);
-          }
+        if (cancelled) return;
+        if (!status?.authenticated) {
+          await clearOfflineCache();
+          setMe(null);
+          setDash(null);
+          setManagerDash(null);
           return;
         }
-        if (!cancelled) await load();
-      } catch {
-        if (!cancelled) {
-          await clearOfflineData();
+        await load();
+      } catch (error: any) {
+        if (cancelled) return;
+        const message = String(error?.message || '');
+        const authFailure = /Authentication required|Invalid session|Session expired|User inactive|الجلسة غير صالحة|منتهية/i.test(message);
+        if (authFailure) {
+          await clearOfflineCache();
           setMe(null);
+        } else if (!(await restoreCachedOfflineSession(true))) {
+          setError(message || 'تعذر الاتصال بالخادم.');
         }
       }
     })();
@@ -371,9 +407,9 @@ export default function Home() {
     try {
       // A new login is a new security context; never reuse cached data from
       // a previous account on this browser.
-      await clearOfflineData();
+      await clearOfflineCache();
 
-      const r: any = await api('login', {
+      await api('login', {
         username,
         password,
       });
@@ -406,10 +442,12 @@ export default function Home() {
             client_event_id: clientEventId,
             client_recorded_at: recordedAt,
             offline_source: navigator.onLine ? 'ONLINE' : 'OFFLINE_SYNC',
+            gps_accuracy_m: Number.isFinite(p.coords.accuracy) ? p.coords.accuracy : null,
+            gps_timestamp: Number.isFinite(p.timestamp) ? new Date(p.timestamp).toISOString() : recordedAt,
           });
 
           if (result?.offlineQueued) {
-            setPendingSync(await pendingAttendanceCount());
+            setPendingSync(await pendingAttendanceCount(getOfflineUserId()));
             setNotice(action === 'check_in'
               ? 'تم حفظ الحضور على الجهاز وسيتم مزامنته تلقائيًا عند عودة الإنترنت'
               : 'تم حفظ الانصراف على الجهاز وسيتم مزامنته تلقائيًا عند عودة الإنترنت');
@@ -420,7 +458,7 @@ export default function Home() {
               void cacheSet('api:dashboard:{}', next);
               void cacheGet<any[]>('api:attendance_list:{}').then((list) => {
                 const rows = Array.isArray(list) ? [...list] : [];
-                const localDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(recordedAt));
+                const localDate = new Intl.DateTimeFormat('en-CA', { timeZone: APP_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(recordedAt));
                 const idx = rows.findIndex((r: any) => r.employee_id === me?.user?.employee_id && r.date === localDate);
                 if (idx >= 0) rows[idx] = { ...rows[idx], ...(action === 'check_in' ? { check_in: time, check_out: null, source: 'OFFLINE_SYNC', pending_sync: true } : { check_out: time, source: 'OFFLINE_SYNC', pending_sync: true }) };
                 else if (action === 'check_in') rows.unshift({ attendance_id: clientEventId, employee_id: me?.user?.employee_id, date: localDate, check_in: time, check_out: null, status: 'PENDING_SYNC', source: 'OFFLINE_SYNC', pending_sync: true });
@@ -447,7 +485,8 @@ export default function Home() {
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
+        maximumAge: 0,
+        timeout: 20000,
       },
     );
   }
@@ -906,8 +945,8 @@ export default function Home() {
       await api('create_permission', {
         permission_type: permissionType,
         date: permissionStart.slice(0, 10),
-        start_time: permissionStart,
-        end_time: permissionEnd,
+        start_time: permissionStart.slice(11, 16),
+        end_time: permissionEnd.slice(11, 16),
         reason: permissionReason,
       });
 
@@ -1103,7 +1142,7 @@ export default function Home() {
               ? `وضع العمل بدون إنترنت — البيانات المعروضة من آخر مزامنة${pendingSync ? ` • ${pendingSync} عملية حضور بانتظار المزامنة` : ''}`
               : `${pendingSync} عملية حضور وانصراف بانتظار المزامنة`}
             {!isOffline && pendingSync > 0 && (
-              <button type="button" onClick={async () => { const r = await syncAttendanceQueue(async (action, payload) => api(action, payload)); setPendingSync(r.pending); if (r.synced) { setNotice(`تمت مزامنة ${r.synced} عملية`); await load(); } }}>مزامنة الآن</button>
+              <button type="button" onClick={async () => { const r = await syncAttendanceQueue(async (action, payload) => api(action, payload, { offlineSync: true }), getOfflineUserId()); setPendingSync(r.pending); if (r.synced) { setNotice(`تمت مزامنة ${r.synced} عملية`); await load(); } }}>مزامنة الآن</button>
             )}
           </div>
         )}

@@ -19,9 +19,9 @@ export const EXCEL_TABLES: Record<string, TableConfig> = {
   },
   employee_residency_history: {
     label: "تاريخ نوع إقامة الموظفين",
-    columns: ["id","employee_id","residency_type","effective_from","effective_to","created_at"],
-    required: ["id","employee_id","residency_type","effective_from"],
-    key: "id", importable: true,
+    columns: ["history_id","employee_id","residency_type","effective_from","effective_to","created_at"],
+    required: ["history_id","employee_id","residency_type","effective_from"],
+    key: "history_id", importable: true,
   },
   projects: {
     label: "المشروعات",

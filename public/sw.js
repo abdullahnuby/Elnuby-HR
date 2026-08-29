@@ -1,4 +1,4 @@
-const CACHE = 'elnuby-hr-shell-v1';
+const CACHE = 'elnuby-hr-shell-v2';
 const STATIC = [
   '/',
   '/icon.svg',

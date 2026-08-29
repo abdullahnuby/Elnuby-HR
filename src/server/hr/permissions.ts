@@ -1,5 +1,5 @@
 import { parsePagination } from "./core";
-import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, riyadhDate, riyadhTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift } from "./core";
+import { supabase, success, errorResponse, generateId, nowISO, appDate, appTime, timeToMinutes, minutesBetween, getManagedProjectIds, canManageProject, getCurrentAssignment, normalizeTimeInput } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
 export async function permissionList(
@@ -85,16 +85,12 @@ export async function createPermission(
 
   const date = String(
     body.date ||
-      riyadhDate()
+      appDate()
   );
 
-  const startTime = String(
-    body.start_time || ""
-  );
+  const startTime = normalizeTimeInput(body.start_time);
 
-  const endTime = String(
-    body.end_time || ""
-  );
+  const endTime = normalizeTimeInput(body.end_time);
 
   if (
     !startTime ||
@@ -105,11 +101,17 @@ export async function createPermission(
     );
   }
 
-  const minutes =
-    minutesBetween(
-      startTime,
-      endTime
-    );
+  if (date.length !== 10 || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return errorResponse("تاريخ الإذن غير صحيح");
+  }
+
+  const startMinutes = timeToMinutes(startTime);
+  const endMinutes = timeToMinutes(endTime);
+  if (endMinutes <= startMinutes) {
+    return errorResponse("وقت بداية الإذن يجب أن يسبق وقت نهايته في نفس اليوم");
+  }
+
+  const minutes = minutesBetween(startTime, endTime);
 
   if (minutes <= 0) {
     return errorResponse(
@@ -151,6 +153,7 @@ export async function createPermission(
         end_time:
           endTime,
         minutes,
+        permission_type: String(body.permission_type || "GENERAL").trim() || "GENERAL",
         reason:
           body.reason ||
           null,

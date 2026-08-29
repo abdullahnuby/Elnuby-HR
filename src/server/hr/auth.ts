@@ -8,7 +8,7 @@ import {
   generateId,
   sha256,
   nowISO,
-  riyadhDate,
+  appDate,
   getCurrentAssignment,
   getCurrentEmployeeShift,
   verifyPassword,
@@ -18,7 +18,7 @@ import {
 import type { SessionContext } from "./core";
 
 export const SESSION_COOKIE = "elnuby_hr_session";
-export const SESSION_MAX_AGE = 24 * 60 * 60;
+export const SESSION_MAX_AGE = 7 * 24 * 60 * 60;
 
 async function setSessionCookie(token: string) {
   const store = await cookies();

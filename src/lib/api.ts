@@ -1,4 +1,4 @@
-import { apiCacheKey, cacheGet, cacheSet, queueAttendance, clearOfflineData } from './offline';
+import { apiCacheKey, cacheGet, cacheSet, queueAttendance, clearOfflineCache, setOfflineUserId } from './offline';
 
 export type ApiResponse<T = unknown> = {
   ok: boolean;
@@ -16,9 +16,12 @@ function offlineError() {
   return new Error('لا يوجد اتصال بالإنترنت. تم الاحتفاظ بالبيانات المحلية، ويمكن تسجيل الحضور والانصراف وسيتم مزامنتهما تلقائيًا عند عودة الشبكة.');
 }
 
+export type ApiOptions = { offlineSync?: boolean };
+
 export async function api<T = unknown>(
   action: string,
   payload: Record<string, unknown> = {},
+  options: ApiOptions = {},
 ): Promise<T> {
   const key = apiCacheKey(action, payload);
   const offline = typeof navigator !== 'undefined' && !navigator.onLine;
@@ -40,6 +43,7 @@ export async function api<T = unknown>(
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
+        ...(options.offlineSync ? { 'X-Offline-Sync': '1' } : {}),
       },
       credentials: 'include',
       cache: 'no-store',
@@ -62,15 +66,18 @@ export async function api<T = unknown>(
             ? 'ليس لديك صلاحية لتنفيذ هذا الإجراء.'
             : 'فشل تنفيذ الطلب.');
 
-      // Never fall back to cached authenticated data after an auth failure.
-      // Otherwise logout/expired sessions can appear logged in again on refresh.
+      // Authentication failure invalidates cached views, but NEVER deletes the
+      // offline attendance queue. A later login must be able to resume sync.
       if (res.status === 401 || /الجلسة غير صالحة|انتهت جلسة|Authentication required|Invalid session|Session expired|User inactive/i.test(message)) {
-        await clearOfflineData();
+        await clearOfflineCache();
       }
 
       throw new Error(message);
     }
 
+    if (action === 'me' && (result.data as any)?.user?.user_id) {
+      setOfflineUserId(String((result.data as any).user.user_id));
+    }
     if (CACHEABLE_ACTIONS.has(action)) await cacheSet(key, result.data);
     return result.data as T;
   } catch (error: any) {
@@ -81,7 +88,7 @@ export async function api<T = unknown>(
       /الجلسة غير صالحة|انتهت جلسة|Authentication required|Invalid session|Session expired|User inactive|401/i.test(message);
 
     if (authFailure) {
-      await clearOfflineData();
+      await clearOfflineCache();
       throw error;
     }
 

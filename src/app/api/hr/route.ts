@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       // produce a noisy 401 or revive stale client state.
       if (action === "session_status") {
         if (!session && cookieToken) await clearSessionCookie();
-        return Response.json({ ok: true, data: { authenticated: Boolean(session) } });
+        return Response.json({ ok: true, data: { authenticated: Boolean(session), user: session?.user || null } });
       }
 
       // Logout is intentionally idempotent: even if the server-side session
@@ -56,6 +56,8 @@ export async function POST(request: Request) {
         return errorResponse("الجلسة غير صالحة أو منتهية", 401);
       }
     }
+
+if (request.headers.get('x-offline-sync') === '1') body.__offline_sync = true;
 
 const result = await handleAction(action, body, session);
 

@@ -209,7 +209,7 @@ export async function handleAction(
 
       if (auth) return auth;
 
-      return listShifts(body);
+      return listShifts(session!, body);
     }
 
     case "update_shift": { const auth = requireRole(session, ADMIN_ROLES); if (auth) return auth; return updateShift(session!, body); }

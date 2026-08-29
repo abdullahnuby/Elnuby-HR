@@ -1,5 +1,5 @@
 import { parsePagination } from "./core";
-import { supabase, publicSupabase, success, errorResponse, generateId, nowISO, riyadhDate, writeAudit } from "./core";
+import { supabase, publicSupabase, success, errorResponse, generateId, nowISO, appDate, writeAudit } from "./core";
 import type { SessionContext } from "./core";
 
 const ACTIVE_PENDING = ["PENDING_MANAGER", "PENDING_HR"];

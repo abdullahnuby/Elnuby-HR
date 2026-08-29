@@ -1,4 +1,4 @@
-import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, riyadhDate, riyadhTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift, writeAudit } from "./core";
+import { supabase, success, errorResponse, generateId, nowISO, appDate, getManagedProjectIds, getCurrentAssignment, writeAudit } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
 export async function listProjects(
@@ -9,6 +9,13 @@ export async function listProjects(
     .from("projects")
     .select("*")
     .order("name");
+
+  if (session.user.role === "EMPLOYEE") {
+    const assignment = await getCurrentAssignment(session.user.employee_id || "");
+    const employeeProjectId = assignment?.project_id || "";
+    if (!employeeProjectId) return success([]);
+    query = query.eq("project_id", employeeProjectId);
+  }
 
   if (["SECTOR_MANAGER", "PROJECT_MANAGER"].includes(session.user.role)) {
     const ids = await getManagedProjectIds(session.user);
@@ -44,13 +51,13 @@ export async function listProjects(
       .from("project_managers")
       .select("id,user_id,project_id,start_date,end_date")
       .in("project_id", projectIds)
-      .or(`end_date.is.null,end_date.gte.${riyadhDate()}`),
+      .or(`end_date.is.null,end_date.gte.${appDate()}`),
 
     supabase
       .from("sector_manager_projects")
       .select("assignment_id,user_id,project_id,start_date,end_date")
       .in("project_id", projectIds)
-      .or(`end_date.is.null,end_date.gte.${riyadhDate()}`),
+      .or(`end_date.is.null,end_date.gte.${appDate()}`),
 
     supabase
       .from("project_assignments")

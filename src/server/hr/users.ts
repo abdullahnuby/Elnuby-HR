@@ -1,6 +1,6 @@
 import { parsePagination } from "./core";
 import crypto from "crypto";
-import { supabase, success, errorResponse, generateId, sha256, passwordHash, securePasswordHash, nowISO, riyadhDate, previousRiyadhDate, riyadhTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, ROLES, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift, writeAudit } from "./core";
+import { supabase, success, errorResponse, generateId, sha256, passwordHash, securePasswordHash, nowISO, appDate, previousAppDate, appTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, ROLES, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift, writeAudit } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
 export async function listDeductions(
@@ -18,6 +18,11 @@ export async function listDeductions(
       }
     )
     .range(from, to);
+
+  if (session.user.role === "EMPLOYEE") {
+    if (!session.user.employee_id) return success([]);
+    query = query.eq("employee_id", session.user.employee_id);
+  }
 
   if (["SECTOR_MANAGER", "PROJECT_MANAGER"].includes(session.user.role)) {
     const ids =
@@ -338,7 +343,7 @@ export async function createUser(
         assignment_id: generateId("SEC"),
         user_id: userId,
         project_id: id,
-        start_date: riyadhDate(),
+        start_date: appDate(),
         end_date: null,
         created_by: session.user.user_id,
         created_at: nowISO(),
@@ -353,7 +358,7 @@ export async function createUser(
           id: generateId("PM"),
           user_id: userId,
           project_id: projectId,
-          start_date: riyadhDate(),
+          start_date: appDate(),
           end_date: null,
           created_at: nowISO(),
         });
@@ -432,7 +437,7 @@ export async function assignSectorManagerProjects(
   // End previous active scope first, then create the requested current scope.
   await supabase
     .from("sector_manager_projects")
-    .update({ end_date: previousRiyadhDate(riyadhDate()) })
+    .update({ end_date: previousAppDate(appDate()) })
     .eq("user_id", userId)
     .is("end_date", null)
     .not("project_id", "in", `(${projectIds.join(",")})`);
@@ -441,7 +446,7 @@ export async function assignSectorManagerProjects(
     assignment_id: generateId("SEC"),
     user_id: userId,
     project_id: projectId,
-    start_date: String(body.start_date || riyadhDate()),
+    start_date: String(body.start_date || appDate()),
     end_date: null,
     created_by: session.user.user_id,
     created_at: nowISO(),
@@ -484,9 +489,16 @@ const ADMIN_ID_COLUMNS: Record<string,string> = {
   employees: "employee_id", projects: "project_id", shifts: "shift_id", users: "id",
   employee_shifts: "assignment_id", project_assignments: "assignment_id", project_managers: "id",
   sector_manager_projects: "assignment_id", project_supervisors: "id", attendance: "attendance_id",
-  leave_types: "leave_type_id", leave_balances: "balance_id", leave_requests: "leave_id",
-  permission_requests: "permission_id", deductions: "id",
+  leave_types: "leave_type_id", leave_balances: "id", leave_requests: "request_id",
+  permission_requests: "request_id", deductions: "id",
 };
+
+const BLOCKED_ADMIN_FIELDS = new Set([
+  "password_hash", "created_at", "updated_at", "last_login",
+  "manager_id", "manager_decision_at", "manager_comment",
+  "hr_decision_at", "hr_comment", "hr_decision",
+  "client_event_id", "check_out_event_id",
+]);
 
 const BLOCKED_RELATION_COLUMNS = new Set([
   "employee_id", "project_id", "shift_id", "user_id", "assignment_id",
@@ -516,7 +528,9 @@ export async function adminInsert(
   if (!table || !row || typeof row !== "object" || Array.isArray(row)) {
     return errorResponse("جدول أو بيانات الإدخال غير صحيحة");
   }
-  const { data, error } = await supabase.from(table).insert(row as Record<string, unknown>).select("*").single();
+  const safeRow = Object.fromEntries(Object.entries(row as Record<string, unknown>).filter(([key]) => !BLOCKED_ADMIN_FIELDS.has(key)));
+  if (!Object.keys(safeRow).length) return errorResponse("لا توجد حقول آمنة للإدخال");
+  const { data, error } = await supabase.from(table).insert(safeRow).select("*").single();
   if (error) return errorResponse(error.message, 500);
   await writeAudit(session.user.user_id, "ADMIN_INSERT", table, String((data as any)?.id || (data as any)?.employee_id || (data as any)?.project_id || ""), { row });
   return success(data, 201);
@@ -532,7 +546,7 @@ export async function adminUpdate(
   const changes = body.changes;
   if (!table || !idColumn || !id || !changes || typeof changes !== "object" || Array.isArray(changes)) return errorResponse("بيانات التعديل غير صحيحة");
   if (ADMIN_ID_COLUMNS[table] !== idColumn) return errorResponse("معرف السجل غير مسموح لهذا الجدول");
-  const safeChanges = Object.fromEntries(Object.entries(changes as Record<string, unknown>).filter(([key]) => !BLOCKED_RELATION_COLUMNS.has(key) && key !== ADMIN_ID_COLUMNS[table]));
+  const safeChanges = Object.fromEntries(Object.entries(changes as Record<string, unknown>).filter(([key]) => !BLOCKED_RELATION_COLUMNS.has(key) && !BLOCKED_ADMIN_FIELDS.has(key) && key !== ADMIN_ID_COLUMNS[table]));
   if (!Object.keys(safeChanges).length) return errorResponse("لا توجد حقول آمنة للتعديل");
   const { data, error } = await supabase.from(table).update(safeChanges).eq(idColumn, id).select("*").maybeSingle();
   if (error) return errorResponse(error.message, 500);

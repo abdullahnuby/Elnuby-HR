@@ -1,8 +1,8 @@
-import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, riyadhDate, riyadhTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift, writeAudit } from "./core";
+import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, appDate, appTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift, writeAudit } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
 function startOfCurrentYear() {
-  return `${riyadhDate().slice(0, 4)}-01-01`;
+  return `${appDate().slice(0, 4)}-01-01`;
 }
 
 export async function listEmployees(
@@ -10,6 +10,11 @@ export async function listEmployees(
   _body: Record<string, unknown> = {},
 ) {
   let employeeIds: string[] | null = null;
+
+  if (session.user.role === "EMPLOYEE") {
+    if (!session.user.employee_id) return success([]);
+    employeeIds = [session.user.employee_id];
+  }
 
   if (["SECTOR_MANAGER", "PROJECT_MANAGER"].includes(session.user.role)) {
     const projectIds = await getManagedProjectIds(session.user);
@@ -24,8 +29,8 @@ export async function listEmployees(
         .select("employee_id")
         .in("project_id", projectIds)
         .eq("is_current", true)
-        .lte("start_date", riyadhDate())
-        .or(`end_date.is.null,end_date.gte.${riyadhDate()}`);
+        .lte("start_date", appDate())
+        .or(`end_date.is.null,end_date.gte.${appDate()}`);
 
     if (assignmentError) {
       console.error("employees assignments:", assignmentError);
@@ -77,7 +82,7 @@ export async function listEmployees(
     .map((employee: any) => employee.employee_id)
     .filter(Boolean);
 
-  const today = riyadhDate();
+  const today = appDate();
 
   const [
     assignmentsResult,
@@ -419,7 +424,7 @@ export async function createEmployee(
 
   const startDate = String(
     body.start_date ||
-      riyadhDate()
+      appDate()
   );
 
   if (projectId) {

@@ -1,5 +1,5 @@
 import { parsePagination } from "./core";
-import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, riyadhDate, previousRiyadhDate, riyadhTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift } from "./core";
+import { supabase, success, errorResponse, generateId, sha256, passwordHash, nowISO, appDate, previousAppDate, appTime, timeToMinutes, minutesBetween, haversineDistance, requireAuth, requireRole, getManagedProjectIds, canManageProject, getCurrentAssignment, getCurrentEmployeeShift } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
 export async function listEmployeeShifts(
@@ -165,7 +165,7 @@ export async function assignEmployeeShift(
     );
   }
 
-  const startDate = String(body.start_date || riyadhDate());
+  const startDate = String(body.start_date || appDate());
 
   if (!(await canManageProject(session.user, projectId))) {
     return errorResponse(
@@ -274,7 +274,7 @@ export async function assignEmployeeShift(
         .from("project_assignments")
         .update({
           is_current: false,
-          end_date: previousRiyadhDate(startDate),
+          end_date: previousAppDate(startDate),
         })
         .eq(
           "assignment_id",
@@ -365,7 +365,7 @@ export async function assignEmployeeShift(
     .from("employee_shifts")
     .update({
       end_date:
-        previousRiyadhDate(startDate),
+        previousAppDate(startDate),
     })
     .eq(
       "employee_id",
@@ -412,7 +412,7 @@ export async function assignEmployeeShift(
       start_date:
         String(
           body.start_date ||
-            riyadhDate()
+            appDate()
         ),
 
       end_date:
@@ -465,7 +465,7 @@ export async function assignEmployeeProject(
     body.project_id || ""
   );
 
-  const startDate = String(body.start_date || riyadhDate());
+  const startDate = String(body.start_date || appDate());
 
   if (!employeeId || !projectId) {
     return errorResponse(
@@ -501,7 +501,7 @@ export async function assignEmployeeProject(
     .update({
       is_current: false,
       end_date:
-        previousRiyadhDate(startDate),
+        previousAppDate(startDate),
     })
     .eq(
       "employee_id",
@@ -551,7 +551,7 @@ export async function assignEmployeeProject(
       .from("employee_shifts")
       .update({
         end_date:
-          previousRiyadhDate(startDate),
+          previousAppDate(startDate),
       })
       .eq(
         "employee_id",
@@ -579,7 +579,7 @@ export async function assignEmployeeProject(
           start_date:
             String(
               body.start_date ||
-                riyadhDate()
+                appDate()
             ),
           end_date:
             null,
@@ -615,7 +615,7 @@ export async function assignManagerProject(
   const projectId = String(
     body.project_id || ""
   );
-  const startDate = String(body.start_date || riyadhDate());
+  const startDate = String(body.start_date || appDate());
 
   if (!userId || !projectId) {
     return errorResponse(
