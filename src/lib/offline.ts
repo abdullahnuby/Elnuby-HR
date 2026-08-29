@@ -12,7 +12,7 @@ type QueueItem = {
 };
 
 const DB_NAME = 'elnuby-hr-offline';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const ACTIVE_USER_KEY = 'elnuby_hr_offline_user_id';
 const CACHE_STORE = 'api_cache';
 const QUEUE_STORE = 'attendance_queue';
@@ -175,8 +175,12 @@ async function updateQueueItem(id: string, patch: Partial<QueueItem>) {
   }
 }
 
-export function apiCacheKey(action: string, payload: Record<string, unknown>) {
+export function apiCacheKey(action: string, payload: Record<string, unknown> = {}) {
   return `api:${action}:${JSON.stringify(payload || {})}`;
+}
+
+export function offlineCacheKey(action: string, payload: Record<string, unknown> = {}) {
+  return apiCacheKey(action, payload);
 }
 
 

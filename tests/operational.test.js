@@ -16,6 +16,9 @@ const vercel = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'
 // 1) Login survives normal refresh through a durable httpOnly cookie + server session.
 assert.ok(auth.includes('httpOnly: true'));
 assert.ok(auth.includes('maxAge: SESSION_MAX_AGE'));
+assert.ok(auth.includes('expires'));
+assert.ok(auth.includes('sameSite: "lax"'));
+assert.ok(route.includes('dynamic = "force-dynamic"'));
 assert.ok(auth.includes('SESSION_MAX_AGE = 7 * 24 * 60 * 60'));
 assert.ok(core.includes('app_sessions'));
 assert.ok(core.includes('refreshedExpiry'));
@@ -23,14 +26,20 @@ assert.ok(core.includes('refreshedExpiry'));
 // 2) Browser refresh while offline restores last authenticated state instead of logging out.
 assert.ok(page.includes('restoreCachedOfflineSession'));
 assert.ok(page.includes("if (!navigator.onLine && await restoreCachedOfflineSession()) return;"));
+assert.ok(page.includes("cacheGet(apiCacheKey('me', {}))"));
+assert.ok(page.includes("cacheGet(apiCacheKey('dashboard', {}))"));
+assert.ok(page.includes("cacheGet(apiCacheKey('project_manager_dashboard', {}))"));
 assert.ok(page.includes('await clearOfflineCache()'));
 assert.ok(!page.includes("if (!cancelled) {\n          await clearOfflineData();"));
 
 // 3) Offline queue survives auth expiry and is account-bound.
 assert.ok(offline.includes('userId: string'));
 assert.ok(offline.includes('getOfflineUserId'));
+assert.ok(offline.includes('const userId = getOfflineUserId();'));
+assert.ok(offline.includes('return `api:${action}:${JSON.stringify(payload || {})}`;'));
 assert.ok(offline.includes('Never delete pending attendance'));
 assert.ok(api.includes('await clearOfflineCache()'));
+assert.ok(api.includes('// Establish the cache namespace BEFORE storing the response.'));
 assert.ok(!/authFailure[\s\S]{0,180}clearOfflineData\(\)/.test(api));
 
 // 4) Sync cannot start before the authenticated identity is known.
@@ -66,7 +75,7 @@ assert.ok(attendance.includes('shiftOvernight'));
 assert.ok(attendance.includes('rowDate === previousDate && currentMinutes >= autoMinutes'));
 
 // 9) PWA shell version was bumped so old cached application code is invalidated.
-assert.ok(sw.includes("elnuby-hr-shell-v2"));
+assert.ok(sw.includes("elnuby-hr-shell-v3"));
 assert.strictEqual(vercel.crons[0].path, '/api/cron/auto-checkout');
 
 console.log('PASS operational regression matrix: auth refresh, offline restore, queue retention/isolation, sync ordering, idempotency, GPS freshness/accuracy, Egypt timezone, overnight shifts, PWA cache, cron');

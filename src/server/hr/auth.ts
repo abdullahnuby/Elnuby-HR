@@ -22,12 +22,14 @@ export const SESSION_MAX_AGE = 7 * 24 * 60 * 60;
 
 async function setSessionCookie(token: string) {
   const store = await cookies();
+  const expires = new Date(Date.now() + SESSION_MAX_AGE * 1000);
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    sameSite: "lax",
     path: "/",
     maxAge: SESSION_MAX_AGE,
+    expires,
   });
 }
 
@@ -36,9 +38,10 @@ export async function clearSessionCookie() {
   store.set(SESSION_COOKIE, "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    sameSite: "lax",
     path: "/",
     maxAge: 0,
+    expires: new Date(0),
   });
 }
 

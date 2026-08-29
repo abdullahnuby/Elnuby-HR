@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { api, apiMultipart } from '@/lib/api';
-import { cacheGet, cacheSet, syncAttendanceQueue, pendingAttendanceCount, clearOfflineData, clearOfflineCache, getOfflineUserId, setOfflineUserId } from '@/lib/offline';
+import { apiCacheKey, cacheGet, cacheSet, syncAttendanceQueue, pendingAttendanceCount, clearOfflineData, clearOfflineCache, getOfflineUserId, setOfflineUserId } from '@/lib/offline';
 import { navByRole, roleLabels } from '@/components/hr/constants';
 import ManagerDashboard from '@/components/hr/Dashboard';
 import DashboardHome from '@/components/hr/DashboardHome';
@@ -200,12 +200,12 @@ export default function Home() {
     let cancelled = false;
 
     const restoreCachedOfflineSession = async (degradedNetwork = false) => {
-      const cachedMe: any = await cacheGet('me');
+      const cachedMe: any = await cacheGet(apiCacheKey('me', {}));
       if (cancelled || !cachedMe?.user?.user_id) return false;
       setOfflineUserId(String(cachedMe.user.user_id));
       setMe(cachedMe);
-      const cachedDashboard: any = await cacheGet('dashboard');
-      const cachedManagerDashboard: any = await cacheGet('project_manager_dashboard');
+      const cachedDashboard: any = await cacheGet(apiCacheKey('dashboard', {}));
+      const cachedManagerDashboard: any = await cacheGet(apiCacheKey('project_manager_dashboard', {}));
       if (!cancelled) {
         if (cachedDashboard) setDash(cachedDashboard);
         if (cachedManagerDashboard) setManagerDash(cachedManagerDashboard);

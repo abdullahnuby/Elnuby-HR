@@ -76,6 +76,9 @@ export async function api<T = unknown>(
     }
 
     if (action === 'me' && (result.data as any)?.user?.user_id) {
+      // Establish the cache namespace BEFORE storing the response. Otherwise
+      // the first successful load is written under anonymous and cannot be
+      // restored by an offline refresh.
       setOfflineUserId(String((result.data as any).user.user_id));
     }
     if (CACHEABLE_ACTIONS.has(action)) await cacheSet(key, result.data);

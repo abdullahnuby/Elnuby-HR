@@ -5,6 +5,8 @@ import { createLeave } from "@/server/hr/leaves";
 import { SESSION_COOKIE, clearSessionCookie } from "@/server/hr/auth";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const AUDITED_ACTIONS = new Set([
   "check_in","check_out","create_employee","update_employee","create_project","update_project","create_shift","update_shift",
@@ -46,7 +48,8 @@ export async function POST(request: Request) {
       // the browser on first load so an unauthenticated refresh does not
       // produce a noisy 401 or revive stale client state.
       if (action === "session_status") {
-        if (!session && cookieToken) await clearSessionCookie();
+        // Do not clear a browser cookie during a passive status probe. A
+        // transient session-store/network failure must never become a logout.
         return Response.json({ ok: true, data: { authenticated: Boolean(session), user: session?.user || null } });
       }
 
