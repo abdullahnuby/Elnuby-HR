@@ -252,7 +252,7 @@ export default function Home() {
       // A refresh while offline must restore the last authenticated app state,
       // not interpret network absence as logout.
       if (!navigator.onLine && await restoreCachedOfflineSession()) {
-        if (!loadCancelled) setAuthReady(true);
+        if (!cancelled) setAuthReady(true);
         return;
       }
 
@@ -261,9 +261,9 @@ export default function Home() {
         // session_status probe can be temporarily unavailable and must not
         // turn into a logout.
         await load();
-        if (loadCancelled) return;
+        if (cancelled) return;
       } catch (error: any) {
-        if (loadCancelled) return;
+        if (cancelled) return;
         const message = String(error?.message || '');
         const authFailure = /Authentication required|Invalid session|Session expired|User inactive|الجلسة غير صالحة|منتهية/i.test(message);
         if (authFailure) {
@@ -278,7 +278,7 @@ export default function Home() {
           setError(message || 'تعذر الاتصال بالخادم.');
         }
       } finally {
-        if (!loadCancelled) setAuthReady(true);
+        if (!cancelled) setAuthReady(true);
       }
     })();
     return () => { cancelled = true; };
