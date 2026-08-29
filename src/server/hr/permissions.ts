@@ -1,5 +1,5 @@
 import { parsePagination } from "./core";
-import { supabase, success, errorResponse, generateId, nowISO, appDate, appTime, timeToMinutes, minutesBetween, getManagedProjectIds, canManageProject, getCurrentAssignment, normalizeTimeInput } from "./core";
+import { supabase, success, errorResponse, generateId, nowISO, appDate, appTime, timeToMinutes, minutesBetween, getManagedProjectIds, canManageProject, getCurrentAssignment, normalizeTimeInput, writeAudit } from "./core";
 import type { SessionContext, CurrentUser } from "./core";
 
 export async function permissionList(
@@ -204,6 +204,11 @@ export async function decidePermission(
     );
   }
 
+  const comment = String(body.comment || "").trim();
+  if (decision === "REJECT" && comment.length < 3) {
+    return errorResponse("سبب الرفض مطلوب");
+  }
+
   const { data: request } =
     await supabase
       .from("permission_requests")
@@ -265,6 +270,7 @@ export async function decidePermission(
         "request_id",
         requestId
       )
+      .eq("status", "PENDING")
       .select("*")
       .single();
 
@@ -275,6 +281,29 @@ export async function decidePermission(
     );
   }
 
+  return success(data);
+}
+
+export async function cancelPermission(
+  session: SessionContext,
+  body: Record<string, unknown>
+) {
+  const requestId = String(body.request_id || "");
+  const reason = String(body.reason || "").trim();
+  if (!requestId) return errorResponse("رقم الطلب مطلوب");
+  if (reason.length < 3) return errorResponse("سبب إلغاء الطلب مطلوب");
+  const { data: request } = await supabase.from("permission_requests")
+    .select("request_id,employee_id,status").eq("request_id",requestId).maybeSingle();
+  if (!request) return errorResponse("طلب الإذن غير موجود",404);
+  if (request.employee_id !== session.user.employee_id && !["SYSTEM_ADMIN","HR_MANAGER"].includes(session.user.role)) {
+    return errorResponse("ليس لديك صلاحية إلغاء هذا الطلب",403);
+  }
+  if (request.status !== "PENDING") return errorResponse("لا يمكن إلغاء الطلب بعد اتخاذ القرار");
+  const { data, error } = await supabase.from("permission_requests").update({
+    status:"CANCELLED", cancellation_reason:reason, cancelled_by:session.user.user_id, cancelled_at:nowISO(), updated_at:nowISO()
+  }).eq("request_id",requestId).eq("status","PENDING").select("*").single();
+  if (error) return errorResponse(error.message,500);
+  await writeAudit(session.user.user_id,"cancel_permission","permission_requests",requestId,{reason});
   return success(data);
 }
 

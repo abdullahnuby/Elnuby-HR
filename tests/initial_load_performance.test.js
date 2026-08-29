@@ -5,7 +5,7 @@ const root = path.join(__dirname, '..');
 const page = fs.readFileSync(path.join(root, 'src/app/page.tsx'), 'utf8');
 const auth = fs.readFileSync(path.join(root, 'src/server/hr/auth.ts'), 'utf8');
 
-assert.ok(page.includes('if (!cancelled) setAuthReady(true);'));
+assert.ok(page.includes('if (!loadCancelled) setAuthReady(true);'));
 assert.ok(page.includes('const results = await Promise.allSettled(tasks);'));
 assert.ok(page.includes("cacheGet<any>(apiCacheKey('dashboard', {}))"));
 assert.ok(page.includes('Paint the most recent local snapshot immediately on refresh'));

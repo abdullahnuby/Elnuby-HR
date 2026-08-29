@@ -140,7 +140,7 @@ export default function Home() {
   const [selectedShift, setSelectedShift] = useState('');
   const [selectedManager, setSelectedManager] = useState('');
 
-  const [leaveType, setLeaveType] = useState('Annual');
+  const [leaveType, setLeaveType] = useState('LT-ANNUAL');
   const [leaveFrom, setLeaveFrom] = useState('');
   const [leaveTo, setLeaveTo] = useState('');
   const [leaveReason, setLeaveReason] = useState('');
@@ -155,7 +155,7 @@ export default function Home() {
     auto_checkout_time: '18:00',
   });
 
-  const [permissionType, setPermissionType] = useState('Permission');
+  const [permissionType, setPermissionType] = useState('PERSONAL');
   const [permissionStart, setPermissionStart] = useState('');
   const [permissionEnd, setPermissionEnd] = useState('');
   const [permissionReason, setPermissionReason] = useState('');
@@ -252,7 +252,7 @@ export default function Home() {
       // A refresh while offline must restore the last authenticated app state,
       // not interpret network absence as logout.
       if (!navigator.onLine && await restoreCachedOfflineSession()) {
-        if (!cancelled) setAuthReady(true);
+        if (!loadCancelled) setAuthReady(true);
         return;
       }
 
@@ -261,9 +261,9 @@ export default function Home() {
         // session_status probe can be temporarily unavailable and must not
         // turn into a logout.
         await load();
-        if (cancelled) return;
+        if (loadCancelled) return;
       } catch (error: any) {
-        if (cancelled) return;
+        if (loadCancelled) return;
         const message = String(error?.message || '');
         const authFailure = /Authentication required|Invalid session|Session expired|User inactive|الجلسة غير صالحة|منتهية/i.test(message);
         if (authFailure) {
@@ -278,7 +278,7 @@ export default function Home() {
           setError(message || 'تعذر الاتصال بالخادم.');
         }
       } finally {
-        if (!cancelled) setAuthReady(true);
+        if (!loadCancelled) setAuthReady(true);
       }
     })();
     return () => { cancelled = true; };
@@ -349,6 +349,7 @@ export default function Home() {
   }
 
   async function load() {
+    let loadCancelled = false;
     setError('');
 
     try {
@@ -378,7 +379,7 @@ export default function Home() {
         cacheGet<Shift[]>(apiCacheKey('shifts', {})),
         cacheGet<User[]>(apiCacheKey('users', {})),
       ]);
-      if (!cancelled) {
+      if (!loadCancelled) {
         if (cachedInitial[0]) setDash(cachedInitial[0]);
         if (cachedInitial[1]) setManagerDash(cachedInitial[1]);
         if (cachedInitial[2]) setEmployees(cachedInitial[2]);
@@ -390,7 +391,7 @@ export default function Home() {
       // Authentication is now established. Render the application shell
       // immediately; dashboard/reference data continues in the background.
       // This keeps a refresh from waiting for every secondary request.
-      if (!cancelled) setAuthReady(true);
+      if (!loadCancelled) setAuthReady(true);
 
       const role = String(m.user?.role || '');
       const isManager = ['PROJECT_MANAGER', 'SECTOR_MANAGER'].includes(role);
@@ -415,7 +416,7 @@ export default function Home() {
       // is applied independently as it becomes available.
       const results = await Promise.allSettled(tasks);
 
-      if (cancelled) return;
+      if (loadCancelled) return;
 
       let i = 0;
       const take = () => results[i++];
@@ -1043,8 +1044,9 @@ export default function Home() {
         reason: permissionReason,
       });
 
-      setNotice('تم إرسال طلب الإذن');
+      setNotice('تم إرسال طلب الإذن للاعتماد');
 
+      await refreshSection('permissions');
       setPermissionStart('');
       setPermissionEnd('');
       setPermissionReason('');
@@ -1451,6 +1453,7 @@ export default function Home() {
                 createPermission
               }
               busy={busy}
+              role={me.user?.role}
             />
           )}
 

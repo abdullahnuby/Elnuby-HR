@@ -7,9 +7,9 @@ import { listProjects, createProject, updateProject } from "./projects";
 import { listShifts, createShift, updateShift } from "./shifts";
 import { listEmployeeShifts, assignEmployeeShift, assignEmployeeProject, assignManagerProject } from "./assignments";
 import { attendanceList, attendanceAction , closeAttendance} from "./attendance";
-import { leaveList, createLeave, decideLeaveManager, decideLeaveHR, getLeaveDocument } from "./leaves";
+import { leaveList, createLeave, decideLeaveManager, decideLeaveHR, cancelLeave, getLeaveDocument } from "./leaves";
 import { listLeavePolicies, listEmployeeLeaveBalances, listLeaveTypes, createLeavePolicy, updateLeavePolicy } from "./leavePolicies";
-import { permissionList, createPermission, decidePermission } from "./permissions";
+import { permissionList, createPermission, decidePermission, cancelPermission } from "./permissions";
 import { listDeductions, listUsers, createUser, updateUser, deleteUser, assignSectorManagerProjects, adminList, adminInsert, adminUpdate, adminDelete } from "./users";
 
 export async function handleAction(
@@ -362,7 +362,7 @@ export async function handleAction(
     }
 
     case "leave_types": {
-      const auth = requireRole(session, ADMIN_ROLES);
+      const auth = requireRole(session, ROLES);
       if (auth) return auth;
       return listLeaveTypes();
     }
@@ -425,6 +425,12 @@ export async function handleAction(
       );
     }
 
+    case "cancel_leave": {
+      const auth = requireRole(session, ["EMPLOYEE","PROJECT_MANAGER","HR_MANAGER","SYSTEM_ADMIN"]);
+      if (auth) return auth;
+      return cancelLeave(session!, body);
+    }
+
     case "decide_leave_hr": {
       const auth =
         requireRole(
@@ -470,6 +476,12 @@ export async function handleAction(
         session!,
         body
       );
+    }
+
+    case "cancel_permission": {
+      const auth = requireRole(session, ["EMPLOYEE","PROJECT_MANAGER","HR_MANAGER","SYSTEM_ADMIN"]);
+      if (auth) return auth;
+      return cancelPermission(session!, body);
     }
 
     case "decide_permission": {
