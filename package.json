@@ -10,7 +10,7 @@
     "test:backend": "node tests/backend_smoke.test.js",
     "test:security": "node tests/security_contract.test.js",
     "test": "npm run test:contract && npm run test:backend && npm run test:security && npm run test:operational",
-    "test:operational": "node tests/operational.test.js && node tests/auth_offline_regression.test.js && node tests/auth_refresh_deep_regression.test.js"
+    "test:operational": "node tests/operational.test.js && node tests/auth_offline_regression.test.js && node tests/auth_refresh_deep_regression.test.js && node tests/initial_load_performance.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.3",

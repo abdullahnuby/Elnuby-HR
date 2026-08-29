@@ -153,26 +153,28 @@ export async function getMe(session: SessionContext) {
   let shift = null;
 
   if (employeeId) {
-    const { data } = await supabase
-      .from("employees")
-      .select("*")
-      .eq("employee_id", employeeId)
-      .maybeSingle();
-    employee = data;
-
-    const assignment = await getCurrentAssignment(employeeId);
-    if (assignment) {
-      const { data: projectData } = await supabase
-        .from("projects")
+    const [employeeResult, assignment] = await Promise.all([
+      supabase
+        .from("employees")
         .select("*")
-        .eq("project_id", assignment.project_id)
-        .maybeSingle();
-      project = projectData;
+        .eq("employee_id", employeeId)
+        .maybeSingle(),
+      getCurrentAssignment(employeeId),
+    ]);
 
-      if (project) {
-        const employeeShift = await getCurrentEmployeeShift(employeeId, project.project_id);
-        shift = employeeShift?.shifts || null;
-      }
+    employee = employeeResult.data;
+
+    if (assignment?.project_id) {
+      const [{ data: projectData }, employeeShift] = await Promise.all([
+        supabase
+          .from("projects")
+          .select("*")
+          .eq("project_id", assignment.project_id)
+          .maybeSingle(),
+        getCurrentEmployeeShift(employeeId, assignment.project_id),
+      ]);
+      project = projectData;
+      shift = employeeShift?.shifts || null;
     }
   }
 

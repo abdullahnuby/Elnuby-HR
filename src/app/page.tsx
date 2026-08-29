@@ -362,8 +362,35 @@ export default function Home() {
       // Establish the authenticated identity before any other cacheable call.
       // This also ensures all subsequent cached responses are stored under
       // the correct user namespace.
-      setOfflineUserId(String(m.user.user_id));
+      const userId = String(m.user.user_id);
+      setOfflineUserId(userId);
       setMe(m);
+
+      // Paint the most recent local snapshot immediately on refresh. The
+      // authenticated network request below still revalidates it in the
+      // background, so cached data is only a fast first paint, not the source
+      // of truth.
+      const cachedInitial = await Promise.all([
+        cacheGet<any>(apiCacheKey('dashboard', {})),
+        cacheGet<any>(apiCacheKey('project_manager_dashboard', {})),
+        cacheGet<Employee[]>(apiCacheKey('employees', {})),
+        cacheGet<Project[]>(apiCacheKey('projects', {})),
+        cacheGet<Shift[]>(apiCacheKey('shifts', {})),
+        cacheGet<User[]>(apiCacheKey('users', {})),
+      ]);
+      if (!cancelled) {
+        if (cachedInitial[0]) setDash(cachedInitial[0]);
+        if (cachedInitial[1]) setManagerDash(cachedInitial[1]);
+        if (cachedInitial[2]) setEmployees(cachedInitial[2]);
+        if (cachedInitial[3]) setProjects(cachedInitial[3]);
+        if (cachedInitial[4]) setShifts(cachedInitial[4]);
+        if (cachedInitial[5]) setUsers(cachedInitial[5]);
+      }
+
+      // Authentication is now established. Render the application shell
+      // immediately; dashboard/reference data continues in the background.
+      // This keeps a refresh from waiting for every secondary request.
+      if (!cancelled) setAuthReady(true);
 
       const role = String(m.user?.role || '');
       const isManager = ['PROJECT_MANAGER', 'SECTOR_MANAGER'].includes(role);
@@ -384,7 +411,11 @@ export default function Home() {
       }
       if (canManageUsers) tasks.push(api('users'));
 
+      // Do not block the authenticated shell on secondary data. Each result
+      // is applied independently as it becomes available.
       const results = await Promise.allSettled(tasks);
+
+      if (cancelled) return;
 
       let i = 0;
       const take = () => results[i++];
