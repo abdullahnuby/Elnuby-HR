@@ -5,12 +5,12 @@ import { Empty, Badge } from './common';
 const PERMISSION_TYPES = [
   ['PERSONAL', 'إذن شخصي'],
   ['LATE_ARRIVAL', 'تأخر عن الدوام'],
-  ['EARLY_EXIT', 'انصراف مبكر'],
+  ['EARLY_DEPARTURE', 'انصراف مبكر'],
   ['MEDICAL', 'موعد/حالة طبية'],
-  ['SITE_TASK', 'مهمة خارج الموقع'],
+  ['FIELD_MISSION', 'مهمة خارج الموقع'],
   ['OTHER', 'أخرى'],
 ];
-const TYPE_LABELS = Object.fromEntries(PERMISSION_TYPES);
+const TYPE_LABELS = { ...Object.fromEntries(PERMISSION_TYPES), EARLY_EXIT: 'انصراف مبكر', SITE_TASK: 'مهمة خارج الموقع' };
 
 export default function PermissionSection({ rows, employeeMode, permissionType, setPermissionType, permissionStart, setPermissionStart, permissionEnd, setPermissionEnd, permissionReason, setPermissionReason, createPermission, busy, role }: any) {
   const [localRows, setLocalRows] = useState(rows);
