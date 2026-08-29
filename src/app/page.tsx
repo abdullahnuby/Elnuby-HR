@@ -182,12 +182,30 @@ export default function Home() {
       setFailedSync(await failedAttendanceCount(currentUserId).catch(() => 0));
       if (result.synced > 0) {
         setNotice(`تمت مزامنة ${result.synced} عملية حضور وانصراف بنجاح`);
-        try { await load(); } catch {}
+        try {
+          const [dashboard, manager] = await Promise.all([
+            api('dashboard'),
+            ['PROJECT_MANAGER', 'SECTOR_MANAGER'].includes(me?.user?.role || '')
+              ? api('project_manager_dashboard')
+              : Promise.resolve(null),
+          ]);
+          setDash(dashboard);
+          if (manager) setManagerDash(manager);
+        } catch {}
       }
       if (result.failed > 0) {
         const failedItem = await lastFailedAttendance(currentUserId);
         setError(`تعذر تسجيل ${failedItem?.action === 'check_out' ? 'الانصراف' : 'الحضور'} الذي تم حفظه دون اتصال: ${failedItem?.lastError || result.lastError || 'رفض الخادم العملية'}`);
-        try { await load(); } catch {}
+        try {
+          const [dashboard, manager] = await Promise.all([
+            api('dashboard'),
+            ['PROJECT_MANAGER', 'SECTOR_MANAGER'].includes(me?.user?.role || '')
+              ? api('project_manager_dashboard')
+              : Promise.resolve(null),
+          ]);
+          setDash(dashboard);
+          if (manager) setManagerDash(manager);
+        } catch {}
       }
     };
 
@@ -279,24 +297,27 @@ export default function Home() {
   useEffect(() => {
     if (!me) return;
 
+    // Initial data is already loaded by load(). Keep the periodic refresh only
+    // to avoid issuing duplicate dashboard requests immediately after login or
+    // after a page refresh.
     const refresh = async () => {
       try {
-        setDash(await api('dashboard'));
-
-        if (['PROJECT_MANAGER', 'SECTOR_MANAGER'].includes(me.user?.role)) {
-          setManagerDash(await api('project_manager_dashboard'));
-        }
+        const [dashboard, manager] = await Promise.all([
+          api('dashboard'),
+          ['PROJECT_MANAGER', 'SECTOR_MANAGER'].includes(me.user?.role)
+            ? api('project_manager_dashboard')
+            : Promise.resolve(null),
+        ]);
+        setDash(dashboard);
+        if (manager) setManagerDash(manager);
       } catch {
         // لا يتم تسجيل الخروج بسبب خطأ مؤقت في التحديث
       }
     };
 
-    refresh();
-
     const timer = setInterval(refresh, 15000);
-
     return () => clearInterval(timer);
-  }, [me]);
+  }, [me?.user?.user_id, me?.user?.role]);
 
   async function performLogout() {
     setBusy(true);
@@ -338,52 +359,71 @@ export default function Home() {
         return;
       }
 
+      // Establish the authenticated identity before any other cacheable call.
+      // This also ensures all subsequent cached responses are stored under
+      // the correct user namespace.
+      setOfflineUserId(String(m.user.user_id));
       setMe(m);
 
-      try {
-        setDash(await api('dashboard'));
-      } catch (e: any) {
-        setError(e.message || 'تعذر تحميل لوحة التحكم');
+      const role = String(m.user?.role || '');
+      const isManager = ['PROJECT_MANAGER', 'SECTOR_MANAGER'].includes(role);
+      const canManagePeople = ['SYSTEM_ADMIN', 'HR_MANAGER', 'SECTOR_MANAGER', 'PROJECT_MANAGER'].includes(role);
+      const canManageUsers = ['SYSTEM_ADMIN', 'HR_MANAGER'].includes(role);
+
+      // The dashboard and reference data are independent requests. Fetch them
+      // concurrently so initial app load is bounded by the slowest request,
+      // not the sum of every request.
+      const tasks: Promise<any>[] = [
+        api('dashboard'),
+      ];
+      if (isManager) tasks.push(api('project_manager_dashboard'));
+      if (canManagePeople) {
+        tasks.push(api('employees'));
+        tasks.push(api('projects'));
+        tasks.push(api('shifts'));
+      }
+      if (canManageUsers) tasks.push(api('users'));
+
+      const results = await Promise.allSettled(tasks);
+
+      let i = 0;
+      const take = () => results[i++];
+
+      const dashboardResult = take();
+      if (dashboardResult.status === 'fulfilled') {
+        setDash(dashboardResult.value);
+      } else {
+        setError((dashboardResult.reason as any)?.message || 'تعذر تحميل لوحة التحكم');
       }
 
-      if (['PROJECT_MANAGER', 'SECTOR_MANAGER'].includes(m.user?.role)) {
-        try {
-          setManagerDash(await api('project_manager_dashboard'));
-        } catch (e: any) {
-          setError(e.message || 'تعذر تحميل لوحة مدير المشروع');
+      if (isManager) {
+        const managerResult = take();
+        if (managerResult.status === 'fulfilled') {
+          setManagerDash(managerResult.value);
+        } else {
+          setError((managerResult.reason as any)?.message || 'تعذر تحميل لوحة مدير المشروع');
         }
       }
 
-      if (
-        ['SYSTEM_ADMIN', 'HR_MANAGER', 'SECTOR_MANAGER', 'PROJECT_MANAGER'].includes(
-          m.user?.role,
-        )
-      ) {
-        try {
-          setEmployees(await api('employees'));
-        } catch (e: any) {
-          setError(e.message || 'تعذر تحميل الموظفين');
-        }
+      if (canManagePeople) {
+        const employeesResult = take();
+        const projectsResult = take();
+        const shiftsResult = take();
 
-        try {
-          setProjects(await api('projects'));
-        } catch (e: any) {
-          setError(e.message || 'تعذر تحميل المشاريع');
-        }
+        if (employeesResult.status === 'fulfilled') setEmployees(employeesResult.value || []);
+        else setError((employeesResult.reason as any)?.message || 'تعذر تحميل الموظفين');
 
-        try {
-          setShifts(await api('shifts'));
-        } catch (e: any) {
-          setError(e.message || 'تعذر تحميل الورديات');
-        }
+        if (projectsResult.status === 'fulfilled') setProjects(projectsResult.value || []);
+        else setError((projectsResult.reason as any)?.message || 'تعذر تحميل المشاريع');
+
+        if (shiftsResult.status === 'fulfilled') setShifts(shiftsResult.value || []);
+        else setError((shiftsResult.reason as any)?.message || 'تعذر تحميل الورديات');
       }
 
-      if (['SYSTEM_ADMIN', 'HR_MANAGER'].includes(m.user?.role)) {
-        try {
-          setUsers(await api('users'));
-        } catch (e: any) {
-          setError(e.message || 'تعذر تحميل المستخدمين');
-        }
+      if (canManageUsers) {
+        const usersResult = take();
+        if (usersResult.status === 'fulfilled') setUsers(usersResult.value || []);
+        else setError((usersResult.reason as any)?.message || 'تعذر تحميل المستخدمين');
       }
     } catch (e: any) {
       const message = String(e?.message || '');
