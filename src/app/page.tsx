@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { api, apiMultipart } from '@/lib/api';
-import { apiCacheKey, cacheGet, cacheSet, syncAttendanceQueue, pendingAttendanceCount, failedAttendanceCount, lastFailedAttendance, clearOfflineData, getOfflineUserId, setOfflineUserId } from '@/lib/offline';
+import { apiCacheKey, cacheGet, cacheSet, syncAttendanceQueue, pendingAttendanceCount, failedAttendanceCount, lastFailedAttendance, clearOfflineData, clearOfflineCache, getOfflineUserId, setOfflineUserId } from '@/lib/offline';
 import { navByRole, roleLabels } from '@/components/hr/constants';
 import ManagerDashboard from '@/components/hr/Dashboard';
 import DashboardHome from '@/components/hr/DashboardHome';
