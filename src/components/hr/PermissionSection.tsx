@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { Empty } from './common';
+import { Empty, Badge } from './common';
 export default function PermissionSection({
   rows,
   employeeMode,
