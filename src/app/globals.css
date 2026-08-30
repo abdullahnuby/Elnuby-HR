@@ -519,3 +519,60 @@
   .mobile-bottom-nav button span{font-size:7px}
   .kpi strong{font-size:18px}
 }
+
+
+/* Final mobile readability: dark hero sections must never inherit dark heading text. */
+.employee-hero .ux-title-row h2,
+.employee-hero .ux-page-head h2,
+.pm-hero .ux-title-row h2,
+.pm-hero .ux-page-head h2 { color:#fff !important; }
+.employee-hero .ux-page-head p,
+.pm-hero .ux-page-head p { color:#d7e7f6 !important; }
+.employee-hero .ux-eyebrow,
+.pm-hero .ux-eyebrow { color:#bcd9f4 !important; }
+.employee-hero .ux-head-actions .secondary,
+.pm-hero .ux-head-actions .secondary { background:rgba(255,255,255,.1); color:#fff; border-color:rgba(255,255,255,.2); }
+@media(max-width:800px){
+  .employee-hero .ux-title-row h2,
+  .pm-hero .ux-title-row h2 { color:#fff !important; }
+  .employee-hero .ux-head-actions,
+  .pm-hero .ux-head-actions { width:100%; }
+  .employee-hero .ux-head-actions>* ,
+  .pm-hero .ux-head-actions>* { min-height:44px; }
+  .ux-person strong { color:#22354b !important; }
+  .sidebar .profile-mini strong,
+  .sidebar .side-brand b,
+  .sidebar nav button.active span,
+  .sidebar nav button.active { color:#fff !important; }
+}
+
+
+/* Mobile contrast and identity readability */
+.employee-hero, .pm-hero { color:#fff; }
+.employee-hero .employee-role-card strong,
+.employee-hero .employee-role-card span,
+.employee-hero .employee-role-card small,
+.pm-hero .pm-hero-copy strong,
+.pm-hero .pm-hero-copy span,
+.pm-hero .pm-hero-copy small { color:#fff !important; }
+.employee-hero .ux-person strong,
+.pm-hero .ux-person strong { color:#fff !important; }
+.dark-surface .ux-person strong,
+.dark-surface strong,
+.dark-surface .ux-title-row h2 { color:#fff !important; }
+
+
+/* Identity readability across mobile and dark surfaces */
+@media(max-width:800px){
+  .employee-hero .ux-page-head .ux-title-row h2,
+  .pm-hero .ux-page-head .ux-title-row h2 { color:#fff !important; text-shadow:0 1px 1px rgba(0,0,0,.12); }
+  .employee-hero .ux-page-head p,
+  .pm-hero .ux-page-head p { color:#e2eef8 !important; }
+  .employee-hero .employee-role-card strong,
+  .pm-hero .pm-hero-copy strong { color:#fff !important; }
+  .ux-mobile-card-table .ux-person strong,
+  .table-wrap .ux-person strong { color:#22354b !important; }
+  .ux-mobile-card-table .ux-person small,
+  .table-wrap .ux-person small { color:#7d8b9d !important; }
+  .sidebar .profile-mini strong { color:#fff !important; }
+}

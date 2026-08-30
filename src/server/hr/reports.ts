@@ -61,7 +61,10 @@ export async function attendanceMonthlyReport(session: SessionContext, body: Rec
     const permissions = (p.data||[]) as any[];
     const calendar = new Map((calendarResult.data||[]).map((r:any)=>[String(r.calendar_date).slice(0,10),r]));
     const weekend1 = Number(calendarSettingsResult.data?.weekend_day_1 ?? 5);
-    const weekend2 = Number(calendarSettingsResult.data?.weekend_day_2 ?? 6);
+    const weekend2Raw = calendarSettingsResult.data?.weekend_day_2;
+    const weekend2 = weekend2Raw === null || weekend2Raw === undefined || weekend2Raw === ""
+      ? null
+      : Number(weekend2Raw);
     const today = new Date().toISOString().slice(0,10);
     const summary:Record<string,number> = {};
     const employeeSummary:any[] = [];
@@ -80,7 +83,7 @@ export async function attendanceMonthlyReport(session: SessionContext, body: Rec
           const utcDay = new Date(`${date}T00:00:00Z`).getUTCDay();
           const nonWorking = calendarDay
             ? (String(calendarDay.day_type) === "HOLIDAY" || calendarDay.is_working_day === false)
-            : (utcDay === weekend1 || utcDay === weekend2);
+            : (utcDay === weekend1 || (weekend2 !== null && utcDay === weekend2));
           if (calendarDay && String(calendarDay.day_type) === "HOLIDAY") status = "HOLIDAY";
           else if (nonWorking) status = "WEEKEND";
           else {
