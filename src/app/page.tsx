@@ -22,6 +22,7 @@ import Performance from '@/components/hr/Performance';
 import AttendanceCalendar from '@/components/hr/AttendanceCalendar';
 import HRExecutiveDashboard from '@/components/hr/HRExecutiveDashboard';
 import ApprovalsCenter from '@/components/hr/ApprovalsCenter';
+import ClientErrorBoundary from '@/components/hr/ClientErrorBoundary';
 import HRAdvanced from '@/components/hr/HRAdvanced';
 
 
@@ -1199,6 +1200,7 @@ export default function Home() {
         </header>
 
         <div className="content">
+          <ClientErrorBoundary>
           {section === 'dashboard' &&
             (['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? (
               <HRExecutiveDashboard me={me} setSection={openSection} />
@@ -1441,7 +1443,7 @@ export default function Home() {
                 <div className="kpi danger-kpi"><div className="kpi-icon"><Icon name="alert" size={21}/></div><div><span>عالية الأولوية</span><strong>{notifications?.high ?? 0}</strong></div><em>تحتاج مراجعة</em></div>
               </div>
               <div className="state-card">
-                {(notifications?.notices || []).length === 0 ? <><Icon name="check" size={22}/><div><strong>لا توجد تنبيهات حالية</strong><span>لا توجد حالات تحتاج إلى مراجعة في الوقت الحالي.</span></div></> : <div style={{width:'100%'}}>{notifications.notices.map((n:any,i:number)=><article key={`${n.type}-${n.request_id||n.case_id||n.employee_id||i}`} className="notification-row"><div><strong>{n.title}</strong><span>{n.message}</span></div><b>{n.priority === 'HIGH' ? 'عالية' : 'متوسطة'}</b></article>)}</div>}
+                {(Array.isArray(notifications?.notices) ? notifications.notices : []).length === 0 ? <><Icon name="check" size={22}/><div><strong>لا توجد تنبيهات حالية</strong><span>لا توجد حالات تحتاج إلى مراجعة في الوقت الحالي.</span></div></> : <div style={{width:'100%'}}>{(Array.isArray(notifications?.notices)?notifications.notices:[]).map((n:any,i:number)=><article key={`${n.type}-${n.request_id||n.case_id||n.employee_id||i}`} className="notification-row"><div><strong>{n.title}</strong><span>{n.message}</span></div><b>{n.priority === 'HIGH' ? 'عالية' : 'متوسطة'}</b></article>)}</div>}
               </div>
             </section>
           )}
@@ -1472,6 +1474,7 @@ export default function Home() {
               {notice}
             </div>
           )}
+          </ClientErrorBoundary>
         </div>
       </section>
     </main>

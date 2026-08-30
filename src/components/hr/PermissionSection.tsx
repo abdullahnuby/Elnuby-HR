@@ -15,8 +15,8 @@ export default function PermissionSection({
   createPermission,
   busy,
 }: any) {
-  const [localRows, setLocalRows] = useState(rows);
-  useEffect(() => setLocalRows(rows), [rows]);
+  const [localRows, setLocalRows] = useState<any[]>(Array.isArray(rows) ? rows : []);
+  useEffect(() => setLocalRows(Array.isArray(rows) ? rows : []), [rows]);
 
   async function decide(requestId: string, decision: 'APPROVE'|'REJECT') {
     try { await api('decide_permission', { request_id: requestId, decision }); setLocalRows((prev:any[]) => prev.map(r => r.request_id === requestId ? {...r, status: decision === 'APPROVE' ? 'APPROVED' : 'REJECTED'} : r)); window.dispatchEvent(new CustomEvent('hr:toast',{detail:{message:decision==='APPROVE'?'تم اعتماد طلب الإذن':'تم رفض طلب الإذن'}})); }

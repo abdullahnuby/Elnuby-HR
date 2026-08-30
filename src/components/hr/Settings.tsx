@@ -22,7 +22,7 @@ export default function Settings({role='HR_MANAGER'}:{role?:string}){
  const canEdit=['SYSTEM_ADMIN','HR_MANAGER'].includes(role);
 
  async function loadPolicies(){
-   try{const [p,t]=await Promise.all([api<any[]>('leave_policies'),api<any[]>('leave_types')]);setPolicies(p||[]);setTypes(t||[]);}
+   try{const [p,t]=await Promise.all([api<any[]>('leave_policies'),api<any[]>('leave_types')]);setPolicies(Array.isArray(p)?p:[]);setTypes(Array.isArray(t)?t:[]);}
    catch(e:any){window.dispatchEvent(new CustomEvent('hr:toast',{detail:{message:e.message||'تعذر تحميل لوائح الإجازات',type:'error'}}));}
  }
  useEffect(()=>{if(tab==='leaves'&&canEdit) void loadPolicies();},[tab,canEdit]);
