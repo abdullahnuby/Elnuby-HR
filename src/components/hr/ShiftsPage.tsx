@@ -173,7 +173,7 @@ export default function Shifts({
           'إغلاق الحضور',
           'فتح الانصراف',
           'إغلاق الانصراف',
-          'Auto Checkout','إجراء',
+          'الإغلاق التلقائي','إجراء',
         ]}
         rows={shifts.map((s) => [
           s.name,
@@ -212,7 +212,7 @@ export default function Shifts({
           'فتح الحضور',
           'إغلاق الحضور',
           'فتح الانصراف',
-          'Auto Checkout',
+          'الإغلاق التلقائي',
           'من تاريخ',
           'إلى تاريخ',
           'الحالة',
@@ -233,8 +233,8 @@ export default function Shifts({
           r.start_date || '—',
           r.end_date || '—',
           r.end_date
-            ? 'HISTORY'
-            : 'CURRENT',
+            ? <Badge status="HISTORY" />
+            : <Badge status="CURRENT" />,
         ])}
       />
     </section>
