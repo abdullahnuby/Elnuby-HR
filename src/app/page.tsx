@@ -1138,7 +1138,7 @@ export default function Home() {
             </strong>
 
             <span>
-              {roleLabels[me.user?.role] ||
+              {roleLabels[me.user?.role || ''] ||
                 me.user?.role}
             </span>
           </div>
@@ -1210,7 +1210,7 @@ export default function Home() {
                   'لوحة التحكم'}
               </strong>
 
-              <small>{roleLabels[me.user?.role] || me.user?.role}</small>
+              <small>{roleLabels[me.user?.role || ''] || me.user?.role}</small>
             </div>
           </div>
 
@@ -1227,7 +1227,7 @@ export default function Home() {
               )}
             </span>
 
-            <details className="profile-menu"><summary className="avatar top-avatar" aria-label="قائمة الحساب">{(me.employee?.name||me.user?.username||'U').slice(0,1)}</summary><div className="profile-menu-card"><strong>{me.employee?.name||me.user?.username}</strong><span>{roleLabels[me.user?.role]||me.user?.role}</span><button className="secondary" onClick={performLogout}>تسجيل الخروج</button></div></details>
+            <details className="profile-menu"><summary className="avatar top-avatar" aria-label="قائمة الحساب">{(me.employee?.name||me.user?.username||'U').slice(0,1)}</summary><div className="profile-menu-card"><strong>{me.employee?.name||me.user?.username}</strong><span>{roleLabels[me.user?.role || '']||me.user?.role}</span><button className="secondary" onClick={performLogout}>تسجيل الخروج</button></div></details>
           </div>
         </header>
 
