@@ -232,9 +232,7 @@ export default function Shifts({
             '—',
           r.start_date || '—',
           r.end_date || '—',
-          r.end_date
-            ? 'HISTORY'
-            : 'CURRENT',
+          <Badge status={r.end_date ? 'HISTORY' : 'CURRENT'} />,
         ])}
       />
     </section>

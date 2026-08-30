@@ -27,7 +27,7 @@ export default function Projects({
           <h2>المشاريع</h2>
           <p>
             إنشاء وإدارة مواقع المشاريع
-            وإحداثيات الـ GPS ونطاق الحضور.
+            وإحداثيات الموقع الجغرافي ونطاق الحضور.
           </p>
         </div>
 
@@ -117,7 +117,7 @@ export default function Projects({
                   </span>
 
                   <span>
-                    GPS {p.latitude},{' '}
+                    الموقع {p.latitude},{' '}
                     {p.longitude}
                   </span>
 

@@ -1,86 +1,34 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Employee } from './types';
 import { api } from '@/lib/api';
 import { Badge, Empty } from './common';
 
-export default function EmployeeProfile({ employeeId, onClose }: { employeeId: string; onClose: () => void }) {
-  const [profile, setProfile] = useState<any>(null);
-  const [busy, setBusy] = useState(true);
-  const [error, setError] = useState('');
-  const [event, setEvent] = useState({ event_type: 'OTHER', title: '', description: '', effective_date: new Date().toISOString().slice(0,10) });
-  const [saving, setSaving] = useState(false);
-  const [documents, setDocuments] = useState<any[]>([]);
-  const [requirements, setRequirements] = useState<any[]>([]);
-  const [docType, setDocType] = useState('NATIONAL_ID');
-  const [docFile, setDocFile] = useState<File | null>(null);
-  const [docIssue, setDocIssue] = useState('');
-  const [docExpiry, setDocExpiry] = useState('');
-  const [docNotes, setDocNotes] = useState('');
+const EVENT_LABELS: Record<string,string> = { HIRE:'تعيين', TRANSFER:'نقل', PROMOTION:'ترقية', JOB_CHANGE:'تغيير وظيفة', PROJECT_ASSIGNMENT:'تعيين على مشروع', SHIFT_CHANGE:'تغيير وردية', TERMINATION:'إنهاء خدمة', OTHER:'أخرى' };
+const DOC_LABELS: Record<string,string> = { NATIONAL_ID:'الرقم القومي', PASSPORT:'جواز السفر', WORK_PERMIT:'تصريح العمل', OTHER:'مستند آخر' };
+const dateAr=(v?:string)=>{if(!v)return '—';const d=new Date(`${v}T00:00:00`);return Number.isNaN(d.getTime())?v:new Intl.DateTimeFormat('ar-EG',{day:'numeric',month:'long',year:'numeric'}).format(d)};
 
-  async function load() {
-    try { setBusy(true); setError(''); const [p,d] = await Promise.all([api<any>('employee_profile', { employee_id: employeeId }), api<any>('employee_documents', { employee_id: employeeId })]); setProfile(p); setDocuments(d.documents||[]); setRequirements(d.requirements||[]); }
-    catch (e:any) { setError(e.message || 'تعذر تحميل ملف الموظف'); }
-    finally { setBusy(false); }
-  }
-  useEffect(() => { load(); }, [employeeId]);
-
-  async function uploadDocument() {
-    if (!docFile) return setError('اختر المستند أولًا');
-    try {
-      setSaving(true); setError('');
-      const form = new FormData();
-      form.append('action','upload_employee_document'); form.append('employee_id',employeeId); form.append('document_type',docType);
-      form.append('issue_date',docIssue); form.append('expiry_date',docExpiry); form.append('notes',docNotes); form.append('document',docFile);
-      const res = await fetch('/api/hr',{method:'POST',credentials:'include',cache:'no-store',body:form});
-      const data = await res.json(); if(!res.ok || !data.ok) throw new Error(data.error||'تعذر رفع المستند');
-      setDocFile(null); setDocIssue(''); setDocExpiry(''); setDocNotes(''); await load();
-    } catch(e:any) { setError(e.message||'تعذر حفظ المستند'); } finally { setSaving(false); }
-  }
-
-  async function openDocument(id:string) {
-    try { const d=await api<any>('employee_document_url',{document_id:id}); window.open(d.signed_url,'_blank','noopener,noreferrer'); } catch(e:any) { setError(e.message||'تعذر فتح المستند'); }
-  }
-
-  async function deleteDocument(id:string) {
-    if(!window.confirm('هل تريد حذف هذا المستند؟')) return;
-    try { setSaving(true); await api('delete_employee_document',{document_id:id}); await load(); } catch(e:any) { setError(e.message||'تعذر حذف المستند'); } finally { setSaving(false); }
-  }
-
-  async function addEvent() {
-    if (!event.title.trim()) return setError('وصف الحدث الوظيفي مطلوب');
-    try { setSaving(true); setError(''); await api('add_employment_event', { employee_id: employeeId, ...event }); setEvent({ ...event, title:'', description:'' }); await load(); }
-    catch (e:any) { setError(e.message || 'تعذر حفظ الحدث'); }
-    finally { setSaving(false); }
-  }
-
-  if (busy) return <div className="profile-drawer"><div className="profile-drawer-card"><div className="panel-head"><h2>ملف الموظف</h2><button className="secondary" onClick={onClose}>إغلاق</button></div><div className="state-card">جاري تحميل ملف الموظف...</div></div></div>;
-  if (!profile) return <div className="profile-drawer"><div className="profile-drawer-card"><div className="panel-head"><h2>ملف الموظف</h2><button className="secondary" onClick={onClose}>إغلاق</button></div><div className="state-card error-state">{error || 'تعذر تحميل الملف'}</div></div></div>;
-  const e: Employee = profile.employee;
-  const safeEvents = Array.isArray(profile?.events) ? profile.events : [];
-  const safeAssignments = Array.isArray(profile?.assignments) ? profile.assignments : [];
-  const safeShifts = Array.isArray(profile?.shifts) ? profile.shifts : [];
-  const safeDocuments = Array.isArray(documents) ? documents : [];
-  const safeRequirements = Array.isArray(requirements) ? requirements : [];
-  return <div className="profile-drawer" role="dialog" aria-modal="true">
-    <div className="profile-drawer-card">
-      <div className="profile-drawer-head"><div><span className="eyebrow">ملف الموارد البشرية</span><h2>{e.name}</h2><p>{e.job_title || 'بدون وظيفة محددة'} — {e.employee_id}</p></div><button className="secondary" onClick={onClose}>إغلاق</button></div>
-      {error && <div className="state-card error-state">{error}</div>}
-      <div className="profile-stat-grid">
-        <div><span>القسم</span><strong>{e.department || '—'}</strong></div><div><span>الهاتف</span><strong>{e.phone || '—'}</strong></div><div><span>الرقم القومي</span><strong>{e.national_id || '—'}</strong></div><div><span>تاريخ التعيين</span><strong>{e.hire_date || '—'}</strong></div><div><span>نوع الإقامة</span><strong>{e.residency_type === 'EXPATRIATE' ? 'مغترب' : 'مقيم'}</strong></div><div><span>الحالة</span><strong><Badge status={e.status || 'ACTIVE'} /></strong></div>
-      </div>
-      <div className="profile-section"><div className="section-title"><div><h3>المسار الوظيفي</h3><p>تاريخ التغييرات والقرارات المرتبطة بالموظف</p></div></div>
-        <div className="timeline">{safeEvents.length ? safeEvents.map((x:any)=><div className="timeline-item" key={x.event_id}><i/><div><strong>{x.title}</strong><span>{x.event_type} — {x.effective_date}</span>{x.description && <p>{x.description}</p>}</div></div>) : <Empty text="لا توجد أحداث وظيفية مسجلة."/>}</div>
-        <div className="event-form"><select value={event.event_type} onChange={e=>setEvent({...event,event_type:e.target.value})}><option value="HIRE">تعيين</option><option value="TRANSFER">نقل</option><option value="PROMOTION">ترقية</option><option value="JOB_CHANGE">تغيير وظيفة</option><option value="PROJECT_ASSIGNMENT">تعيين مشروع</option><option value="SHIFT_CHANGE">تغيير وردية</option><option value="TERMINATION">إنهاء خدمة</option><option value="OTHER">أخرى</option></select><input value={event.title} onChange={e=>setEvent({...event,title:e.target.value})} placeholder="وصف الحدث"/><input type="date" value={event.effective_date} onChange={e=>setEvent({...event,effective_date:e.target.value})}/><textarea value={event.description} onChange={e=>setEvent({...event,description:e.target.value})} placeholder="ملاحظات أو سبب التغيير"/><button className="primary" disabled={saving} onClick={addEvent}>{saving ? 'جاري الحفظ...' : 'إضافة للسجل الوظيفي'}</button></div>
-      </div>
-      <div className="profile-section employee-documents-section"><div className="section-title"><div><h3>مستندات الموظف</h3><p>المستندات الرسمية وتواريخ انتهائها وحالتها</p></div></div>
-        <div className="document-upload-form"><select value={docType} onChange={e=>setDocType(e.target.value)}>{safeRequirements.map(r=><option key={r.document_type} value={r.document_type}>{r.document_label}</option>)}<option value="PASSPORT">جواز السفر</option><option value="WORK_PERMIT">تصريح العمل</option><option value="OTHER">مستند آخر</option></select><input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={e=>setDocFile(e.target.files?.[0]||null)}/><input type="date" value={docIssue} onChange={e=>setDocIssue(e.target.value)} aria-label="تاريخ الإصدار"/><input type="date" value={docExpiry} onChange={e=>setDocExpiry(e.target.value)} aria-label="تاريخ الانتهاء"/><input value={docNotes} onChange={e=>setDocNotes(e.target.value)} placeholder="ملاحظات"/><button className="primary" disabled={saving} onClick={uploadDocument}>رفع المستند</button></div>
-        <div className="document-list">{safeDocuments.length ? safeDocuments.map(d=><div className="document-row" key={d.document_id}><div><strong>{d.document_label}</strong><span>{d.document_name}</span></div><div><span>{d.expiry_date ? `ينتهي ${d.expiry_date}` : 'بدون تاريخ انتهاء'}</span><Badge status={d.computed_status}/></div><div><button className="tiny secondary" onClick={()=>openDocument(d.document_id)}>فتح</button><button className="tiny reject" disabled={saving} onClick={()=>deleteDocument(d.document_id)}>حذف</button></div></div>) : <Empty text="لا توجد مستندات مرفوعة لهذا الموظف."/>}</div>
-      </div>
-      <div className="profile-columns">
-        <div className="profile-section"><h3>المشروعات السابقة والحالية</h3>{safeAssignments.length ? safeAssignments.map((x:any)=><div className="history-row" key={x.assignment_id}><strong>{x.projects?.name || 'مشروع غير محدد'}</strong><span>{x.start_date} → {x.end_date || 'مستمر'}</span></div>) : <Empty text="لا يوجد سجل مشروعات."/>}</div>
-        <div className="profile-section"><h3>الورديات</h3>{safeShifts.length ? safeShifts.map((x:any,i:number)=><div className="history-row" key={`${x.assignment_id}-${i}`}><strong>{x.shifts?.name || 'وردية'}</strong><span>{x.start_date} → {x.end_date || 'مستمرة'}</span></div>) : <Empty text="لا يوجد سجل ورديات."/>}</div>
-      </div>
-      <div className="profile-kpis"><div><strong>{profile.leaves?.length || 0}</strong><span>طلبات إجازة</span></div><div><strong>{profile.permissions?.length || 0}</strong><span>أذونات</span></div><div><strong>{profile.deductions?.length || 0}</strong><span>خصومات</span></div><div><strong>{profile.disciplinary_cases?.length || 0}</strong><span>وقائع انضباطية</span></div></div>
-    </div>
-  </div>;
+export default function EmployeeProfile({employeeId,onClose}:{employeeId:string;onClose:()=>void}){
+ const [profile,setProfile]=useState<any>(null),[busy,setBusy]=useState(true),[error,setError]=useState(''),[saving,setSaving]=useState(false),[activeSection,setActiveSection]=useState('overview');
+ const [event,setEvent]=useState({event_type:'OTHER',title:'',description:'',effective_date:new Date().toISOString().slice(0,10)});
+ const [docType,setDocType]=useState('NATIONAL_ID'),[docFile,setDocFile]=useState<File|null>(null),[docIssue,setDocIssue]=useState(''),[docExpiry,setDocExpiry]=useState(''),[docNotes,setDocNotes]=useState(''),[confirmDelete,setConfirmDelete]=useState<string|null>(null);
+ async function load(){try{setBusy(true);setError('');const [p,d]=await Promise.all([api<any>('employee_profile',{employee_id:employeeId}),api<any>('employee_documents',{employee_id:employeeId})]);setProfile(p?{...p,documents:Array.isArray(d?.documents)?d.documents:[],requirements:Array.isArray(d?.requirements)?d.requirements:[]}:null)}catch(e:any){setError(e.message||'تعذر تحميل ملف الموظف')}finally{setBusy(false)}}
+ useEffect(()=>{void load()},[employeeId]);
+ const e:Employee|undefined=profile?.employee; const docs=Array.isArray(profile?.documents)?profile.documents:[]; const reqs=Array.isArray(profile?.requirements)?profile.requirements:[]; const events=Array.isArray(profile?.events)?profile.events:[]; const assignments=Array.isArray(profile?.assignments)?profile.assignments:[]; const shifts=Array.isArray(profile?.shifts)?profile.shifts:[];
+ const counts=useMemo(()=>({leaves:Array.isArray(profile?.leaves)?profile.leaves.length:0,permissions:Array.isArray(profile?.permissions)?profile.permissions.length:0,deductions:Array.isArray(profile?.deductions)?profile.deductions.length:0,cases:Array.isArray(profile?.disciplinary_cases)?profile.disciplinary_cases.length:0}),[profile]);
+ async function addEvent(){if(!event.title.trim())return setError('عنوان الحدث الوظيفي مطلوب');try{setSaving(true);setError('');await api('add_employment_event',{employee_id:employeeId,...event});setEvent({...event,title:'',description:''});await load()}catch(e:any){setError(e.message||'تعذر حفظ الحدث')}finally{setSaving(false)}}
+ async function uploadDocument(){if(!docFile)return setError('اختر المستند أولًا');try{setSaving(true);setError('');const fd=new FormData();fd.append('action','upload_employee_document');fd.append('employee_id',employeeId);fd.append('document_type',docType);if(docIssue)fd.append('issue_date',docIssue);if(docExpiry)fd.append('expiry_date',docExpiry);fd.append('notes',docNotes);fd.append('document',docFile);const res=await fetch('/api/hr',{method:'POST',credentials:'include',cache:'no-store',body:fd});const data=await res.json();if(!res.ok||!data.ok)throw new Error(data.error||'تعذر رفع المستند');setDocFile(null);setDocIssue('');setDocExpiry('');setDocNotes('');await load()}catch(e:any){setError(e.message||'تعذر حفظ المستند')}finally{setSaving(false)}}
+ async function deleteDocument(id:string){try{setSaving(true);await api('delete_employee_document',{document_id:id});setConfirmDelete(null);await load()}catch(e:any){setError(e.message||'تعذر حذف المستند')}finally{setSaving(false)}}
+ async function openDocument(id:string){try{const d=await api<any>('employee_document_url',{document_id:id});window.open(d.signed_url,'_blank','noopener,noreferrer')}catch(e:any){setError(e.message||'تعذر فتح المستند')}}
+ if(busy)return <div className="profile-drawer"><div className="profile-drawer-card"><div className="profile-loading"><div className="skeleton-row"/><div className="skeleton-row"/><div className="skeleton-row"/></div></div></div>;
+ if(!e)return <div className="profile-drawer"><div className="profile-drawer-card"><div className="panel-head"><h2>ملف الموظف</h2><button className="secondary" onClick={onClose}>إغلاق</button></div><div className="state-card error-state">{error||'تعذر تحميل الملف'}</div></div></div>;
+ const sections=[['overview','نظرة عامة'],['timeline','المسار الوظيفي'],['documents','المستندات'],['assignments','المشروعات والورديات']];
+ return <div className="profile-drawer" role="dialog" aria-modal="true" onMouseDown={ev=>{if(ev.target===ev.currentTarget)onClose()}}><div className="profile-drawer-card">
+  <div className="profile-drawer-head"><div><span className="eyebrow">ملف الموارد البشرية</span><div className="profile-title-line"><div className="avatar-letter large">{String(e.name).slice(0,1)}</div><div><h2>{e.name}</h2><p>{e.job_title||'بدون وظيفة محددة'} · {e.employee_id}</p></div></div></div><button className="secondary" onClick={onClose}>إغلاق</button></div>
+  {error&&<div className="state-card error-state">{error}</div>}
+  <div className="profile-nav">{sections.map(([id,label])=><button key={id} className={activeSection===id?'active':''} onClick={()=>setActiveSection(id)}>{label}</button>)}</div>
+  {activeSection==='overview'&&<><div className="profile-stat-grid"><div><span>القسم</span><strong>{e.department||'—'}</strong></div><div><span>الهاتف</span><strong>{e.phone||'—'}</strong></div><div><span>الرقم القومي</span><strong>{e.national_id||'—'}</strong></div><div><span>تاريخ التعيين</span><strong>{dateAr(e.hire_date)}</strong></div><div><span>نوع الإقامة</span><strong>{e.residency_type==='EXPATRIATE'?'وافد':'مقيم'}</strong></div><div><span>الحالة</span><strong><Badge status={e.status||'ACTIVE'}/></strong></div></div><div className="profile-kpis"><div><strong>{counts.leaves}</strong><span>طلبات إجازة</span></div><div><strong>{counts.permissions}</strong><span>أذونات</span></div><div><strong>{counts.deductions}</strong><span>خصومات</span></div><div><strong>{counts.cases}</strong><span>وقائع انضباطية</span></div></div></>}
+  {activeSection==='timeline'&&<div className="profile-section"><div className="section-title"><div><h3>المسار الوظيفي</h3><p>كل تغيير مهم في مسار الموظف وتاريخ سريانه.</p></div></div><div className="timeline">{events.length?events.map((x:any)=><div className="timeline-item" key={x.event_id}><i/><div><strong>{x.title}</strong><span>{EVENT_LABELS[x.event_type]||x.event_type} · {dateAr(x.effective_date)}</span>{x.description&&<p>{x.description}</p>}</div></div>):<Empty text="لا توجد أحداث وظيفية مسجلة."/>}</div><div className="event-form"><select value={event.event_type} onChange={v=>setEvent({...event,event_type:v.target.value})}>{Object.entries(EVENT_LABELS).map(([k,l])=><option key={k} value={k}>{l}</option>)}</select><input value={event.title} onChange={v=>setEvent({...event,title:v.target.value})} placeholder="عنوان الحدث"/><input type="date" value={event.effective_date} onChange={v=>setEvent({...event,effective_date:v.target.value})}/><textarea value={event.description} onChange={v=>setEvent({...event,description:v.target.value})} placeholder="سبب التغيير أو الملاحظات"/><button className="primary" disabled={saving} onClick={addEvent}>{saving?'جاري الحفظ...':'إضافة للملف الوظيفي'}</button></div></div>}
+  {activeSection==='documents'&&<div className="profile-section"><div className="section-title"><div><h3>المستندات الرسمية</h3><p>رفع ومراجعة المستندات وتواريخ انتهائها.</p></div></div><div className="document-upload-form"><select value={docType} onChange={v=>setDocType(v.target.value)}>{reqs.map((r:any)=><option key={r.document_type} value={r.document_type}>{r.document_label}</option>)}{Object.entries(DOC_LABELS).filter(([k])=>!reqs.some((r:any)=>r.document_type===k)).map(([k,l])=><option key={k} value={k}>{l}</option>)}</select><input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={v=>setDocFile(v.target.files?.[0]||null)}/><input type="date" value={docIssue} onChange={v=>setDocIssue(v.target.value)} aria-label="تاريخ الإصدار"/><input type="date" value={docExpiry} onChange={v=>setDocExpiry(v.target.value)} aria-label="تاريخ الانتهاء"/><input value={docNotes} onChange={v=>setDocNotes(v.target.value)} placeholder="ملاحظات"/><button className="primary" disabled={saving} onClick={uploadDocument}>رفع المستند</button></div><div className="document-list">{docs.length?docs.map((d:any)=><div className="document-row" key={d.document_id}><div><strong>{d.document_label||DOC_LABELS[d.document_type]||'مستند'}</strong><span>{d.document_name}</span></div><div><span>{d.expiry_date?`ينتهي ${dateAr(d.expiry_date)}`:'بدون تاريخ انتهاء'}</span><Badge status={d.computed_status}/></div><div><button className="tiny secondary" onClick={()=>openDocument(d.document_id)}>فتح</button><button className="tiny reject" disabled={saving} onClick={()=>setConfirmDelete(d.document_id)}>حذف</button></div></div>):<Empty text="لا توجد مستندات مرفوعة لهذا الموظف."/>}</div></div>}
+  {activeSection==='assignments'&&<div className="profile-columns"><div className="profile-section"><h3>المشروعات</h3>{assignments.length?assignments.map((x:any)=><div className="history-row" key={x.assignment_id}><strong>{x.projects?.name||'مشروع غير محدد'}</strong><span>{dateAr(x.start_date)} → {x.end_date?dateAr(x.end_date):'مستمر'}</span></div>):<Empty text="لا يوجد سجل مشروعات."/>}</div><div className="profile-section"><h3>الورديات</h3>{shifts.length?shifts.map((x:any,i:number)=><div className="history-row" key={`${x.assignment_id||'shift'}-${i}`}><strong>{x.shifts?.name||'وردية'}</strong><span>{dateAr(x.start_date)} → {x.end_date?dateAr(x.end_date):'مستمرة'}</span></div>):<Empty text="لا يوجد سجل ورديات."/>}</div></div>}
+ </div>{confirmDelete&&<div className="confirm-overlay" onMouseDown={ev=>{if(ev.target===ev.currentTarget)setConfirmDelete(null)}}><div className="confirm-dialog"><div className="confirm-dialog-icon danger">!</div><h3>حذف المستند</h3><p>سيتم حذف المستند من ملف الموظف ولا يمكن التراجع عن العملية.</p><div className="confirm-dialog-actions"><button className="secondary" onClick={()=>setConfirmDelete(null)}>إلغاء</button><button className="danger" disabled={saving} onClick={()=>void deleteDocument(confirmDelete)}>تأكيد الحذف</button></div></div></div>}</div>;
 }

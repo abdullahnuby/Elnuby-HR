@@ -1,42 +1,67 @@
 'use client';
+
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { Empty, Badge } from './common';
 
-const TYPE_OPTIONS = [
-  { value: 'GENERAL', label: 'إذن عام' },
-  { value: 'PERSONAL', label: 'إذن شخصي' },
-  { value: 'MEDICAL', label: 'إذن طبي' },
-  { value: 'EMERGENCY', label: 'إذن طارئ' },
-  { value: 'OFFICIAL', label: 'إذن رسمي' },
-  { value: 'MISSION', label: 'مأمورية' },
-  { value: 'EARLY_DEPARTURE', label: 'انصراف مبكر' },
-];
+type Props = {
+  rows: any[];
+  employeeMode: boolean;
+  permissionType: string;
+  setPermissionType: (v: string) => void;
+  permissionStart: string;
+  setPermissionStart: (v: string) => void;
+  permissionEnd: string;
+  setPermissionEnd: (v: string) => void;
+  permissionReason: string;
+  setPermissionReason: (v: string) => void;
+  createPermission: () => void;
+  busy: boolean;
+};
 
-const TYPE_LABEL: Record<string, string> = Object.fromEntries(TYPE_OPTIONS.map(x => [x.value, x.label]));
+const PERMISSION_TYPES = [
+  ['GENERAL', 'إذن عام', 'خروج خلال ساعات العمل'],
+  ['PERSONAL', 'إذن شخصي', 'لشؤون شخصية'],
+  ['MEDICAL', 'إذن طبي', 'مراجعة أو موعد طبي'],
+  ['EMERGENCY', 'إذن طارئ', 'ظرف طارئ'],
+  ['OFFICIAL', 'إذن رسمي', 'مهمة أو إجراء رسمي'],
+  ['MISSION', 'مأمورية', 'مهمة خارج الموقع'],
+  ['EARLY_DEPARTURE', 'انصراف مبكر', 'مغادرة قبل نهاية العمل'],
+] as const;
 
-function formatDate(value: unknown) {
-  const text = String(value || '');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return text || '—';
-  return new Intl.DateTimeFormat('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(`${text}T00:00:00`));
+const typeLabel = Object.fromEntries(PERMISSION_TYPES.map(([value, label]) => [value, label]));
+
+function formatArabicDate(value?: string) {
+  if (!value) return '—';
+  const d = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return value;
+  return new Intl.DateTimeFormat('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' }).format(d);
 }
 
-function time12(value: unknown) {
-  const text = String(value || '').slice(0, 5);
-  const [h, m] = text.split(':').map(Number);
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return String(value || '—');
+function formatTime(value?: string) {
+  if (!value) return '—';
+  const [h, m] = String(value).slice(0, 5).split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return value;
   const period = h >= 12 ? 'م' : 'ص';
-  return `${(h % 12) || 12}:${String(m).padStart(2, '0')} ${period}`;
+  const hour = h % 12 || 12;
+  return `${hour}:${String(m).padStart(2, '0')} ${period}`;
 }
 
-function formatDuration(value: unknown) {
-  const minutes = Number(value);
+function durationText(minutes: number) {
   if (!Number.isFinite(minutes) || minutes <= 0) return '—';
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   if (!h) return `${m} دقيقة`;
-  if (!m) return `${h} ساعة`;
-  return `${h} ساعة و${m} دقيقة`;
+  if (!m) return `${h} ${h === 1 ? 'ساعة' : 'ساعات'}`;
+  return `${h} س و${m} د`;
+}
+
+function minutesBetween(start: string, end: string) {
+  const [sh, sm] = String(start).slice(0, 5).split(':').map(Number);
+  const [eh, em] = String(end).slice(0, 5).split(':').map(Number);
+  const s = sh * 60 + sm;
+  const e = eh * 60 + em;
+  return e > s ? e - s : 0;
 }
 
 export default function PermissionSection({
@@ -52,26 +77,22 @@ export default function PermissionSection({
   setPermissionReason,
   createPermission,
   busy,
-}: any) {
+}: Props) {
   const [localRows, setLocalRows] = useState<any[]>(Array.isArray(rows) ? rows : []);
   const [employees, setEmployees] = useState<any[]>([]);
   const [selected, setSelected] = useState<any | null>(null);
-  const [rejecting, setRejecting] = useState<any | null>(null);
+  const [rejecting, setRejecting] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
-  const [typeFilter, setTypeFilter] = useState('ALL');
-  const [working, setWorking] = useState<string | null>(null);
+  const [formError, setFormError] = useState('');
 
   useEffect(() => setLocalRows(Array.isArray(rows) ? rows : []), [rows]);
 
   useEffect(() => {
-    if (employeeMode) return;
     let active = true;
     (async () => {
       try {
-        const list = await api<any[]>('employees');
-        if (active) setEmployees(Array.isArray(list) ? list : []);
+        const data = await api<any[]>('employees');
+        if (active) setEmployees(Array.isArray(data) ? data : []);
       } catch {
         if (active) setEmployees([]);
       }
@@ -80,132 +101,142 @@ export default function PermissionSection({
   }, [employeeMode]);
 
   const employeeMap = useMemo(() => new Map(employees.map(e => [String(e.employee_id), e])), [employees]);
-  const normalizedRows = useMemo(() => localRows.map(r => ({
-    ...r,
-    employee_name: r.employee_name || employeeMap.get(String(r.employee_id))?.name || r.employee_id || 'غير محدد',
-    permission_type_label: TYPE_LABEL[String(r.permission_type || '').toUpperCase()] || r.permission_type || 'إذن عام',
-  })), [localRows, employeeMap]);
+  const safeRows = Array.isArray(localRows) ? localRows : [];
+  const displayName = (row: any) => row.employee_name || employeeMap.get(String(row.employee_id))?.name || row.employee_id || 'غير محدد';
+  const duration = minutesBetween(permissionStart, permissionEnd);
 
-  const filteredRows = useMemo(() => normalizedRows.filter(r => {
-    const haystack = `${r.employee_name || ''} ${r.employee_id || ''} ${r.reason || ''} ${r.permission_type_label || ''}`.toLowerCase();
-    if (search.trim() && !haystack.includes(search.trim().toLowerCase())) return false;
-    if (statusFilter !== 'ALL' && String(r.status || '') !== statusFilter) return false;
-    if (typeFilter !== 'ALL' && String(r.permission_type || '').toUpperCase() !== typeFilter) return false;
-    return true;
-  }), [normalizedRows, search, statusFilter, typeFilter]);
-
-  async function decide(requestId: string, decision: 'APPROVE'|'REJECT', comment?: string) {
-    setWorking(requestId + decision);
+  async function decide(requestId: string, decision: 'APPROVE' | 'REJECT', comment?: string) {
     try {
-      await api('decide_permission', { request_id: requestId, decision, comment: comment || null });
-      const nextStatus = decision === 'APPROVE' ? 'APPROVED' : 'REJECTED';
-      setLocalRows(prev => prev.map(r => r.request_id === requestId ? { ...r, status: nextStatus, manager_comment: comment || null } : r));
-      if (selected?.request_id === requestId) setSelected((prev: any) => prev ? { ...prev, status: nextStatus, manager_comment: comment || null } : prev);
-      window.dispatchEvent(new CustomEvent('hr:toast', { detail: { message: decision === 'APPROVE' ? 'تم اعتماد طلب الإذن' : 'تم رفض طلب الإذن' } }));
-      setRejecting(null);
+      await api('decide_permission', { request_id: requestId, decision, comment: comment || undefined });
+      setLocalRows(prev => prev.map(r => r.request_id === requestId
+        ? { ...r, status: decision === 'APPROVE' ? 'APPROVED' : 'REJECTED', manager_comment: comment || r.manager_comment }
+        : r));
+      setSelected((current: any) => current?.request_id === requestId ? null : current);
+      setRejecting(false);
       setRejectReason('');
+      window.dispatchEvent(new CustomEvent('hr:toast', { detail: { message: decision === 'APPROVE' ? 'تم اعتماد طلب الإذن' : 'تم رفض طلب الإذن' } }));
     } catch (error: any) {
       window.dispatchEvent(new CustomEvent('hr:toast', { detail: { message: error?.message || 'تعذر تنفيذ القرار', type: 'error' } }));
-    } finally {
-      setWorking(null);
     }
   }
 
-  const permissionMinutes = permissionStart && permissionEnd
-    ? Math.max(0, Math.round((new Date(`2000-01-01T${permissionEnd.slice(11, 16) || permissionEnd}`).getTime() - new Date(`2000-01-01T${permissionStart.slice(11, 16) || permissionStart}`).getTime()) / 60000))
-    : 0;
+  function submitRequest() {
+    setFormError('');
+    if (!permissionType) return setFormError('اختر نوع الإذن.');
+    if (!permissionStart || !permissionEnd) return setFormError('حدد بداية ونهاية الإذن.');
+    if (duration <= 0) return setFormError('يجب أن تسبق بداية الإذن نهايته.');
+    if (!permissionReason.trim()) return setFormError('اكتب سبب الإذن.');
+    createPermission();
+  }
 
   return (
-    <section className="panel page-panel hr-permissions">
+    <section className="panel page-panel permissions-page">
       <div className="panel-head">
         <div>
+          <div className="eyebrow">إدارة الأذونات</div>
           <h2>الأذونات</h2>
-          <p>إدارة طلبات الأذونات ومراجعتها واعتمادها من شاشة واحدة.</p>
+          <p>إنشاء ومتابعة واعتماد الأذونات من شاشة واضحة وسريعة.</p>
         </div>
-        <span className="count-pill">{filteredRows.length} طلب</span>
+        <span className="count-pill">{safeRows.length} طلب</span>
       </div>
 
       {employeeMode && (
-        <div className="request-card permission-form-card">
-          <div className="request-card-head">
-            <div><h3>طلب إذن جديد</h3><p>حدد نوع الإذن ووقته وسيحسب النظام المدة تلقائيًا.</p></div>
+        <div className="request-card permission-create-card">
+          <div className="request-card-headline">
+            <div><h3>طلب إذن جديد</h3><p>اختر النوع والفترة والسبب، وسيظهر لك ملخص الطلب قبل الإرسال.</p></div>
           </div>
+
           <div className="permission-type-grid">
-            {TYPE_OPTIONS.map(option => (
-              <button type="button" key={option.value} className={`permission-type-option ${permissionType === option.value ? 'active' : ''}`} onClick={() => setPermissionType(option.value)}>
-                <strong>{option.label}</strong>
-                <span>{option.value === 'EARLY_DEPARTURE' ? 'مغادرة قبل نهاية العمل' : 'طلب يحتاج اعتمادًا'}</span>
+            {PERMISSION_TYPES.map(([value, label, note]) => (
+              <button type="button" key={value} className={`permission-type-option ${permissionType === value ? 'active' : ''}`} onClick={() => setPermissionType(value)}>
+                <strong>{label}</strong><span>{note}</span>
               </button>
             ))}
           </div>
+
           <div className="formgrid permission-form-grid">
-            <label><span>وقت البداية</span><input type="datetime-local" value={permissionStart} onChange={e => setPermissionStart(e.target.value)} /></label>
-            <label><span>وقت النهاية</span><input type="datetime-local" value={permissionEnd} onChange={e => setPermissionEnd(e.target.value)} /></label>
-            <label className="wide"><span>السبب</span><textarea rows={3} placeholder="اكتب سبب الإذن" value={permissionReason} onChange={e => setPermissionReason(e.target.value)} /></label>
+            <label><span>من</span><input type="datetime-local" value={permissionStart} onChange={e => setPermissionStart(e.target.value)} /></label>
+            <label><span>إلى</span><input type="datetime-local" value={permissionEnd} onChange={e => setPermissionEnd(e.target.value)} /></label>
+            <label className="wide"><span>السبب</span><textarea rows={3} value={permissionReason} onChange={e => setPermissionReason(e.target.value)} placeholder="اكتب سبب الإذن بوضوح" /></label>
           </div>
-          {permissionMinutes > 0 && <div className="permission-duration-preview"><span>مدة الإذن المتوقعة</span><strong>{formatDuration(permissionMinutes)}</strong></div>}
-          <button className="primary" disabled={busy || !permissionStart || !permissionEnd || !permissionReason.trim()} onClick={createPermission}>{busy ? 'جاري إرسال الطلب...' : 'إرسال طلب الإذن'}</button>
+
+          <div className="permission-duration-preview">
+            <span>مدة الإذن المتوقعة</span>
+            <strong>{durationText(duration)}</strong>
+          </div>
+
+          {formError && <div className="inline-form-error">{formError}</div>}
+          <button className="primary" disabled={busy} onClick={submitRequest}>{busy ? 'جاري الإرسال...' : 'إرسال طلب الإذن'}</button>
         </div>
       )}
 
-      <div className="table-toolbar">
-        <div className="table-search"><input value={search} onChange={e => setSearch(e.target.value)} placeholder="ابحث باسم الموظف أو سبب الطلب" aria-label="بحث الأذونات" /></div>
-        <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} aria-label="نوع الإذن">
-          <option value="ALL">كل أنواع الأذونات</option>{TYPE_OPTIONS.map(x => <option key={x.value} value={x.value}>{x.label}</option>)}
-        </select>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="حالة الإذن">
-          <option value="ALL">كل الحالات</option><option value="PENDING">بانتظار الاعتماد</option><option value="APPROVED">معتمد</option><option value="REJECTED">مرفوض</option>
-        </select>
-        {(search || statusFilter !== 'ALL' || typeFilter !== 'ALL') && <button className="secondary" onClick={() => { setSearch(''); setStatusFilter('ALL'); setTypeFilter('ALL'); }}>مسح الفلاتر</button>}
-      </div>
-
-      <div className="table-wrap hr-enhanced-table">
-        <table>
-          <thead><tr><th>الموظف</th><th>نوع الإذن</th><th>التاريخ</th><th>الفترة</th><th>المدة</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
-          <tbody>
-            {filteredRows.map(r => (
-              <tr key={r.request_id} onDoubleClick={() => setSelected(r)}>
-                <td data-label="الموظف"><strong>{r.employee_name}</strong><small>{r.employee_id || '—'}</small></td>
-                <td data-label="نوع الإذن">{r.permission_type_label}</td>
-                <td data-label="التاريخ">{formatDate(r.date)}</td>
-                <td data-label="الفترة" dir="ltr">{time12(r.start_time)} — {time12(r.end_time)}</td>
-                <td data-label="المدة">{formatDuration(r.minutes)}</td>
-                <td data-label="الحالة"><Badge status={r.status}/></td>
-                <td data-label="الإجراءات"><div className="table-actions"><button className="table-action" onClick={() => setSelected(r)}>التفاصيل</button>{r.status === 'PENDING' && <><button className="tiny approve" disabled={working === r.request_id + 'APPROVE'} onClick={() => void decide(r.request_id, 'APPROVE')}>اعتماد</button><button className="tiny reject" onClick={() => setRejecting(r)}>رفض</button></>}</div></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {!filteredRows.length && <Empty text={search || statusFilter !== 'ALL' || typeFilter !== 'ALL' ? 'لا توجد طلبات مطابقة للفلاتر.' : 'لا توجد طلبات إذن.'} />}
-
-      {selected && <div className="request-drawer-overlay" onMouseDown={e => { if (e.target === e.currentTarget) setSelected(null); }}>
-        <aside className="request-drawer" role="dialog" aria-modal="true" aria-labelledby="permission-details-title">
-          <header className="request-drawer-head"><div><span>طلب إذن</span><h2 id="permission-details-title">تفاصيل طلب الإذن</h2><small>{selected.request_id}</small></div><button className="icon-close" onClick={() => setSelected(null)} aria-label="إغلاق">×</button></header>
-          <div className="request-status-banner"><span>الحالة</span><Badge status={selected.status}/></div>
-          <div className="request-detail-grid">
-            <div><span>الموظف</span><strong>{selected.employee_name}</strong></div>
-            <div><span>الرقم الوظيفي</span><strong>{selected.employee_id || '—'}</strong></div>
-            <div><span>نوع الإذن</span><strong>{selected.permission_type_label}</strong></div>
-            <div><span>التاريخ</span><strong>{formatDate(selected.date)}</strong></div>
-            <div><span>البداية</span><strong>{time12(selected.start_time)}</strong></div>
-            <div><span>النهاية</span><strong>{time12(selected.end_time)}</strong></div>
-            <div><span>المدة</span><strong>{formatDuration(selected.minutes)}</strong></div>
-            <div className="wide"><span>السبب</span><strong>{selected.reason || 'لا يوجد سبب مسجل'}</strong></div>
-          </div>
-          {selected.manager_comment && <div className="request-comment"><span>ملاحظة الاعتماد</span><p>{selected.manager_comment}</p></div>}
-          <footer className="request-drawer-footer">{selected.status === 'PENDING' && <><button className="danger-outline" onClick={() => setRejecting(selected)}>رفض الطلب</button><button className="primary" disabled={!!working} onClick={() => void decide(selected.request_id, 'APPROVE')}>اعتماد الطلب</button></>}</footer>
-        </aside>
-      </div>}
-
-      {rejecting && <div className="confirm-overlay" onMouseDown={e => { if (e.target === e.currentTarget) setRejecting(null); }}>
-        <div className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="reject-title">
-          <div className="confirm-dialog-icon danger">!</div><h3 id="reject-title">رفض طلب الإذن</h3><p>اكتب سبب الرفض ليظهر ضمن سجل الطلب.</p>
-          <textarea rows={4} value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="سبب الرفض *" autoFocus />
-          <div className="confirm-dialog-actions"><button className="secondary" onClick={() => { setRejecting(null); setRejectReason(''); }}>إلغاء</button><button className="danger" disabled={!rejectReason.trim() || !!working} onClick={() => void decide(rejecting.request_id, 'REJECT', rejectReason.trim())}>تأكيد الرفض</button></div>
+      {!employeeMode && (
+        <div className="table-toolbar">
+          <div className="table-toolbar-title"><strong>طلبات الأذونات</strong><span>اضغط على أي طلب لعرض التفاصيل واتخاذ القرار.</span></div>
+          <span className="table-toolbar-count">{safeRows.length} طلب</span>
         </div>
-      </div>}
+      )}
+
+      <div className="permission-list">
+        {safeRows.map((r: any) => (
+          <article className="permission-request-card" key={r.request_id} onClick={() => setSelected(r)}>
+            <div className="permission-request-main">
+              <div className="permission-person">
+                <div className="avatar-letter">{String(displayName(r)).slice(0, 1)}</div>
+                <div><strong>{displayName(r)}</strong><span>{r.employee_id || '—'}</span></div>
+              </div>
+              <div className="permission-request-type"><strong>{typeLabel[String(r.permission_type || 'GENERAL').toUpperCase()] || String(r.permission_type || 'إذن عام')}</strong><span>{formatArabicDate(r.date)}</span></div>
+              <div className="permission-time-block"><strong>{formatTime(r.start_time)} — {formatTime(r.end_time)}</strong><span>{durationText(Number(r.minutes || 0))}</span></div>
+              <Badge status={r.status} />
+              <button type="button" className="table-action" onClick={e => { e.stopPropagation(); setSelected(r); }}>التفاصيل</button>
+            </div>
+            {r.reason && <p className="permission-request-reason">{r.reason}</p>}
+          </article>
+        ))}
+      </div>
+
+      {!safeRows.length && <Empty text="لا توجد طلبات إذن." />}
+
+      {selected && (
+        <div className="request-drawer-overlay" onMouseDown={e => { if (e.target === e.currentTarget) setSelected(null); }}>
+          <aside className="request-drawer permission-drawer" role="dialog" aria-modal="true">
+            <div className="request-drawer-head">
+              <div><span>تفاصيل طلب الإذن</span><h2>{displayName(selected)}</h2><small>{selected.request_id}</small></div>
+              <button className="icon-close" onClick={() => setSelected(null)} aria-label="إغلاق">×</button>
+            </div>
+            <div className="request-status-banner"><span>الحالة الحالية</span><Badge status={selected.status} /></div>
+            <div className="request-detail-grid">
+              <div><span>نوع الإذن</span><strong>{typeLabel[String(selected.permission_type || 'GENERAL').toUpperCase()] || String(selected.permission_type || 'إذن عام')}</strong></div>
+              <div><span>التاريخ</span><strong>{formatArabicDate(selected.date)}</strong></div>
+              <div><span>بداية الإذن</span><strong>{formatTime(selected.start_time)}</strong></div>
+              <div><span>نهاية الإذن</span><strong>{formatTime(selected.end_time)}</strong></div>
+              <div><span>المدة</span><strong>{durationText(Number(selected.minutes || 0))}</strong></div>
+              <div><span>المشروع</span><strong>{selected.project_name || selected.project_id || 'غير محدد'}</strong></div>
+              <div className="wide"><span>السبب</span><strong>{selected.reason || 'لم يُذكر سبب'}</strong></div>
+            </div>
+            {selected.manager_comment && <div className="request-comment"><span>ملاحظة القرار</span><p>{selected.manager_comment}</p></div>}
+
+            <div className="request-drawer-footer">
+              {selected.status === 'PENDING' && !employeeMode ? <>
+                <button className="primary" onClick={() => void decide(selected.request_id, 'APPROVE')}>اعتماد الطلب</button>
+                <button className="danger-outline" onClick={() => setRejecting(true)}>رفض الطلب</button>
+              </> : <button className="secondary" onClick={() => setSelected(null)}>إغلاق</button>}
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {rejecting && selected && (
+        <div className="confirm-overlay" onMouseDown={e => { if (e.target === e.currentTarget) setRejecting(false); }}>
+          <div className="confirm-dialog">
+            <div className="confirm-dialog-icon danger">!</div>
+            <h3>رفض طلب الإذن</h3>
+            <p>اكتب سبب الرفض ليظهر للموظف ويحفظ ضمن سجل الطلب.</p>
+            <textarea rows={4} value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="سبب الرفض *" autoFocus />
+            <div className="confirm-dialog-actions"><button className="secondary" onClick={() => setRejecting(false)}>إلغاء</button><button className="danger" disabled={!rejectReason.trim()} onClick={() => void decide(selected.request_id, 'REJECT', rejectReason.trim())}>تأكيد الرفض</button></div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
