@@ -4,6 +4,9 @@ export type Employee = {
   job_title?: string;
   department?: string;
   phone?: string;
+  national_id?: string;
+  birth_date?: string;
+  hire_date?: string;
   status?: string;
   residency_type?: 'EXPATRIATE' | 'RESIDENT';
   project_id?: string;
