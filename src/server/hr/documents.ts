@@ -53,6 +53,22 @@ export async function uploadEmployeeDocument(session: SessionContext, body: Reco
   }
 }
 
+export async function documentsOverview(session: SessionContext, body: Record<string, unknown>) {
+  if (!HR_ROLES.includes(session.user.role)) return errorResponse('ليس لديك صلاحية عرض مركز المستندات',403);
+  const { data, error } = await supabase.from('employee_documents').select('document_id,employee_id,document_type,document_name,issue_date,expiry_date,status,notes,created_at').order('expiry_date',{ascending:true,nullsFirst:false}).order('created_at',{ascending:false}).limit(1000);
+  if (error) return errorResponse('تعذر تحميل مركز المستندات',500);
+  const employees = await supabase.from('employees').select('employee_id,name,job_title,department').in('employee_id',(data||[]).map((d:any)=>d.employee_id));
+  if (employees.error) return errorResponse('تعذر تحميل بيانات الموظفين للمستندات',500);
+  const em = new Map((employees.data||[]).map((e:any)=>[String(e.employee_id),e]));
+  const now = Date.now();
+  const enriched = (data||[]).map((d:any)=>{
+    const days = d.expiry_date ? Math.ceil((new Date(`${d.expiry_date}T23:59:59`).getTime()-now)/86400000) : null;
+    const computed_status = days !== null && days < 0 ? 'EXPIRED' : days !== null && days <= 30 ? 'EXPIRING' : d.status;
+    return {...d, employee_name:em.get(String(d.employee_id))?.name || d.employee_id, job_title:em.get(String(d.employee_id))?.job_title, department:em.get(String(d.employee_id))?.department, days_to_expiry:days, computed_status};
+  });
+  return success({documents:enriched});
+}
+
 export async function employeeDocumentUrl(session: SessionContext, body: Record<string, unknown>) {
   if (!HR_ROLES.includes(session.user.role)) return errorResponse('ليس لديك صلاحية فتح المستند',403);
   const id = String(body.document_id||'').trim();

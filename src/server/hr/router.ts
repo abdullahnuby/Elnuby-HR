@@ -15,7 +15,7 @@ import { listDeductions, listUsers, createUser, updateUser, deleteUser, assignSe
 import { attendanceMonthlyReport } from "./reports";
 import { listNotifications } from "./notifications";
 import { performanceList, performanceTemplates, createPerformanceTemplate, createPerformanceReview, savePerformanceScores, decidePerformanceReview, performanceGoals, createPerformanceGoal, updatePerformanceGoal, developmentPlans, createDevelopmentPlan, updateDevelopmentPlan } from './performance';
-import { employeeDocuments, uploadEmployeeDocument, employeeDocumentUrl, deleteEmployeeDocument } from './documents';
+import { employeeDocuments, documentsOverview, uploadEmployeeDocument, employeeDocumentUrl, deleteEmployeeDocument } from './documents';
 import { approvalInbox, createApprovalRequest, approvalRequests } from "./governance";
 import { listOrganizationUnits, createOrganizationUnit, updateOrganizationUnit, assignEmployeeOrganization, employeeOrganizationHistory } from "./organization";
 import { disciplinaryCases, createDisciplinaryCase, decideDisciplinaryCase, trainingPrograms, createTrainingProgram, assignTraining, recruitmentData, createPosition, addCandidate, updateCandidate, workforcePlan, createWorkforcePlan, payrollExportPreview } from "./advanced";
@@ -280,6 +280,7 @@ export async function handleAction(
 
     case "employee_contracts": { const auth = requireRole(session, ADMIN_ROLES); if (auth) return auth; return listEmployeeContracts(session!, body); }
     case "employee_documents": { const auth = requireRole(session, ADMIN_ROLES); if (auth) return auth; return employeeDocuments(session!, body); }
+    case "documents_overview": { const auth = requireRole(session, ADMIN_ROLES); if (auth) return auth; return documentsOverview(session!, body); }
     case "upload_employee_document": { const auth = requireRole(session, ADMIN_ROLES); if (auth) return auth; return uploadEmployeeDocument(session!, body); }
     case "employee_document_url": { const auth = requireRole(session, ADMIN_ROLES); if (auth) return auth; return employeeDocumentUrl(session!, body); }
     case "delete_employee_document": { const auth = requireRole(session, ADMIN_ROLES); if (auth) return auth; return deleteEmployeeDocument(session!, body); }

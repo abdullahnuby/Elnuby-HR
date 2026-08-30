@@ -1,171 +1,22 @@
+'use client';
+import { useMemo, useState } from 'react';
 import Icon from './Icon';
 import type { Project, Employee } from './types';
 import { Empty, Badge } from './common';
-export default function Projects({
-  projects,
-  employees,
-  managerMode,
-  projectForm,
-  setProjectForm,
-  createProject,
-  busy,
-  onEdit,
-}: {
-  projects: Project[];
-  employees: Employee[];
-  managerMode: boolean;
-  projectForm: any;
-  setProjectForm: any;
-  createProject: () => void;
-  busy: boolean;
-  onEdit?: (projectId: string) => void;
-}) {
-  return (
-    <section className="panel page-panel">
-      <div className="panel-head">
-        <div>
-          <h2>المشاريع</h2>
-          <p>
-            إنشاء وإدارة مواقع المشاريع
-            وإحداثيات الموقع الجغرافي ونطاق الحضور.
-          </p>
-        </div>
+import { Detail, Drawer, Filters, Metric, PageHeader, TableShell } from './ui';
 
-        <span className="count-pill">
-          {projects.length} مشروع
-        </span>
-      </div>
-
-      {!managerMode && (
-        <div className="request-card">
-          <h3>
-            إضافة مشروع جديد
-          </h3>
-
-          <div className="formgrid project-formgrid">
-            <label><span>اسم المشروع *</span><input value={projectForm.name} onChange={(e)=>setProjectForm({...projectForm,name:e.target.value})}/></label>
-            <label><span>العميل</span><input value={projectForm.client} onChange={(e)=>setProjectForm({...projectForm,client:e.target.value})}/></label>
-            <label><span>اسم الموقع</span><input value={projectForm.location_name} onChange={(e)=>setProjectForm({...projectForm,location_name:e.target.value})}/></label>
-            <label><span>نطاق الحضور (متر)</span><input type="number" min="50" value={projectForm.geofence_radius_m ?? 200} onChange={(e)=>setProjectForm({...projectForm,geofence_radius_m:e.target.value})}/></label>
-            <label><span>خط العرض *</span><input type="number" step="any" value={projectForm.latitude} onChange={(e)=>setProjectForm({...projectForm,latitude:e.target.value})}/></label>
-            <label><span>خط الطول *</span><input type="number" step="any" value={projectForm.longitude} onChange={(e)=>setProjectForm({...projectForm,longitude:e.target.value})}/></label>
-          </div>
-
-          <button
-            className="primary"
-            disabled={busy}
-            onClick={createProject}
-          >
-            إنشاء المشروع
-          </button>
-        </div>
-      )}
-
-      <div className="project-cards">
-        {projects.map((p) => {
-          const assigned =
-            employees.filter(
-              (e) =>
-                String(
-                  e.project_id || '',
-                ) ===
-                String(p.project_id),
-            );
-
-          return (
-            <div
-              className="project-card"
-              key={p.project_id}
-            >
-              <div className="project-icon">
-                <Icon name="projects" size={19} />
-              </div>
-
-              <div className="project-card-main">
-                <h3>
-                  {p.name ||
-                    p.project_id}
-                </h3>
-
-                <p>
-                  {p.location_name ||
-                    'الموقع غير محدد'}{' '}
-                  {p.client
-                    ? `• ${p.client}`
-                    : ''}
-                </p>
-
-                <div className="project-meta">
-                  <Badge status={p.status || 'ACTIVE'} />
-
-                  <span>
-                    👷 {p.employee_count ?? assigned.length}{' '}
-                    موظف
-                  </span>
-
-                  <span>
-                    مديرو المشروع:{' '}
-                    {(p.managers || [])
-                      .map(
-                        (m: any) =>
-                          m.name ||
-                          m.username,
-                      )
-                      .filter(Boolean)
-                      .join('، ') ||
-                      'غير محدد'}
-                  </span>
-
-                  <span>
-                    الموقع {p.latitude},{' '}
-                    {p.longitude}
-                  </span>
-
-                  <span>
-                    {p.geofence_radius_m ||
-                      200}
-                    m
-                  </span>
-                </div>
-
-                {onEdit && <button className="secondary" disabled={busy} onClick={() => onEdit(p.project_id)}>تعديل المشروع</button>}
-
-                <div className="project-workers">
-                  {assigned
-                    .slice(0, 6)
-                    .map((e) => (
-                      <span
-                        key={
-                          e.employee_id
-                        }
-                        title={e.name}
-                      >
-                        {e.name}
-                      </span>
-                    ))}
-
-                  {assigned.length > 6 && (
-                    <span>
-                      +{assigned.length - 6}
-                    </span>
-                  )}
-
-                  {!assigned.length && (
-                    <span>
-                      لا يوجد موظفون معينون
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {!projects.length && (
-        <Empty text="لا توجد مشاريع مسجلة حتى الآن. أضف أول مشروع من النموذج أعلاه." />
-      )}
-    </section>
-  );
+export default function Projects({projects,employees,managerMode,projectForm,setProjectForm,createProject,busy,onEdit}:{projects:Project[];employees:Employee[];managerMode:boolean;projectForm:any;setProjectForm:any;createProject:()=>void;busy:boolean;onEdit?: (projectId:string)=>void}){
+ const safeProjects=Array.isArray(projects)?projects:[]; const safeEmployees=Array.isArray(employees)?employees:[];
+ const [query,setQuery]=useState(''); const [status,setStatus]=useState('ALL'); const [selected,setSelected]=useState<Project|null>(null); const [showCreate,setShowCreate]=useState(false);
+ const filtered=useMemo(()=>safeProjects.filter(p=>(!query||`${p.name} ${p.client||''} ${p.location_name||''}`.toLowerCase().includes(query.toLowerCase()))&&(status==='ALL'||String(p.status||'ACTIVE')===status)),[safeProjects,query,status]);
+ const totalEmployees=safeProjects.reduce((s,p)=>s+Number(p.employee_count||0),0);
+ return <section className="panel page-panel">
+  <PageHeader title="المشاريع" subtitle="إدارة مواقع المشاريع ونطاقات الحضور وربط فرق العمل." eyebrow="إدارة التشغيل" count={<span className="count-pill">{safeProjects.length} مشروع</span>} actions={!managerMode?<button className="primary" onClick={()=>setShowCreate(v=>!v)}>{showCreate?'إغلاق النموذج':'إضافة مشروع'}</button>:null}/>
+  {showCreate&&!managerMode&&<div className="ux-card" style={{marginBottom:14}}><div className="request-card-headline"><div><h3>إضافة مشروع جديد</h3><p>سجل اسم المشروع وموقعه ونطاق الحضور الجغرافي.</p></div></div><div className="ux-grid-2"><label className="ux-field"><span>اسم المشروع *</span><input value={projectForm.name} onChange={e=>setProjectForm({...projectForm,name:e.target.value})}/></label><label className="ux-field"><span>العميل</span><input value={projectForm.client} onChange={e=>setProjectForm({...projectForm,client:e.target.value})}/></label><label className="ux-field"><span>اسم الموقع</span><input value={projectForm.location_name} onChange={e=>setProjectForm({...projectForm,location_name:e.target.value})}/></label><label className="ux-field"><span>نطاق الحضور بالمتر</span><input type="number" min="50" value={projectForm.geofence_radius_m||200} onChange={e=>setProjectForm({...projectForm,geofence_radius_m:e.target.value})}/></label><label className="ux-field"><span>خط العرض *</span><input type="number" step="any" value={projectForm.latitude} onChange={e=>setProjectForm({...projectForm,latitude:e.target.value})}/></label><label className="ux-field"><span>خط الطول *</span><input type="number" step="any" value={projectForm.longitude} onChange={e=>setProjectForm({...projectForm,longitude:e.target.value})}/></label></div><button className="primary" disabled={busy||!projectForm.name||!projectForm.latitude||!projectForm.longitude} onClick={()=>{createProject();setShowCreate(false)}}>حفظ المشروع</button></div>}
+  <div className="ux-metric-grid"><Metric label="إجمالي المشاريع" value={safeProjects.length} caption="المسجلة بالنظام" icon="projects"/><Metric label="المشاريع النشطة" value={safeProjects.filter(p=>p.status==='ACTIVE'||!p.status).length} caption="قيد التشغيل" tone="green" icon="check"/><Metric label="أفراد الفرق" value={totalEmployees} caption="حسب التعيينات الحالية" tone="purple" icon="users"/><Metric label="مشاريع بإحداثيات" value={safeProjects.filter(p=>p.latitude&&p.longitude).length} caption="مجهزة للحضور الجغرافي" tone="amber" icon="projects"/></div>
+  <Filters onReset={()=>{setQuery('');setStatus('ALL')}}><label className="ux-field"><span>بحث</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="اسم المشروع أو العميل أو الموقع"/></label><label className="ux-field"><span>الحالة</span><select value={status} onChange={e=>setStatus(e.target.value)}><option value="ALL">كل الحالات</option><option value="ACTIVE">نشط</option><option value="INACTIVE">غير نشط</option></select></label></Filters>
+  <TableShell title="قائمة المشاريع" count={`${filtered.length} نتيجة`} empty={!filtered.length?'لا توجد مشاريع مطابقة للبحث الحالي.':undefined}><table><thead><tr><th>المشروع</th><th>الموقع</th><th>العميل</th><th>الفريق</th><th>نطاق الحضور</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>{filtered.map(p=><tr key={p.project_id} onClick={()=>setSelected(p)} style={{cursor:'pointer'}}><td><div className="ux-person"><span className="ux-avatar"><Icon name="projects" size={15}/></span><span><strong>{p.name||p.project_id}</strong><small>{p.project_id}</small></span></div></td><td>{p.location_name||'غير محدد'}</td><td>{p.client||'—'}</td><td>{p.employee_count??safeEmployees.filter(e=>String(e.project_id)===String(p.project_id)).length} موظف</td><td>{p.geofence_radius_m||200} متر</td><td><Badge status={p.status||'ACTIVE'}/></td><td>{onEdit&&<button className="table-action" onClick={e=>{e.stopPropagation();onEdit(p.project_id)}} disabled={busy}>تعديل</button>}</td></tr>)}</tbody></table></TableShell>
+  <ConfirmDialog open={confirm} title="إضافة مشروع جديد" description="سيتم فتح نموذج المشروع هنا بعد التأكيد." confirmLabel="فتح النموذج" onClose={()=>setConfirm(false)} onConfirm={()=>{setConfirm(false);setProjectForm({...projectForm,name:'',client:'',location_name:'',latitude:'',longitude:'',geofence_radius_m:'200'});}}/>
+  <Drawer open={!!selected} title={selected?.name||'تفاصيل المشروع'} subtitle={selected?.project_id} onClose={()=>setSelected(null)}><div className="ux-detail-grid"><Detail label="الحالة"><Badge status={selected?.status||'ACTIVE'}/></Detail><Detail label="العميل" value={selected?.client}/><Detail label="الموقع" value={selected?.location_name}/><Detail label="الفريق" value={`${selected?.employee_count??safeEmployees.filter(e=>String(e.project_id)===String(selected?.project_id)).length} موظف`}/><Detail label="الإحداثيات" value={selected?.latitude&&selected?.longitude?`${selected.latitude} ، ${selected.longitude}`:'غير محددة'} wide/><Detail label="نطاق الحضور" value={`${selected?.geofence_radius_m||200} متر`}/></div><div className="ux-section"><h4>مديرو المشروع</h4><div className="ux-list">{(selected?.managers||[]).length?(selected?.managers||[]).map((m:any)=><div className="ux-list-item" key={m.user_id||m.username}><div className="ux-person"><span className="ux-avatar">{String(m.name||m.username||'?').charAt(0)}</span><span><strong>{m.name||m.username}</strong><small>مدير المشروع</small></span></div></div>):<span className="ux-muted">لا يوجد مدير مرتبط حاليًا.</span>}</div></div></Drawer>
+ </section>
 }
-

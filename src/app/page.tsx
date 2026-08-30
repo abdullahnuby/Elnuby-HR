@@ -24,6 +24,7 @@ import HRExecutiveDashboard from '@/components/hr/HRExecutiveDashboard';
 import ApprovalsCenter from '@/components/hr/ApprovalsCenter';
 import ClientErrorBoundary from '@/components/hr/ClientErrorBoundary';
 import HRAdvanced from '@/components/hr/HRAdvanced';
+import DocumentCenter from '@/components/hr/DocumentCenter';
 
 
 type Employee = {
@@ -1255,7 +1256,8 @@ export default function Home() {
               assignProject={assignProject}
               busy={busy}
             
-              onEdit={['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? updateEmployeeRecord : undefined}/>
+              onEdit={['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? updateEmployeeRecord : undefined}
+              onOpenProfile={(id) => setEmployeeProfileId(id)}/>
           )}
 
           {employeeProfileId && <EmployeeProfile employeeId={employeeProfileId} onClose={() => setEmployeeProfileId(null)} />}
@@ -1431,6 +1433,8 @@ export default function Home() {
 
           {section === 'performance' && <Performance employees={employees} role={me.user?.role} />}
           {section === 'hr-advanced' && <HRAdvanced employees={employees} role={me.user?.role} />}
+
+          {section === 'documents' && <DocumentCenter />}
 
           {section === 'notifications' && (
             <section className="panel-section">

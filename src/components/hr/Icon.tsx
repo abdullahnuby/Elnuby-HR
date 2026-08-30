@@ -11,6 +11,7 @@ const paths: Record<string, ReactElement> = {
   leaves:<><path d="M4 4h16v16H4z"/><path d="M8 2v4M16 2v4M4 9h16"/><path d="M8 13h3M8 17h5"/></>,
   permissions:<><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
   deductions:<><path d="M5 12h14"/></>,
+  documents:<><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></>,
   reports:<><path d="M4 19V5M4 19h16"/><path d="M8 16v-5M12 16V7M16 16v-9"/></>,
   settings:<><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="m19.4 15 .1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.3a2 2 0 1 1-4 0V19a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 5.2 12a1.7 1.7 0 0 0-1.2-1.6h-.3a2 2 0 1 1 0-4H4A1.7 1.7 0 0 0 5.2 3.5l-.1-.1A2 2 0 1 1 7.9.6l.1.1A1.7 1.7 0 0 0 10.9-.5v-.3"/></>,
   menu:<><path d="M4 6h16M4 12h16M4 18h16"/></>,

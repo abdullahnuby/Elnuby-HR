@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { apiFile, downloadExcel } from "@/lib/api";
+import { apiFile, downloadإكسل } from "@/lib/api";
 
 const TABLES = [
   ["all","كل الجداول"],
@@ -17,7 +17,7 @@ const TABLES = [
   ["deductions","الخصومات"],
 ];
 
-export default function ExcelCenter() {
+export default function إكسلCenter() {
   const [table,setTable]=useState("employees");
   const [file,setFile]=useState<File|null>(null);
   const [preview,setPreview]=useState<any>(null);
@@ -28,18 +28,18 @@ export default function ExcelCenter() {
   async function download(action:"export"|"template") {
     setBusy(true); setError(""); setMessage("");
     try {
-      const blob=await downloadExcel(action, table);
+      const blob=await downloadإكسل(action, table);
       const url=URL.createObjectURL(blob);
       const a=document.createElement("a"); a.href=url;
       a.download=`ELNUBY-${table}-${action}.xlsx`; a.click();
       URL.revokeObjectURL(url);
-      setMessage(action==="export"?"تم تصدير ملف Excel بنجاح":"تم تنزيل نموذج Excel");
+      setMessage(action==="export"?"تم تصدير ملف إكسل بنجاح":"تم تنزيل نموذج إكسل");
     } catch(e:any){setError(e.message||"تعذر تنفيذ العملية");}
     finally{setBusy(false);}
   }
 
   async function inspect() {
-    if(!file) return setError("اختر ملف Excel أولاً");
+    if(!file) return setError("اختر ملف إكسل أولاً");
     setBusy(true); setError(""); setMessage("");
     try { setPreview(await apiFile("import",{table,commit:false},file)); }
     catch(e:any){setError(e.message||"تعذر قراءة الملف");}
@@ -60,7 +60,7 @@ export default function ExcelCenter() {
 
   return <section className="excel-center">
     <div className="excel-hero">
-      <div><div className="eyebrow">DATA OPERATIONS</div><h3>مركز Excel</h3><p>استيراد وتصدير منظم مع فحص قبل الحفظ وسجل تدقيق للعمليات.</p></div>
+      <div><div className="eyebrow">عمليات البيانات</div><h3>مركز إكسل</h3><p>استيراد وتصدير منظم مع فحص قبل الحفظ وسجل تدقيق للعمليات.</p></div>
       <div className="excel-badge">XLSX</div>
     </div>
     <div className="excel-grid">
@@ -70,7 +70,7 @@ export default function ExcelCenter() {
           {TABLES.map(([id,label])=><option key={id} value={id}>{label}</option>)}
         </select>
         <div className="excel-actions">
-          <button className="primary" disabled={busy} onClick={()=>download("export")}>تصدير Excel</button>
+          <button className="primary" disabled={busy} onClick={()=>download("export")}>تصدير إكسل</button>
           {table!=="all"&&<button className="secondary" disabled={busy} onClick={()=>download("template")}>تحميل النموذج</button>}
         </div>
       </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
+import { ConfirmDialog } from './ui';
 
 type AdminTable = {
   value: string;
@@ -137,6 +138,7 @@ export default function SystemAdminPanel() {
   const [advanced, setAdvanced] = useState(false);
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<{type:'delete'|'disable'; title:string; id:string}|null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -230,28 +232,31 @@ export default function SystemAdminPanel() {
     } finally { setBusy(false); }
   }
 
-  async function remove() {
+  function remove() {
     if (!selected) return setError('اختر سجلًا أولًا');
     const id = String(selected[idColumn] ?? '').trim();
     if (!id) return setError(`لا يوجد مفتاح ${idColumn} في السجل المحدد`);
-
     if (table === 'shifts') {
-      if (!window.confirm('الوردية مرتبطة بموظفين. سيتم تعطيلها بدل حذفها للحفاظ على التعيينات والسجل التاريخي.')) return;
-      setBusy(true); setError('');
-      try {
-        await api('admin_update', { table: 'shifts', id_column: 'shift_id', id, changes: { status: 'INACTIVE' } });
-        setNotice('تم تعطيل الوردية بنجاح. السجلات التاريخية محفوظة.');
-        await load();
-      } catch (e: unknown) { setError(getErrorMessage(e)); }
-      finally { setBusy(false); }
+      setConfirmDelete({type:'disable',title:'تعطيل الوردية',id});
       return;
     }
+    setConfirmDelete({type:'delete',title:`حذف ${config.label}`,id});
+  }
 
-    if (!window.confirm(`تأكيد حذف ${config.label}؟ هذا الإجراء لا يمكن التراجع عنه.`)) return;
+  async function executeRemove() {
+    if (!confirmDelete) return;
+    const {type,id}=confirmDelete;
+    setConfirmDelete(null);
     setBusy(true); setError(''); setNotice('');
     try {
-      await api('admin_delete', { table, id_column: idColumn, id });
-      setNotice('تم حذف السجل بنجاح'); await load();
+      if (type==='disable') {
+        await api('admin_update', { table: 'shifts', id_column: 'shift_id', id, changes: { status: 'INACTIVE' } });
+        setNotice('تم تعطيل الوردية بنجاح. السجلات التاريخية محفوظة.');
+      } else {
+        await api('admin_delete', { table, id_column: idColumn, id });
+        setNotice('تم حذف السجل بنجاح');
+      }
+      await load();
     } catch (e: unknown) { setError(getErrorMessage(e)); }
     finally { setBusy(false); }
   }
@@ -356,6 +361,16 @@ export default function SystemAdminPanel() {
           {table === 'shifts' && selected && <div className="alert" style={{ background: '#fff9e8', color: '#8a6100', border: '1px solid #f4df9f', marginTop: 12 }}>الورديات المرتبطة بموظفين لا يتم حذفها فعليًا حتى لا تنكسر التعيينات أو السجلات التاريخية. استخدم تعطيل الوردية.</div>}
         </section>
       </div>
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title={confirmDelete?.title || ''}
+        description={confirmDelete?.type==='disable' ? 'سيتم تعطيل الوردية بدل حذفها للحفاظ على التعيينات والسجل التاريخي.' : `سيتم حذف ${config.label} نهائيًا، ولا يمكن التراجع عن العملية.`}
+        confirmLabel={confirmDelete?.type==='disable' ? 'تعطيل الوردية' : 'حذف نهائي'}
+        danger={confirmDelete?.type!=='disable'}
+        onClose={()=>setConfirmDelete(null)}
+        onConfirm={()=>void executeRemove()}
+      />
+
     </section>
   );
 }

@@ -18,6 +18,7 @@ export const navByRole = (role: string) => [
   { id: 'deductions', label: 'الخصومات', icon: 'deductions', roles: ['SYSTEM_ADMIN','HR_MANAGER','SECTOR_MANAGER','PROJECT_MANAGER'] },
   { id: 'users', label: 'حسابات المستخدمين', icon: 'users', roles: ['SYSTEM_ADMIN','HR_MANAGER'] },
   { id: 'reports', label: 'التقارير', icon: 'reports', roles: ['SYSTEM_ADMIN','HR_MANAGER','SECTOR_MANAGER','PROJECT_MANAGER'] },
+  { id: 'documents', label: 'مركز المستندات', icon: 'documents', roles: ['SYSTEM_ADMIN','HR_MANAGER'] },
   { id: 'notifications', label: 'تنبيهات الموارد البشرية', icon: 'alert', roles: ['SYSTEM_ADMIN','HR_MANAGER'] },
   { id: 'approvals', label: 'مركز الاعتمادات', icon: 'check', roles: ['SYSTEM_ADMIN','HR_MANAGER','SECTOR_MANAGER','PROJECT_MANAGER'] },
   { id: 'performance', label: 'تقييم الأداء', icon: 'reports', roles: ['SYSTEM_ADMIN','HR_MANAGER','SECTOR_MANAGER','PROJECT_MANAGER'] },
