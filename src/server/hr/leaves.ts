@@ -251,7 +251,7 @@ export async function createLeave(session: SessionContext, body: Record<string, 
 
 export async function decideLeaveManager(session: SessionContext, body: Record<string, unknown>) {
   const requestId = String(body.request_id || "");
-  const decision = String(body.decision || "").toUpperCase();
+  const decision = String(body.decision || "").toUpperCase() as "APPROVE" | "REJECT" | "";
   if (!requestId || !["APPROVE","REJECT"].includes(decision)) return errorResponse("بيانات القرار غير صحيحة");
   const { data: request } = await supabase.from("leave_requests").select("*").eq("request_id", requestId).maybeSingle();
   if (!request) return errorResponse("طلب الإجازة غير موجود", 404);
@@ -274,7 +274,7 @@ export async function decideLeaveManager(session: SessionContext, body: Record<s
 
 export async function decideLeaveHR(session: SessionContext, body: Record<string, unknown>) {
   const requestId = String(body.request_id || "");
-  const decision = String(body.decision || "").toUpperCase();
+  const decision = String(body.decision || "").toUpperCase() as "APPROVE" | "REJECT" | "";
   if (!requestId || !["APPROVE","REJECT"].includes(decision)) return errorResponse("بيانات القرار غير صحيحة");
   const { data: request } = await supabase.from("leave_requests").select("*").eq("request_id", requestId).maybeSingle();
   if (!request) return errorResponse("طلب الإجازة غير موجود",404);
