@@ -3,7 +3,7 @@ import type { SessionContext } from "./core";
 
 const LABELS: Record<string,string> = {
   PRESENT: "حاضر", LATE: "متأخر", ABSENT: "غائب", LEAVE: "إجازة", PERMISSION: "إذن",
-  WEEKEND: "راحة أسبوعية", NOT_STARTED: "لم يبدأ التسجيل", INCOMPLETE: "انصراف غير مكتمل",
+  WEEKEND: "راحة / يوم غير عمل", HOLIDAY: "عطلة رسمية", NOT_STARTED: "لم يبدأ التسجيل", INCOMPLETE: "انصراف غير مكتمل",
   AUTO_CLOSED: "انصراف تلقائي", NOT_EMPLOYED: "ليس على رأس العمل",
 };
 
@@ -15,7 +15,6 @@ function monthRange(month: string) {
   return { start, end: `${y}-${String(m).padStart(2,"0")}-${String(last).padStart(2,"0")}`, days:last };
 }
 function addDays(date:string, n:number){ const d=new Date(`${date}T00:00:00Z`); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
-function isWeekend(date:string){ const day=new Date(`${date}T00:00:00Z`).getUTCDay(); return day===5 || day===6; }
 function dateLE(a:string,b:string){ return a <= b; }
 function normalizeStatus(row:any): string {
   if (!row) return "ABSENT";
@@ -43,15 +42,26 @@ export async function attendanceMonthlyReport(session: SessionContext, body: Rec
       if (!projectIds.length) return success({start,end,summary:{},employeeSummary:[],rows:[]});
       attendanceQuery = attendanceQuery.in("project_id",projectIds);
     }
-    const [a,l,p] = await Promise.all([attendanceQuery,leaveQuery,permissionQuery]);
+    const [a,l,p,calendarResult,calendarSettingsResult] = await Promise.all([
+    attendanceQuery,
+    leaveQuery,
+    permissionQuery,
+    supabase.from("company_calendar").select("calendar_date,day_type,name,is_working_day").gte("calendar_date", start).lte("calendar_date", end),
+    supabase.from("company_calendar_settings").select("weekend_day_1,weekend_day_2").limit(1).maybeSingle(),
+  ]);
     if (a.error) return errorResponse(a.error.message,500);
     if (l.error) return errorResponse(l.error.message,500);
     if (p.error) return errorResponse(p.error.message,500);
+    if (calendarResult.error) return errorResponse(calendarResult.error.message,500);
+    if (calendarSettingsResult.error) return errorResponse(calendarSettingsResult.error.message,500);
 
     const attendance = new Map<string,any>();
     for (const r of a.data||[]) attendance.set(`${r.employee_id}|${r.date}`,r);
     const leaves = (l.data||[]) as any[];
     const permissions = (p.data||[]) as any[];
+    const calendar = new Map((calendarResult.data||[]).map((r:any)=>[String(r.calendar_date).slice(0,10),r]));
+    const weekend1 = Number(calendarSettingsResult.data?.weekend_day_1 ?? 5);
+    const weekend2 = Number(calendarSettingsResult.data?.weekend_day_2 ?? 6);
     const today = new Date().toISOString().slice(0,10);
     const summary:Record<string,number> = {};
     const employeeSummary:any[] = [];
@@ -65,8 +75,15 @@ export async function attendanceMonthlyReport(session: SessionContext, body: Rec
         let status = "NOT_STARTED";
         let source:any = null;
         if (hire && date < hire) status = "NOT_EMPLOYED";
-        else if (isWeekend(date)) status = "WEEKEND";
         else {
+          const calendarDay = calendar.get(date);
+          const utcDay = new Date(`${date}T00:00:00Z`).getUTCDay();
+          const nonWorking = calendarDay
+            ? (String(calendarDay.day_type) === "HOLIDAY" || calendarDay.is_working_day === false)
+            : (utcDay === weekend1 || utcDay === weekend2);
+          if (calendarDay && String(calendarDay.day_type) === "HOLIDAY") status = "HOLIDAY";
+          else if (nonWorking) status = "WEEKEND";
+          else {
           const leave = leaves.find(r=>r.employee_id===employee.employee_id && dateLE(String(r.from_date).slice(0,10),date) && dateLE(date,String(r.to_date).slice(0,10)));
           const permission = permissions.find(r=>r.employee_id===employee.employee_id && String(r.date).slice(0,10)===date);
           const att = attendance.get(`${employee.employee_id}|${date}`);
@@ -74,6 +91,7 @@ export async function attendanceMonthlyReport(session: SessionContext, body: Rec
           else if (att) { status=normalizeStatus(att); source=att; }
           else if (permission) { status="PERMISSION"; source=permission; }
           else if (date <= today) status="ABSENT";
+          }
         }
         counts[status]=(counts[status]||0)+1; summary[status]=(summary[status]||0)+1;
         rows.push({date,employee_id:employee.employee_id,employee_name:employee.name,status,status_label:LABELS[status]||status,check_in:source?.check_in||null,check_out:source?.check_out||null,late_minutes:Number(source?.late_minutes||0),shift_name:null});

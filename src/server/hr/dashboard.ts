@@ -292,3 +292,24 @@ export async function getProjectManagerDashboard(
    EMPLOYEES
 ========================================================= */
 
+
+
+export async function getHRExecutiveDashboard(session: SessionContext) {
+  if (!["SYSTEM_ADMIN","HR_MANAGER"].includes(session.user.role)) return errorResponse("ليس لديك صلاحية عرض لوحة الموارد البشرية",403);
+  const today = appDate();
+  const [emp, att, leaves, perms, docs, workflows] = await Promise.all([
+    supabase.from("employees").select("employee_id,status,employment_status").eq("employment_status","ACTIVE"),
+    supabase.from("attendance").select("employee_id,status,check_in,check_out").eq("date",today),
+    supabase.from("leave_requests").select("request_id,from_date,to_date,status").in("status",["PENDING_MANAGER","PENDING_HR","APPROVED"]),
+    supabase.from("permission_requests").select("request_id,date,status").in("status",["PENDING","APPROVED"]),
+    supabase.from("employee_documents").select("document_id,expiry_date,status").not("expiry_date","is",null),
+    supabase.from("approval_workflows").select("id,due_at,status").eq("status","pending"),
+  ]);
+  const active = emp.data||[]; const attendance=att.data||[];
+  const activeLeave = (leaves.data||[]).filter((r:any)=>r.status==='APPROVED'&&String(r.from_date)<=today&&String(r.to_date)>=today).length;
+  const pendingLeaves = (leaves.data||[]).filter((r:any)=>["PENDING_MANAGER","PENDING_HR"].includes(r.status)).length;
+  const pendingPermissions = (perms.data||[]).filter((r:any)=>r.status==='PENDING').length;
+  const expiringDocs = (docs.data||[]).filter((r:any)=>r.expiry_date && String(r.expiry_date).slice(0,10) >= today).filter((r:any)=>{const d=(new Date(String(r.expiry_date).slice(0,10)).getTime()-new Date(today).getTime())/86400000; return d<=30;}).length;
+  const overdueApprovals = (workflows.data||[]).filter((r:any)=>r.due_at && new Date(r.due_at)<new Date()).length;
+  return success({active:active.length,present:attendance.filter((r:any)=>r.check_in).length,late:attendance.filter((r:any)=>r.status==='LATE').length,absent:Math.max(0,active.length-attendance.length-activeLeave),leave:activeLeave,permission:(perms.data||[]).filter((r:any)=>r.status==='APPROVED'&&String(r.date)===today).length,pendingLeaves,pendingPermissions,expiringDocs,overdueApprovals,today});
+}

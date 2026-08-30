@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { autoCheckoutOpenAttendance } from "@/server/hr/attendance";
 import { publicSupabase } from "@/server/hr/core";
+import { processApprovalSla } from "@/server/hr/governance";
 
 export const runtime = "nodejs";
 
@@ -14,8 +15,9 @@ export async function GET(request: Request) {
 
   try {
     const result = await autoCheckoutOpenAttendance();
+    const approvalSla = await processApprovalSla();
     await publicSupabase.from("app_sessions").delete().lt("expires_at", new Date().toISOString());
-    return NextResponse.json({ ok: true, data: result });
+    return NextResponse.json({ ok: true, data: { autoCheckout: result, approvalSla } });
   } catch (error) {
     console.error("AUTO_CHECKOUT_CRON:", error);
     return NextResponse.json({ ok: false, error: "Auto checkout failed" }, { status: 500 });

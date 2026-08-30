@@ -20,7 +20,7 @@ export async function listNotifications(session: SessionContext) {
       supabase.from("employees").select("employee_id,name,status").eq("status", "ACTIVE"),
       supabase.from("leave_requests").select("request_id,employee_id,from_date,to_date,status").in("status", ["PENDING_MANAGER", "PENDING_HR"]),
       supabase.from("permission_requests").select("request_id,employee_id,date,status").eq("status", "PENDING"),
-      supabase.from("disciplinary_cases").select("case_id,employee_id,status,created_at").in("status", ["OPEN", "UNDER_REVIEW"]),
+      supabase.from("disciplinary_cases").select("case_id,employee_id,status,created_at").in("status", ["OPEN", "UNDER_INVESTIGATION"]),
       supabase.from("employee_documents").select("employee_id,document_name,expiry_date,status").not("expiry_date", "is", null),
     ]);
     const first = [contractError, employeeError, leaveError, permissionError, casesError, documentError].find(Boolean);

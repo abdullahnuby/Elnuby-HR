@@ -16,7 +16,7 @@ assert.ok(!api.includes('body.token'), 'body token accepted');
 
 const vercel = fs.readFileSync(path.join(root, 'vercel.json'), 'utf8');
 assert.ok(vercel.includes('/api/cron/auto-checkout'), 'Vercel must call the real auto-checkout route');
-assert.ok(vercel.includes('"schedule": "0 * * * *"'), 'Auto-checkout cron should run hourly');
+assert.ok(vercel.includes('"schedule": "0 20 * * *"'), 'Cron should run once daily on the free tier');
 
 assert.ok(core.includes('process.env.APP_TIMEZONE || "Africa/Cairo"'), 'Egypt deployment timezone must default to Cairo');
 assert.ok(core.includes('status >= 500'), '5xx errors must be sanitized');

@@ -19,6 +19,9 @@ import SystemAdminPanel from '@/components/hr/SystemAdminPanel';
 import Icon from '@/components/hr/Icon';
 import EmployeeProfile from '@/components/hr/EmployeeProfile';
 import Performance from '@/components/hr/Performance';
+import AttendanceCalendar from '@/components/hr/AttendanceCalendar';
+import HRExecutiveDashboard from '@/components/hr/HRExecutiveDashboard';
+import ApprovalsCenter from '@/components/hr/ApprovalsCenter';
 
 
 type Employee = {
@@ -1196,7 +1199,9 @@ export default function Home() {
 
         <div className="content">
           {section === 'dashboard' &&
-            (['PROJECT_MANAGER', 'SECTOR_MANAGER'].includes(me.user?.role) ? (
+            (['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? (
+              <HRExecutiveDashboard me={me} setSection={openSection} />
+            ) : ['PROJECT_MANAGER', 'SECTOR_MANAGER'].includes(me.user?.role) ? (
               <ManagerDashboard
                 me={me}
                 dash={dash}
@@ -1279,6 +1284,9 @@ export default function Home() {
             
               onEdit={['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? updateProjectRecord : undefined}/>
           )}
+
+          {section === 'attendance-calendar' && <AttendanceCalendar />}
+          {section === 'approvals' && <ApprovalsCenter />}
 
           {section === 'attendance' && (
             <DataSection

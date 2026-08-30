@@ -1,7 +1,7 @@
 import { supabase, success, errorResponse, sha256, nowISO, requireAuth, requireRole, ROLES, ADMIN_ROLES, MANAGEMENT_ROLES, PROJECT_VIEW_ROLES, PROJECT_MANAGE_ROLES } from "./core";
 import type { SessionContext } from "./core";
 import { login, logout, getMe } from "./auth";
-import { getDashboard, getProjectManagerDashboard } from "./dashboard";
+import { getDashboard, getProjectManagerDashboard, getHRExecutiveDashboard } from "./dashboard";
 import { listEmployees, createEmployee, updateEmployee } from "./employees";
 import { getEmployeeProfile, addEmploymentEvent, listEmployeeContracts, createEmployeeContract } from "./employeeProfile";
 import { listProjects, createProject, updateProject } from "./projects";
@@ -25,6 +25,7 @@ export async function handleAction(
   session: SessionContext | null
 ) {
   switch (action) {
+    case "hr_executive_dashboard": { const auth = requireRole(session, ["SYSTEM_ADMIN","HR_MANAGER"]); if (auth) return auth; return getHRExecutiveDashboard(session!); }
     /* AUTH */
 
     case "login":
