@@ -129,3 +129,6 @@ Recommended:
 - HR/System Admin have an Excel center with XLSX export, templates, validation preview and audited import.
 - Security-sensitive tables/fields such as password hashes and audit logs are intentionally excluded from Excel import.
 - Migration: `supabase/migrations/20260826_leave_policy_and_excel.sql`.
+
+## Latest stage
+Employee HR documents are supported through a private Supabase Storage bucket and `employee_documents` metadata, with expiry notifications and HR-only signed access.

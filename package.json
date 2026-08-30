@@ -9,8 +9,14 @@
     "test:contract": "node tests/contract.test.js",
     "test:backend": "node tests/backend_smoke.test.js",
     "test:security": "node tests/security_contract.test.js",
-    "test": "npm run test:contract && npm run test:backend && npm run test:security && npm run test:operational",
-    "test:operational": "node tests/operational.test.js && node tests/auth_offline_regression.test.js && node tests/auth_refresh_deep_regression.test.js && node tests/initial_load_performance.test.js && node tests/leave_permission_workflow.test.js && node tests/admin_edit_ui.test.js"
+    "test": "npm run test:contract && npm run test:backend && npm run test:security && npm run test:operational && npm run test:notifications && npm run test:employee-profile && npm run test:performance && npm run test:goals && npm run test:documents && npm run test:governance",
+    "test:operational": "node tests/operational.test.js && node tests/auth_offline_regression.test.js",
+    "test:notifications": "node tests/notifications_contract.test.js",
+    "test:employee-profile": "node tests/employee_profile_contract.test.js",
+    "test:performance": "node tests/performance_contract.test.js",
+    "test:goals": "node tests/goals_development.test.js",
+    "test:documents": "node tests/employee_documents.test.js",
+    "test:governance": "node tests/governance_workflow.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.3",
