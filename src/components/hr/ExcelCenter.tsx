@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { apiFile, downloadإكسل } from "@/lib/api";
+import { apiFile, downloadExcel } from "@/lib/api";
 
 const TABLES = [
   ["all","كل الجداول"],
@@ -28,7 +28,7 @@ export default function إكسلCenter() {
   async function download(action:"export"|"template") {
     setBusy(true); setError(""); setMessage("");
     try {
-      const blob=await downloadإكسل(action, table);
+      const blob=await downloadExcel(action, table);
       const url=URL.createObjectURL(blob);
       const a=document.createElement("a"); a.href=url;
       a.download=`ELNUBY-${table}-${action}.xlsx`; a.click();
