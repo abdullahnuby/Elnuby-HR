@@ -27,7 +27,7 @@ export default function Projects({
           <h2>المشاريع</h2>
           <p>
             إنشاء وإدارة مواقع المشاريع
-            وإحداثيات تحديد الموقع ونطاق الحضور.
+            وإحداثيات الـ GPS ونطاق الحضور.
           </p>
         </div>
 
@@ -47,8 +47,8 @@ export default function Projects({
             <label><span>العميل</span><input value={projectForm.client} onChange={(e)=>setProjectForm({...projectForm,client:e.target.value})}/></label>
             <label><span>اسم الموقع</span><input value={projectForm.location_name} onChange={(e)=>setProjectForm({...projectForm,location_name:e.target.value})}/></label>
             <label><span>نطاق الحضور (متر)</span><input type="number" min="50" value={projectForm.geofence_radius_m ?? 200} onChange={(e)=>setProjectForm({...projectForm,geofence_radius_m:e.target.value})}/></label>
-            <label><span>خط العرض (Latitude) *</span><input type="number" step="any" value={projectForm.latitude} onChange={(e)=>setProjectForm({...projectForm,latitude:e.target.value})}/></label>
-            <label><span>خط الطول (Longitude) *</span><input type="number" step="any" value={projectForm.longitude} onChange={(e)=>setProjectForm({...projectForm,longitude:e.target.value})}/></label>
+            <label><span>خط العرض *</span><input type="number" step="any" value={projectForm.latitude} onChange={(e)=>setProjectForm({...projectForm,latitude:e.target.value})}/></label>
+            <label><span>خط الطول *</span><input type="number" step="any" value={projectForm.longitude} onChange={(e)=>setProjectForm({...projectForm,longitude:e.target.value})}/></label>
           </div>
 
           <button
@@ -117,7 +117,7 @@ export default function Projects({
                   </span>
 
                   <span>
-                    الموقع {p.latitude},{' '}
+                    GPS {p.latitude},{' '}
                     {p.longitude}
                   </span>
 

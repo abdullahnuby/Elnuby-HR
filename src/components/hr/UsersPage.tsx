@@ -194,7 +194,7 @@ export default function Users({
           {newRole ===
             'HR_MANAGER' && (
             <div className="empty-note">
-              حساب مدير الموارد البشرية إداري مركزي: لا يحتاج
+              حساب الموارد البشرية إداري مركزي: لا يحتاج
               موظفاً مرتبطاً ولا يتم تعيينه على
               مشروع.
             </div>
@@ -213,7 +213,7 @@ export default function Users({
           <div className="empty-note">
             لا توجد سجلات موظفين محملة. اضغط
             «تحديث الموظفين» وتأكد أن الموظف موجود
-            في قائمة الموظفين.
+            في جدول EMPLOYEES.
           </div>
         )}
 

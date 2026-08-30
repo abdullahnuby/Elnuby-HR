@@ -47,7 +47,7 @@ const FIELD_CONFIGS: Record<string, FieldDef[]> = {
   projects: [
     { key: 'name', label: 'اسم المشروع' }, { key: 'client', label: 'العميل' },
     { key: 'location_name', label: 'الموقع' }, { key: 'latitude', label: 'خط العرض', type: 'number' },
-    { key: 'longitude', label: 'خط الطول', type: 'number' }, { key: 'geofence_radius_m', label: 'نطاق تحديد الموقع بالمتر', type: 'number' },
+    { key: 'longitude', label: 'خط الطول', type: 'number' }, { key: 'geofence_radius_m', label: 'نطاق GPS بالمتر', type: 'number' },
     { key: 'status', label: 'الحالة' },
   ],
   shifts: [
@@ -262,9 +262,9 @@ export default function SystemAdminPanel() {
     <section className="panel page-panel" style={{ minHeight: 650 }}>
       <div className="panel-head" style={{ alignItems: 'center' }}>
         <div>
-          <div className="eyebrow">مركز إدارة النظام</div>
+          <div className="eyebrow">مركز تحكم النظام</div>
           <h2 style={{ fontSize: 22, marginTop: 5 }}>مركز إدارة النظام</h2>
-          <p>إدارة بيانات النظام بالكامل من داخل ELNUBY HR مع حماية العلاقات وسجل المراجعة.</p>
+          <p>إدارة بيانات النظام بالكامل من داخل ELNUBY HR مع حماية العلاقات وسجل التدقيق.</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span className="live"><b /> مدير النظام</span>

@@ -233,8 +233,8 @@ export default function Shifts({
           r.start_date || '—',
           r.end_date || '—',
           r.end_date
-            ? <Badge status="HISTORY" />
-            : <Badge status="CURRENT" />,
+            ? 'HISTORY'
+            : 'CURRENT',
         ])}
       />
     </section>

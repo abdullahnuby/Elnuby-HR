@@ -24,7 +24,6 @@ import HRExecutiveDashboard from '@/components/hr/HRExecutiveDashboard';
 import ApprovalsCenter from '@/components/hr/ApprovalsCenter';
 import ClientErrorBoundary from '@/components/hr/ClientErrorBoundary';
 import HRAdvanced from '@/components/hr/HRAdvanced';
-import AdminEditModal from '@/components/hr/AdminEditModal';
 
 
 type Employee = {
@@ -111,7 +110,6 @@ export default function Home() {
   const [isOffline, setIsOffline] = useState(false);
   const [pendingSync, setPendingSync] = useState(0);
   const [employeeProfileId, setEmployeeProfileId] = useState<string | null>(null);
-  const [editTarget, setEditTarget] = useState<{entity:'employee'|'project'|'shift'|'user-password';record:any}|null>(null);
   const APP_TIMEZONE = 'Africa/Cairo';
 
   const [newUsername, setNewUsername] = useState('');
@@ -437,7 +435,7 @@ export default function Home() {
     setError('');
 
     if (!navigator.geolocation) {
-      return setError('المتصفح لا يدعم تحديد الموقع');
+      return setError('المتصفح لا يدعم GPS');
     }
 
     setBusy(true);
@@ -904,34 +902,18 @@ export default function Home() {
     }
   }
 
-  function updateEmployeeRecord(employeeId: string) {
-    const current = employees.find((e:any)=>String(e.employee_id)===String(employeeId));
-    if (current) setEditTarget({entity:'employee',record:current});
+  async function updateEmployeeRecord(employeeId: string) {
+    setEmployeeProfileId(employeeId);
   }
 
-  function updateProjectRecord(projectId: string) {
-    const current = projects.find((p:any)=>String(p.project_id)===String(projectId));
-    if (current) setEditTarget({entity:'project',record:current});
+  async function updateProjectRecord(projectId: string) {
+    const current=projects.find(p=>p.project_id===projectId);if(!current)return; const name=window.prompt('اسم المشروع',current.name||'');if(name===null)return;const client=window.prompt('العميل',current.client||'');if(client===null)return;const location_name=window.prompt('اسم الموقع',current.location_name||'');if(location_name===null)return;const radius=window.prompt('نطاق GPS بالمتر',String(current.geofence_radius_m??200));if(radius===null)return;
+    try{setBusy(true);await api('update_project',{project_id:projectId,name,client,location_name,geofence_radius_m:Number(radius)});setNotice('تم تعديل المشروع');setProjects(await api('projects'));}catch(e:any){setError(e.message)}finally{setBusy(false)}
   }
 
-  function updateShiftRecord(shiftId: string) {
-    const current = shifts.find((s:any)=>String(s.shift_id)===String(shiftId));
-    if (current) setEditTarget({entity:'shift',record:current});
-  }
-
-  async function saveEdit(payload:Record<string,unknown>) {
-    if (!editTarget) return;
-    setBusy(true); setError(''); setNotice('');
-    try {
-      const action = editTarget.entity==='employee' ? 'update_employee' : editTarget.entity==='project' ? 'update_project' : 'update_shift';
-      await api(action,payload);
-      if(editTarget.entity==='employee') setEmployees(await api('employees'));
-      if(editTarget.entity==='project') setProjects(await api('projects'));
-      if(editTarget.entity==='shift') setShifts(await api('shifts'));
-      setEditTarget(null);
-      setNotice('تم حفظ التعديلات بنجاح');
-    } catch(e:any) { setError(e?.message||'تعذر حفظ التعديلات'); }
-    finally { setBusy(false); }
+  async function updateShiftRecord(shiftId: string) {
+    const current=shifts.find(s=>s.shift_id===shiftId);if(!current)return; const fields=['name','start_time','attendance_open','attendance_close','checkout_open','checkout_close','auto_checkout_time']; const values:any={}; for(const f of fields){const v=window.prompt(f,current[f as keyof typeof current] as string||'');if(v===null)return;values[f]=v;}
+    try{setBusy(true);await api('update_shift',{shift_id:shiftId,...values});setNotice('تم تعديل الوردية');setShifts(await api('shifts'));}catch(e:any){setError(e.message)}finally{setBusy(false)}
   }
 
   async function toggleUser(userId:string,status:string){try{setBusy(true);if(status==='ACTIVE')await api('delete_user',{user_id:userId});else await api('update_user',{user_id:userId,status:'ACTIVE'});setNotice(status==='ACTIVE'?'تم تعطيل الحساب':'تم تفعيل الحساب');setUsers(await api('users'));}catch(e:any){setError(e.message)}finally{setBusy(false)}}
@@ -1479,16 +1461,6 @@ export default function Home() {
             ) : (
               <SystemAdminPanel />
             )
-          )}
-
-          {editTarget && (
-            <AdminEditModal
-              entity={editTarget.entity}
-              record={editTarget.record}
-              busy={busy}
-              onClose={()=>setEditTarget(null)}
-              onSave={saveEdit}
-            />
           )}
 
           {error && (
