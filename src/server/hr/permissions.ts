@@ -1,5 +1,6 @@
 import { parsePagination } from "./core";
-import { supabase, success, errorResponse, generateId, nowISO, appDate, appTime, timeToMinutes, minutesBetween, getManagedProjectIds, canManageProject, getCurrentAssignment, normalizeTimeInput, writeAuditLog } from "./core";
+import { supabase, success, errorResponse, generateId, nowISO, appDate, appTime, timeToMinutes, minutesBetween, getManagedProjectIds, canManageProject, getCurrentAssignment, normalizeTimeInput, writeAudit, requireEmployeeScope } from "./core";
+import { startApprovalWorkflow, recordApprovalStep } from "./governance";
 import type { SessionContext, CurrentUser } from "./core";
 
 export async function permissionList(
@@ -174,6 +175,14 @@ export async function createPermission(
     );
   }
 
+  try {
+    await startApprovalWorkflow("permission_approval", String(data.request_id), employeeId, String(assignment.project_id));
+  } catch (workflowError: any) {
+    await supabase.from("permission_requests").delete().eq("request_id", data.request_id);
+    console.error("permission approval workflow:", workflowError);
+    return errorResponse("تعذر إنشاء مسار اعتماد الإذن. لم يتم حفظ الطلب.", 500);
+  }
+
   return success(
     data,
     201
@@ -204,11 +213,6 @@ export async function decidePermission(
     );
   }
 
-  const comment = String(body.comment || "").trim();
-  if (decision === "REJECT" && comment.length < 3) {
-    return errorResponse("سبب الرفض مطلوب");
-  }
-
   const { data: request } =
     await supabase
       .from("permission_requests")
@@ -233,6 +237,10 @@ export async function decidePermission(
     return errorResponse(
       "الطلب ليس في انتظار القرار"
     );
+  }
+
+  if (request.employee_id === session.user.employee_id) {
+    return errorResponse("لا يجوز اعتماد طلبك بنفسك.", 403);
   }
 
   const allowed =
@@ -270,7 +278,6 @@ export async function decidePermission(
         "request_id",
         requestId
       )
-      .eq("status", "PENDING")
       .select("*")
       .single();
 
@@ -281,29 +288,15 @@ export async function decidePermission(
     );
   }
 
-  return success(data);
-}
+  try { await recordApprovalStep("permission_approval", requestId, 1, session, decision, body.comment); }
+  catch (e) { console.error("permission workflow step:", e); }
+  await writeAudit(session.user.user_id, "permission_manager_decision", "permission_request", requestId, {
+    before: request.status,
+    after: decision === "APPROVE" ? "APPROVED" : "REJECTED",
+    decision,
+    comment: body.comment || null,
+  });
 
-export async function cancelPermission(
-  session: SessionContext,
-  body: Record<string, unknown>
-) {
-  const requestId = String(body.request_id || "");
-  const reason = String(body.reason || "").trim();
-  if (!requestId) return errorResponse("رقم الطلب مطلوب");
-  if (reason.length < 3) return errorResponse("سبب إلغاء الطلب مطلوب");
-  const { data: request } = await supabase.from("permission_requests")
-    .select("request_id,employee_id,status").eq("request_id",requestId).maybeSingle();
-  if (!request) return errorResponse("طلب الإذن غير موجود",404);
-  if (request.employee_id !== session.user.employee_id && !["SYSTEM_ADMIN","HR_MANAGER"].includes(session.user.role)) {
-    return errorResponse("ليس لديك صلاحية إلغاء هذا الطلب",403);
-  }
-  if (request.status !== "PENDING") return errorResponse("لا يمكن إلغاء الطلب بعد اتخاذ القرار");
-  const { data, error } = await supabase.from("permission_requests").update({
-    status:"CANCELLED", cancellation_reason:reason, cancelled_by:session.user.user_id, cancelled_at:nowISO(), updated_at:nowISO()
-  }).eq("request_id",requestId).eq("status","PENDING").select("*").single();
-  if (error) return errorResponse(error.message,500);
-  await writeAuditLog(session.user.user_id,"cancel_permission","permission_requests",requestId,{reason});
   return success(data);
 }
 

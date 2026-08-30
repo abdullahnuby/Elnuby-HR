@@ -1,0 +1,10 @@
+const fs=require('fs'), path=require('path'); const root=path.resolve(__dirname,'..');
+const read=p=>fs.readFileSync(path.join(root,p),'utf8');
+const router=read('src/server/hr/router.ts'); const profile=read('src/server/hr/employeeProfile.ts'); const page=read('src/app/page.tsx'); const component=read('src/components/hr/EmployeeProfile.tsx'); const migration=read('supabase-migration-20260829_employee_lifecycle.sql');
+if(!router.includes('case "employee_profile"')) throw new Error('profile action missing');
+if(!router.includes('case "add_employment_event"')) throw new Error('event action missing');
+if(!profile.includes('employment_events') || !profile.includes('project_assignments') || !profile.includes('leave_requests') || !profile.includes('permission_requests')) throw new Error('profile aggregation missing');
+if(!component.includes('ملف الموارد البشرية') || !component.includes('المسار الوظيفي')) throw new Error('arabic profile UI missing');
+if(!page.includes("<EmployeeProfile employeeId={employeeProfileId}")) throw new Error('profile UI not mounted');
+if(!migration.includes('create table if not exists public.employment_events')) throw new Error('migration missing');
+console.log('employee profile contract: PASS');

@@ -1,0 +1,14 @@
+const fs=require('fs');
+const path=require('path');
+const root=path.join(__dirname,'..');
+const router=fs.readFileSync(path.join(root,'src/server/hr/router.ts'),'utf8');
+const report=fs.readFileSync(path.join(root,'src/server/hr/reports.ts'),'utf8');
+const ui=fs.readFileSync(path.join(root,'src/components/hr/Reports.tsx'),'utf8');
+const excel=fs.readFileSync(path.join(root,'src/app/api/hr/excel/route.ts'),'utf8');
+if(!router.includes('case "attendance_monthly_report"')) throw new Error('monthly report route missing');
+for(const key of ['LEAVE','PERMISSION','ABSENT','LATE','INCOMPLETE','AUTO_CLOSED','WEEKEND']) if(!report.includes(key)) throw new Error(`status ${key} missing`);
+if(!report.includes('.eq("status","APPROVED")')) throw new Error('approved-only filter missing');
+if(!report.includes('date <= today')) throw new Error('future dates must not be counted absent');
+if(!ui.includes("تصدير إكسل")) throw new Error('excel export missing');
+if(!excel.includes('action === "monthly_report"')) throw new Error('excel monthly export missing');
+console.log('PASS monthly reports contract: monthly HR report + Arabic UI + Excel export');

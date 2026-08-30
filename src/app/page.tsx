@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { api, apiMultipart } from '@/lib/api';
-import { apiCacheKey, cacheGet, cacheSet, syncAttendanceQueue, pendingAttendanceCount, failedAttendanceCount, lastFailedAttendance, clearOfflineData, clearOfflineCache, getOfflineUserId, setOfflineUserId } from '@/lib/offline';
+import { apiCacheKey, cacheGet, cacheSet, syncAttendanceQueue, pendingAttendanceCount, clearOfflineData, clearOfflineCache, getOfflineUserId, setOfflineUserId } from '@/lib/offline';
 import { navByRole, roleLabels } from '@/components/hr/constants';
 import ManagerDashboard from '@/components/hr/Dashboard';
 import DashboardHome from '@/components/hr/DashboardHome';
@@ -17,7 +17,8 @@ import Reports from '@/components/hr/Reports';
 import Settings from '@/components/hr/Settings';
 import SystemAdminPanel from '@/components/hr/SystemAdminPanel';
 import Icon from '@/components/hr/Icon';
-import AdminEditModal from '@/components/hr/AdminEditModal';
+import EmployeeProfile from '@/components/hr/EmployeeProfile';
+import Performance from '@/components/hr/Performance';
 
 
 type Employee = {
@@ -88,11 +89,11 @@ export default function Home() {
   const [error, setError] = useState('');
 
   const [me, setMe] = useState<any>(null);
-  const [authReady, setAuthReady] = useState(false);
   const [dash, setDash] = useState<any>(null);
   const [managerDash, setManagerDash] = useState<any>(null);
 
   const [section, setSection] = useState('dashboard');
+  const [notifications, setNotifications] = useState<any>(null);
   const [sidebar, setSidebar] = useState(false);
 
   const [users, setUsers] = useState<User[]>([]);
@@ -103,8 +104,7 @@ export default function Home() {
   const [notice, setNotice] = useState('');
   const [isOffline, setIsOffline] = useState(false);
   const [pendingSync, setPendingSync] = useState(0);
-  const [failedSync, setFailedSync] = useState(0);
-  const [adminEdit, setAdminEdit] = useState<{ entity: 'employee'|'project'|'shift'|'user-password'; record: any } | null>(null);
+  const [employeeProfileId, setEmployeeProfileId] = useState<string | null>(null);
   const APP_TIMEZONE = 'Africa/Cairo';
 
   const [newUsername, setNewUsername] = useState('');
@@ -142,7 +142,7 @@ export default function Home() {
   const [selectedShift, setSelectedShift] = useState('');
   const [selectedManager, setSelectedManager] = useState('');
 
-  const [leaveType, setLeaveType] = useState('LT-ANNUAL');
+  const [leaveType, setLeaveType] = useState('Annual');
   const [leaveFrom, setLeaveFrom] = useState('');
   const [leaveTo, setLeaveTo] = useState('');
   const [leaveReason, setLeaveReason] = useState('');
@@ -157,7 +157,7 @@ export default function Home() {
     auto_checkout_time: '18:00',
   });
 
-  const [permissionType, setPermissionType] = useState('PERSONAL');
+  const [permissionType, setPermissionType] = useState('Permission');
   const [permissionStart, setPermissionStart] = useState('');
   const [permissionEnd, setPermissionEnd] = useState('');
   const [permissionReason, setPermissionReason] = useState('');
@@ -165,9 +165,7 @@ export default function Home() {
   useEffect(() => {
     const updateNetwork = async () => {
       setIsOffline(!navigator.onLine);
-      const uid = me?.user?.user_id || null;
-      setPendingSync(await pendingAttendanceCount(uid).catch(() => 0));
-      setFailedSync(await failedAttendanceCount(uid).catch(() => 0));
+      setPendingSync(await pendingAttendanceCount(me?.user?.user_id || null).catch(() => 0));
     };
     void updateNetwork();
 
@@ -181,33 +179,9 @@ export default function Home() {
         currentUserId,
       );
       setPendingSync(result.pending);
-      setFailedSync(await failedAttendanceCount(currentUserId).catch(() => 0));
       if (result.synced > 0) {
-        setNotice(`تمت مزامنة ${result.synced} عملية حضور وانصراف بنجاح`);
-        try {
-          const [dashboard, manager] = await Promise.all([
-            api('dashboard'),
-            ['PROJECT_MANAGER', 'SECTOR_MANAGER'].includes(me?.user?.role || '')
-              ? api('project_manager_dashboard')
-              : Promise.resolve(null),
-          ]);
-          setDash(dashboard);
-          if (manager) setManagerDash(manager);
-        } catch {}
-      }
-      if (result.failed > 0) {
-        const failedItem = await lastFailedAttendance(currentUserId);
-        setError(`تعذر تسجيل ${failedItem?.action === 'check_out' ? 'الانصراف' : 'الحضور'} الذي تم حفظه دون اتصال: ${failedItem?.lastError || result.lastError || 'رفض الخادم العملية'}`);
-        try {
-          const [dashboard, manager] = await Promise.all([
-            api('dashboard'),
-            ['PROJECT_MANAGER', 'SECTOR_MANAGER'].includes(me?.user?.role || '')
-              ? api('project_manager_dashboard')
-              : Promise.resolve(null),
-          ]);
-          setDash(dashboard);
-          if (manager) setManagerDash(manager);
-        } catch {}
+        setNotice(`تمت مزامنة ${result.synced} عملية حضور وانصراف`);
+        try { await load(); } catch {}
       }
     };
 
@@ -253,36 +227,32 @@ export default function Home() {
     (async () => {
       // A refresh while offline must restore the last authenticated app state,
       // not interpret network absence as logout.
-      if (!navigator.onLine && await restoreCachedOfflineSession()) {
-        if (!cancelled) setAuthReady(true);
-        return;
-      }
+      if (!navigator.onLine && await restoreCachedOfflineSession()) return;
 
       try {
-        // /me is the authoritative authenticated-app check. A passive
-        // session_status probe can be temporarily unavailable and must not
-        // turn into a logout.
-        await load();
+        const status: any = await api('session_status');
         if (cancelled) return;
+        if (!status?.authenticated) {
+          await clearOfflineCache();
+          setMe(null);
+          setDash(null);
+          setManagerDash(null);
+          return;
+        }
+        await load();
       } catch (error: any) {
         if (cancelled) return;
         const message = String(error?.message || '');
         const authFailure = /Authentication required|Invalid session|Session expired|User inactive|الجلسة غير صالحة|منتهية/i.test(message);
         if (authFailure) {
-          // A single 401 must not destroy the local authenticated shell. The
-          // session is only treated as logged out after an explicit logout or
-          // a verified server-side invalidation handled by the user.
-          const restored = await restoreCachedOfflineSession(!navigator.onLine);
-          if (!restored) {
-            setError('تعذر التحقق من جلسة الدخول حاليًا. لم يتم تسجيل الخروج.');
-          }
+          await clearOfflineCache();
+          setMe(null);
         } else if (!(await restoreCachedOfflineSession(true))) {
           setError(message || 'تعذر الاتصال بالخادم.');
         }
-      } finally {
-        if (!cancelled) setAuthReady(true);
       }
     })();
+
     return () => { cancelled = true; };
   }, []);
 
@@ -299,27 +269,24 @@ export default function Home() {
   useEffect(() => {
     if (!me) return;
 
-    // Initial data is already loaded by load(). Keep the periodic refresh only
-    // to avoid issuing duplicate dashboard requests immediately after login or
-    // after a page refresh.
     const refresh = async () => {
       try {
-        const [dashboard, manager] = await Promise.all([
-          api('dashboard'),
-          ['PROJECT_MANAGER', 'SECTOR_MANAGER'].includes(me.user?.role)
-            ? api('project_manager_dashboard')
-            : Promise.resolve(null),
-        ]);
-        setDash(dashboard);
-        if (manager) setManagerDash(manager);
+        setDash(await api('dashboard'));
+
+        if (['PROJECT_MANAGER', 'SECTOR_MANAGER'].includes(me.user?.role)) {
+          setManagerDash(await api('project_manager_dashboard'));
+        }
       } catch {
         // لا يتم تسجيل الخروج بسبب خطأ مؤقت في التحديث
       }
     };
 
+    refresh();
+
     const timer = setInterval(refresh, 15000);
+
     return () => clearInterval(timer);
-  }, [me?.user?.user_id, me?.user?.role]);
+  }, [me]);
 
   async function performLogout() {
     setBusy(true);
@@ -351,7 +318,6 @@ export default function Home() {
   }
 
   async function load() {
-    let loadCancelled = false;
     setError('');
 
     try {
@@ -362,102 +328,52 @@ export default function Home() {
         return;
       }
 
-      // Establish the authenticated identity before any other cacheable call.
-      // This also ensures all subsequent cached responses are stored under
-      // the correct user namespace.
-      const userId = String(m.user.user_id);
-      setOfflineUserId(userId);
       setMe(m);
 
-      // Paint the most recent local snapshot immediately on refresh. The
-      // authenticated network request below still revalidates it in the
-      // background, so cached data is only a fast first paint, not the source
-      // of truth.
-      const cachedInitial = await Promise.all([
-        cacheGet<any>(apiCacheKey('dashboard', {})),
-        cacheGet<any>(apiCacheKey('project_manager_dashboard', {})),
-        cacheGet<Employee[]>(apiCacheKey('employees', {})),
-        cacheGet<Project[]>(apiCacheKey('projects', {})),
-        cacheGet<Shift[]>(apiCacheKey('shifts', {})),
-        cacheGet<User[]>(apiCacheKey('users', {})),
-      ]);
-      if (!loadCancelled) {
-        if (cachedInitial[0]) setDash(cachedInitial[0]);
-        if (cachedInitial[1]) setManagerDash(cachedInitial[1]);
-        if (cachedInitial[2]) setEmployees(cachedInitial[2]);
-        if (cachedInitial[3]) setProjects(cachedInitial[3]);
-        if (cachedInitial[4]) setShifts(cachedInitial[4]);
-        if (cachedInitial[5]) setUsers(cachedInitial[5]);
+      try {
+        setDash(await api('dashboard'));
+      } catch (e: any) {
+        setError(e.message || 'تعذر تحميل لوحة التحكم');
       }
 
-      // Authentication is now established. Render the application shell
-      // immediately; dashboard/reference data continues in the background.
-      // This keeps a refresh from waiting for every secondary request.
-      if (!loadCancelled) setAuthReady(true);
-
-      const role = String(m.user?.role || '');
-      const isManager = ['PROJECT_MANAGER', 'SECTOR_MANAGER'].includes(role);
-      const canManagePeople = ['SYSTEM_ADMIN', 'HR_MANAGER', 'SECTOR_MANAGER', 'PROJECT_MANAGER'].includes(role);
-      const canManageUsers = ['SYSTEM_ADMIN', 'HR_MANAGER'].includes(role);
-
-      // The dashboard and reference data are independent requests. Fetch them
-      // concurrently so initial app load is bounded by the slowest request,
-      // not the sum of every request.
-      const tasks: Promise<any>[] = [
-        api('dashboard'),
-      ];
-      if (isManager) tasks.push(api('project_manager_dashboard'));
-      if (canManagePeople) {
-        tasks.push(api('employees'));
-        tasks.push(api('projects'));
-        tasks.push(api('shifts'));
-      }
-      if (canManageUsers) tasks.push(api('users'));
-
-      // Do not block the authenticated shell on secondary data. Each result
-      // is applied independently as it becomes available.
-      const results = await Promise.allSettled(tasks);
-
-      if (loadCancelled) return;
-
-      let i = 0;
-      const take = () => results[i++];
-
-      const dashboardResult = take();
-      if (dashboardResult.status === 'fulfilled') {
-        setDash(dashboardResult.value);
-      } else {
-        setError((dashboardResult.reason as any)?.message || 'تعذر تحميل لوحة التحكم');
-      }
-
-      if (isManager) {
-        const managerResult = take();
-        if (managerResult.status === 'fulfilled') {
-          setManagerDash(managerResult.value);
-        } else {
-          setError((managerResult.reason as any)?.message || 'تعذر تحميل لوحة مدير المشروع');
+      if (['PROJECT_MANAGER', 'SECTOR_MANAGER'].includes(m.user?.role)) {
+        try {
+          setManagerDash(await api('project_manager_dashboard'));
+        } catch (e: any) {
+          setError(e.message || 'تعذر تحميل لوحة مدير المشروع');
         }
       }
 
-      if (canManagePeople) {
-        const employeesResult = take();
-        const projectsResult = take();
-        const shiftsResult = take();
+      if (
+        ['SYSTEM_ADMIN', 'HR_MANAGER', 'SECTOR_MANAGER', 'PROJECT_MANAGER'].includes(
+          m.user?.role,
+        )
+      ) {
+        try {
+          setEmployees(await api('employees'));
+        } catch (e: any) {
+          setError(e.message || 'تعذر تحميل الموظفين');
+        }
 
-        if (employeesResult.status === 'fulfilled') setEmployees(employeesResult.value || []);
-        else setError((employeesResult.reason as any)?.message || 'تعذر تحميل الموظفين');
+        try {
+          setProjects(await api('projects'));
+        } catch (e: any) {
+          setError(e.message || 'تعذر تحميل المشاريع');
+        }
 
-        if (projectsResult.status === 'fulfilled') setProjects(projectsResult.value || []);
-        else setError((projectsResult.reason as any)?.message || 'تعذر تحميل المشاريع');
-
-        if (shiftsResult.status === 'fulfilled') setShifts(shiftsResult.value || []);
-        else setError((shiftsResult.reason as any)?.message || 'تعذر تحميل الورديات');
+        try {
+          setShifts(await api('shifts'));
+        } catch (e: any) {
+          setError(e.message || 'تعذر تحميل الورديات');
+        }
       }
 
-      if (canManageUsers) {
-        const usersResult = take();
-        if (usersResult.status === 'fulfilled') setUsers(usersResult.value || []);
-        else setError((usersResult.reason as any)?.message || 'تعذر تحميل المستخدمين');
+      if (['SYSTEM_ADMIN', 'HR_MANAGER'].includes(m.user?.role)) {
+        try {
+          setUsers(await api('users'));
+        } catch (e: any) {
+          setError(e.message || 'تعذر تحميل المستخدمين');
+        }
       }
     } catch (e: any) {
       const message = String(e?.message || '');
@@ -468,26 +384,18 @@ export default function Home() {
         );
 
       if (authError) {
-        // Do not destroy local cache/queue on a single authentication race.
-        // Only explicit Logout clears local الموارد البشرية data.
-        const restored = await (async () => {
-          try {
-            const cachedMe: any = await cacheGet(apiCacheKey('me', {}));
-            if (!cachedMe?.user?.user_id) return false;
-            setOfflineUserId(String(cachedMe.user.user_id));
-            setMe(cachedMe);
-            const cachedDashboard: any = await cacheGet(apiCacheKey('dashboard', {}));
-            const cachedManagerDashboard: any = await cacheGet(apiCacheKey('project_manager_dashboard', {}));
-            if (cachedDashboard) setDash(cachedDashboard);
-            if (cachedManagerDashboard) setManagerDash(cachedManagerDashboard);
-            setPendingSync(await pendingAttendanceCount(String(cachedMe.user.user_id)).catch(() => 0));
-            setIsOffline(!navigator.onLine);
-            return true;
-          } catch {
-            return false;
-          }
-        })();
-        if (!restored) setError('تعذر التحقق من جلسة الدخول حاليًا. لم يتم تسجيل الخروج، وسيتم إعادة المحاولة تلقائيًا.');
+        void clearOfflineData();
+        setMe(null);
+        setDash(null);
+        setManagerDash(null);
+        setUsers([]);
+        setEmployees([]);
+        setProjects([]);
+        setShifts([]);
+
+        setError(
+          'انتهت جلسة الدخول، برجاء تسجيل الدخول مرة أخرى.',
+        );
       } else {
         setError(
           message || 'تعذر الاتصال بالخادم، حاول مرة أخرى.',
@@ -522,7 +430,7 @@ export default function Home() {
     setError('');
 
     if (!navigator.geolocation) {
-      return setError('المتصفح لا يدعم الموقع الجغرافي');
+      return setError('المتصفح لا يدعم GPS');
     }
 
     setBusy(true);
@@ -630,6 +538,11 @@ export default function Home() {
             ? current
             : '',
         );
+      }
+
+      if (id === 'notifications') {
+        const result: any = await api('notifications');
+        setNotifications(result || { notices: [], total: 0, high: 0 });
       }
 
       if (id === 'employees') {
@@ -952,7 +865,7 @@ export default function Home() {
           : newRole === 'PROJECT_MANAGER'
           ? 'تم إنشاء حساب مدير المشروع وربطه بالمشروع بنجاح'
           : newRole === 'HR_MANAGER'
-            ? 'تم إنشاء حساب مدير الموارد البشرية بدون ربطه بموظف أو مشروع'
+            ? 'تم إنشاء حساب HR بدون ربطه بموظف أو مشروع'
             : 'تم إنشاء الحساب بنجاح',
       );
 
@@ -984,35 +897,22 @@ export default function Home() {
     }
   }
 
-  async function saveAdminEdit(payload: Record<string, unknown>) {
-    try {
-      setBusy(true);
-      if (adminEdit?.entity === 'employee') {
-        await api('update_employee', payload);
-        setEmployees(await api<Employee[]>('employees'));
-        setNotice('تم حفظ تعديلات الموظف بنجاح');
-      } else if (adminEdit?.entity === 'project') {
-        await api('update_project', payload);
-        setProjects(await api<Project[]>('projects'));
-        setNotice('تم حفظ تعديلات المشروع بنجاح');
-      } else if (adminEdit?.entity === 'shift') {
-        await api('update_shift', payload);
-        setShifts(await api<Shift[]>('shifts'));
-        setNotice('تم حفظ تعديلات الوردية بنجاح');
-      } else if (adminEdit?.entity === 'user-password') {
-        await api('update_user', payload);
-        setNotice('تم تغيير كلمة مرور الحساب بنجاح');
-      }
-      setAdminEdit(null);
-    } catch (e: any) {
-      setError(e.message || 'تعذر حفظ التعديلات');
-    } finally {
-      setBusy(false);
-    }
+  async function updateEmployeeRecord(employeeId: string) {
+    setEmployeeProfileId(employeeId);
+  }
+
+  async function updateProjectRecord(projectId: string) {
+    const current=projects.find(p=>p.project_id===projectId);if(!current)return; const name=window.prompt('اسم المشروع',current.name||'');if(name===null)return;const client=window.prompt('العميل',current.client||'');if(client===null)return;const location_name=window.prompt('اسم الموقع',current.location_name||'');if(location_name===null)return;const radius=window.prompt('نطاق GPS بالمتر',String(current.geofence_radius_m??200));if(radius===null)return;
+    try{setBusy(true);await api('update_project',{project_id:projectId,name,client,location_name,geofence_radius_m:Number(radius)});setNotice('تم تعديل المشروع');setProjects(await api('projects'));}catch(e:any){setError(e.message)}finally{setBusy(false)}
+  }
+
+  async function updateShiftRecord(shiftId: string) {
+    const current=shifts.find(s=>s.shift_id===shiftId);if(!current)return; const fields=['name','start_time','attendance_open','attendance_close','checkout_open','checkout_close','auto_checkout_time']; const values:any={}; for(const f of fields){const v=window.prompt(f,current[f as keyof typeof current] as string||'');if(v===null)return;values[f]=v;}
+    try{setBusy(true);await api('update_shift',{shift_id:shiftId,...values});setNotice('تم تعديل الوردية');setShifts(await api('shifts'));}catch(e:any){setError(e.message)}finally{setBusy(false)}
   }
 
   async function toggleUser(userId:string,status:string){try{setBusy(true);if(status==='ACTIVE')await api('delete_user',{user_id:userId});else await api('update_user',{user_id:userId,status:'ACTIVE'});setNotice(status==='ACTIVE'?'تم تعطيل الحساب':'تم تفعيل الحساب');setUsers(await api('users'));}catch(e:any){setError(e.message)}finally{setBusy(false)}}
-  async function resetUserPassword(userId:string){const current=users.find(u=>u.user_id===userId);if(current)setAdminEdit({entity:'user-password',record:current});}
+  async function resetUserPassword(userId:string){const password=window.prompt('كلمة المرور الجديدة');if(password===null)return;try{setBusy(true);await api('update_user',{user_id:userId,password});setNotice('تم تغيير كلمة المرور');}catch(e:any){setError(e.message)}finally{setBusy(false)}}
 
   async function closeAttendanceRecord(attendanceId:string){
     if(!window.confirm('هل تريد إغلاق سجل الحضور هذا الآن؟')) return;
@@ -1057,9 +957,8 @@ export default function Home() {
         reason: permissionReason,
       });
 
-      setNotice('تم إرسال طلب الإذن للاعتماد');
+      setNotice('تم إرسال طلب الإذن');
 
-      await refreshSection('permissions');
       setPermissionStart('');
       setPermissionEnd('');
       setPermissionReason('');
@@ -1078,29 +977,6 @@ export default function Home() {
     [me?.user?.role],
   );
 
-  if (!authReady) {
-    return (
-      <main className="login-page" dir="rtl" aria-busy="true">
-        <div className="login-shell">
-          <div className="login-brand">
-            <div className="brand-mark">N</div>
-            <div>
-              <b>النُبي للموارد البشرية</b>
-              <span>نظام إدارة موارد بشرية للمشروعات</span>
-            </div>
-          </div>
-          <section className="login-card">
-            <div className="eyebrow">التحقق من الجلسة</div>
-            <h1>جاري تحميل النظام</h1>
-            <p>يتم استعادة جلسة الدخول والبيانات المحلية. لن تحتاج إلى تسجيل الدخول مرة أخرى.</p>
-            <div className="alert" role="status">جاري التحقق…</div>
-          </section>
-          <small className="login-footer">النُبي للموارد البشرية • إدارة القوى العاملة بالمشروعات</small>
-        </div>
-      </main>
-    );
-  }
-
   if (!me) {
     return (
       <main
@@ -1114,7 +990,7 @@ export default function Home() {
             </div>
 
             <div>
-              <b>النُبي للموارد البشرية</b>
+              <b>ELNUBY HR</b>
               <span>
                 نظام إدارة موارد بشرية للمشروعات
               </span>
@@ -1142,7 +1018,7 @@ export default function Home() {
               onChange={(e) =>
                 setUsername(e.target.value)
               }
-              placeholder="أدخل اسم المستخدم"
+              placeholder="abdullah"
             />
 
             <label>
@@ -1179,7 +1055,7 @@ export default function Home() {
           </section>
 
           <small className="login-footer">
-            النُبي للموارد البشرية • إدارة القوى العاملة بالمشروعات
+            ELNUBY HR
           </small>
         </div>
       </main>
@@ -1210,8 +1086,8 @@ export default function Home() {
           </div>
 
           <div>
-            <b>النُبي للموارد البشرية</b>
-            <small>إدارة القوى العاملة</small>
+            <b>ELNUBY HR</b>
+            
           </div>
         </div>
 
@@ -1272,11 +1148,8 @@ export default function Home() {
             {isOffline
               ? `وضع العمل بدون إنترنت — البيانات المعروضة من آخر مزامنة${pendingSync ? ` • ${pendingSync} عملية حضور بانتظار المزامنة` : ''}`
               : `${pendingSync} عملية حضور وانصراف بانتظار المزامنة`}
-            {!isOffline && (pendingSync > 0 || failedSync > 0) && (
-              <button type="button" onClick={async () => { const r = await syncAttendanceQueue(async (action, payload) => api(action, payload, { offlineSync: true }), getOfflineUserId()); const uid = getOfflineUserId(); setPendingSync(r.pending); setFailedSync(await failedAttendanceCount(uid).catch(() => 0)); if (r.synced) setNotice(`تمت مزامنة ${r.synced} عملية حضور وانصراف بنجاح`); if (r.failed) setError(`تم رفض ${r.failed} عملية تمت أثناء عدم الاتصال: ${r.lastError || 'راجع تفاصيل العملية'}`); await load(); }}>مزامنة الآن</button>
-            )}
-            {!isOffline && failedSync > 0 && (
-              <span> • {failedSync} عملية مرفوضة تحتاج مراجعة</span>
+            {!isOffline && pendingSync > 0 && (
+              <button type="button" onClick={async () => { const r = await syncAttendanceQueue(async (action, payload) => api(action, payload, { offlineSync: true }), getOfflineUserId()); setPendingSync(r.pending); if (r.synced) { setNotice(`تمت مزامنة ${r.synced} عملية`); await load(); } }}>مزامنة الآن</button>
             )}
           </div>
         )}
@@ -1317,7 +1190,7 @@ export default function Home() {
               )}
             </span>
 
-            <details className="profile-menu"><summary className="avatar top-avatar" aria-label="قائمة الحساب">{(me.employee?.name||me.user?.username||'U').slice(0,1)}</summary><div className="profile-menu-card"><strong>{me.employee?.name||me.user?.username}</strong><span>{roleLabels[me.user?.role]||'دور غير محدد'}</span><button className="secondary" onClick={performLogout}>تسجيل الخروج</button></div></details>
+            <details className="profile-menu"><summary className="avatar top-avatar" aria-label="قائمة الحساب">{(me.employee?.name||me.user?.username||'U').slice(0,1)}</summary><div className="profile-menu-card"><strong>{me.employee?.name||me.user?.username}</strong><span>{roleLabels[me.user?.role]||me.user?.role}</span><button className="secondary" onClick={performLogout}>تسجيل الخروج</button></div></details>
           </div>
         </header>
 
@@ -1374,8 +1247,10 @@ export default function Home() {
               assignProject={assignProject}
               busy={busy}
             
-              onEdit={['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? (employeeId:string) => { const record=employees.find(e=>e.employee_id===employeeId); if(record) setAdminEdit({entity:'employee',record}); } : undefined}/>
+              onEdit={['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? updateEmployeeRecord : undefined}/>
           )}
+
+          {employeeProfileId && <EmployeeProfile employeeId={employeeProfileId} onClose={() => setEmployeeProfileId(null)} />}
 
           {section === 'shifts' && (
             <ShiftsPage
@@ -1387,7 +1262,7 @@ export default function Home() {
               createShift={createShift}
               busy={busy}
             
-              onEdit={['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? (shiftId:string) => { const record=shifts.find(s=>s.shift_id===shiftId); if(record) setAdminEdit({entity:'shift',record}); } : undefined}/>
+              onEdit={['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? updateShiftRecord : undefined}/>
           )}
 
           {section === 'projects' && (
@@ -1402,7 +1277,7 @@ export default function Home() {
               createProject={createProject}
               busy={busy}
             
-              onEdit={['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? (projectId:string) => { const record=projects.find(p=>p.project_id===projectId); if(record) setAdminEdit({entity:'project',record}); } : undefined}/>
+              onEdit={['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? updateProjectRecord : undefined}/>
           )}
 
           {section === 'attendance' && (
@@ -1466,7 +1341,6 @@ export default function Home() {
                 createPermission
               }
               busy={busy}
-              role={me.user?.role}
             />
           )}
 
@@ -1544,6 +1418,24 @@ export default function Home() {
               onResetPassword={resetUserPassword}/>
           )}
 
+          {section === 'performance' && <Performance employees={employees} role={me.user?.role} />}
+
+          {section === 'notifications' && (
+            <section className="panel-section">
+              <div className="section-head">
+                <div><h2>تنبيهات الموارد البشرية</h2><p>الحالات التي تحتاج إلى مراجعة من إدارة الموارد البشرية.</p></div>
+                <button className="secondary" onClick={() => refreshSection('notifications')}>تحديث</button>
+              </div>
+              <div className="kpi-grid">
+                <div className="kpi"><div className="kpi-icon"><Icon name="alert" size={21}/></div><div><span>إجمالي التنبيهات</span><strong>{notifications?.total ?? 0}</strong></div><em>اليوم</em></div>
+                <div className="kpi danger-kpi"><div className="kpi-icon"><Icon name="alert" size={21}/></div><div><span>عالية الأولوية</span><strong>{notifications?.high ?? 0}</strong></div><em>تحتاج مراجعة</em></div>
+              </div>
+              <div className="state-card">
+                {(notifications?.notices || []).length === 0 ? <><Icon name="check" size={22}/><div><strong>لا توجد تنبيهات حالية</strong><span>لا توجد حالات تحتاج إلى مراجعة في الوقت الحالي.</span></div></> : <div style={{width:'100%'}}>{notifications.notices.map((n:any,i:number)=><article key={`${n.type}-${n.request_id||n.case_id||n.employee_id||i}`} className="notification-row"><div><strong>{n.title}</strong><span>{n.message}</span></div><b>{n.priority === 'HIGH' ? 'عالية' : 'متوسطة'}</b></article>)}</div>}
+              </div>
+            </section>
+          )}
+
           {section === 'reports' && (
             <Reports
               dash={dash}
@@ -1569,16 +1461,6 @@ export default function Home() {
             <div className="alert success global-alert">
               {notice}
             </div>
-          )}
-
-          {adminEdit && (
-            <AdminEditModal
-              entity={adminEdit.entity}
-              record={adminEdit.record}
-              busy={busy}
-              onClose={() => !busy && setAdminEdit(null)}
-              onSave={saveAdminEdit}
-            />
           )}
         </div>
       </section>

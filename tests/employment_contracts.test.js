@@ -1,0 +1,13 @@
+const fs = require('fs');
+const path = require('path');
+const root = path.resolve(__dirname, '..');
+const migration = fs.readFileSync(path.join(root,'supabase-migration-20260830_employment_assignments.sql'),'utf8');
+const router = fs.readFileSync(path.join(root,'src/server/hr/router.ts'),'utf8');
+const profile = fs.readFileSync(path.join(root,'src/server/hr/employeeProfile.ts'),'utf8');
+if (!migration.includes('employee_contracts')) throw new Error('contracts table missing');
+if (!migration.includes('employee_delegations')) throw new Error('delegations table missing');
+if (!migration.includes('check (end_date is null or end_date >= start_date)')) throw new Error('date integrity missing');
+if (!router.includes('case "employee_contracts"')) throw new Error('contract route missing');
+if (!router.includes('case "create_employee_contract"')) throw new Error('contract create route missing');
+if (!profile.includes('createEmployeeContract')) throw new Error('contract service missing');
+console.log('Employment contracts/assignments PASS');

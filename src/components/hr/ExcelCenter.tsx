@@ -33,13 +33,13 @@ export default function ExcelCenter() {
       const a=document.createElement("a"); a.href=url;
       a.download=`ELNUBY-${table}-${action}.xlsx`; a.click();
       URL.revokeObjectURL(url);
-      setMessage(action==="export"?"تم تصدير ملف إكسل بنجاح":"تم تنزيل نموذج إكسل");
+      setMessage(action==="export"?"تم تصدير ملف Excel بنجاح":"تم تنزيل نموذج Excel");
     } catch(e:any){setError(e.message||"تعذر تنفيذ العملية");}
     finally{setBusy(false);}
   }
 
   async function inspect() {
-    if(!file) return setError("اختر ملف إكسل أولاً");
+    if(!file) return setError("اختر ملف Excel أولاً");
     setBusy(true); setError(""); setMessage("");
     try { setPreview(await apiFile("import",{table,commit:false},file)); }
     catch(e:any){setError(e.message||"تعذر قراءة الملف");}
@@ -60,8 +60,8 @@ export default function ExcelCenter() {
 
   return <section className="excel-center">
     <div className="excel-hero">
-      <div><div className="eyebrow">عمليات البيانات</div><h3>مركز إكسل</h3><p>استيراد وتصدير منظم مع فحص قبل الحفظ وسجل تدقيق للعمليات.</p></div>
-      <div className="excel-badge">ملفات إكسل</div>
+      <div><div className="eyebrow">DATA OPERATIONS</div><h3>مركز Excel</h3><p>استيراد وتصدير منظم مع فحص قبل الحفظ وسجل تدقيق للعمليات.</p></div>
+      <div className="excel-badge">XLSX</div>
     </div>
     <div className="excel-grid">
       <div className="excel-card">
@@ -70,7 +70,7 @@ export default function ExcelCenter() {
           {TABLES.map(([id,label])=><option key={id} value={id}>{label}</option>)}
         </select>
         <div className="excel-actions">
-          <button className="primary" disabled={busy} onClick={()=>download("export")}>تصدير إكسل</button>
+          <button className="primary" disabled={busy} onClick={()=>download("export")}>تصدير Excel</button>
           {table!=="all"&&<button className="secondary" disabled={busy} onClick={()=>download("template")}>تحميل النموذج</button>}
         </div>
       </div>

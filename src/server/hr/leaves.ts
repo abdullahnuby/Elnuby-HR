@@ -1,5 +1,6 @@
 import { parsePagination } from "./core";
-import { supabase, publicSupabase, success, errorResponse, generateId, nowISO, appDate, writeAuditLog } from "./core";
+import { supabase, publicSupabase, success, errorResponse, generateId, nowISO, appDate, writeAudit } from "./core";
+import { startApprovalWorkflow, recordApprovalStep } from "./governance";
 import type { SessionContext } from "./core";
 
 const ACTIVE_PENDING = ["PENDING_MANAGER", "PENDING_HR"];
@@ -207,6 +208,13 @@ export async function createLeave(session: SessionContext, body: Record<string, 
     updated_at: nowISO(),
   }).select("*").single();
   if (error) return errorResponse(error.message, 500);
+  try {
+    await startApprovalWorkflow("leave_approval", requestId, employeeId, String(assignment.project_id));
+  } catch (workflowError: any) {
+    await supabase.from("leave_requests").delete().eq("request_id", requestId);
+    console.error("leave approval workflow:", workflowError);
+    return errorResponse("تعذر إنشاء مسار اعتماد الإجازة. لم يتم حفظ الطلب.", 500);
+  }
 
   let uploadedPath: string | null = null;
   try {
@@ -245,19 +253,21 @@ export async function decideLeaveManager(session: SessionContext, body: Record<s
   const requestId = String(body.request_id || "");
   const decision = String(body.decision || "").toUpperCase();
   if (!requestId || !["APPROVE","REJECT"].includes(decision)) return errorResponse("بيانات القرار غير صحيحة");
-  const comment = String(body.comment || "").trim();
-  if (decision === "REJECT" && comment.length < 3) return errorResponse("سبب الرفض مطلوب");
   const { data: request } = await supabase.from("leave_requests").select("*").eq("request_id", requestId).maybeSingle();
   if (!request) return errorResponse("طلب الإجازة غير موجود", 404);
   if (request.status !== "PENDING_MANAGER") return errorResponse("الطلب ليس في انتظار اعتماد مدير المشروع");
   const { canManageProject } = await import("./core");
   if (!(await canManageProject(session.user, request.project_id))) return errorResponse("الطلب غير تابع لمشروعك",403);
+  if (request.employee_id === session.user.employee_id) return errorResponse("لا يجوز اعتماد طلبك بنفسك.", 403);
   const newStatus = decision === "APPROVE" ? "PENDING_HR" : "REJECTED";
   const { data,error } = await supabase.from("leave_requests").update({
     status:newStatus, manager_id:session.user.user_id, manager_decision_at:nowISO(),
     manager_comment:body.comment || null, updated_at:nowISO()
-  }).eq("request_id",requestId).eq("status", "PENDING_MANAGER").select("*").single();
+  }).eq("request_id",requestId).select("*").single();
   if (error) return errorResponse(error.message,500);
+  try { await recordApprovalStep("leave_approval", requestId, 1, session, decision, body.comment); }
+  catch (e) { console.error("leave workflow manager step:", e); }
+  await writeAudit(session.user.user_id, "leave_manager_decision", "leave_request", requestId, { before: request.status, after: newStatus, decision });
   try { const b=await calculateBalance(request.employee_id,request.leave_type_id,String(request.from_date)); if(b) await syncLegacyBalance(request.employee_id,request.leave_type_id,Number(String(request.from_date).slice(0,4)),b); } catch {}
   return success(data);
 }
@@ -266,36 +276,20 @@ export async function decideLeaveHR(session: SessionContext, body: Record<string
   const requestId = String(body.request_id || "");
   const decision = String(body.decision || "").toUpperCase();
   if (!requestId || !["APPROVE","REJECT"].includes(decision)) return errorResponse("بيانات القرار غير صحيحة");
-  const comment = String(body.comment || "").trim();
-  if (decision === "REJECT" && comment.length < 3) return errorResponse("سبب الرفض مطلوب");
   const { data: request } = await supabase.from("leave_requests").select("*").eq("request_id", requestId).maybeSingle();
   if (!request) return errorResponse("طلب الإجازة غير موجود",404);
-  if (request.status !== "PENDING_HR") return errorResponse("الطلب ليس في انتظار اعتماد الموارد البشرية");
+  if (request.status !== "PENDING_HR") return errorResponse("الطلب ليس في انتظار اعتماد HR");
+  if (request.employee_id === session.user.employee_id) return errorResponse("لا يجوز اعتماد طلبك بنفسك.", 403);
+  const nextStatus = decision==="APPROVE"?"APPROVED":"REJECTED";
   const { data,error } = await supabase.from("leave_requests").update({
-    status:decision==="APPROVE"?"APPROVED":"REJECTED", hr_decision:decision,
+    status:nextStatus, hr_decision:decision,
     hr_decision_at:nowISO(), hr_comment:body.comment || null, updated_at:nowISO()
-  }).eq("request_id",requestId).eq("status", "PENDING_HR").select("*").single();
+  }).eq("request_id",requestId).select("*").single();
   if (error) return errorResponse(error.message,500);
+  try { await recordApprovalStep("leave_approval", requestId, 2, session, decision, body.comment); }
+  catch (e) { console.error("leave workflow HR step:", e); }
+  await writeAudit(session.user.user_id, "leave_hr_decision", "leave_request", requestId, { before: request.status, after: nextStatus, decision });
   try { const b=await calculateBalance(request.employee_id,request.leave_type_id,String(request.from_date)); if(b) await syncLegacyBalance(request.employee_id,request.leave_type_id,Number(String(request.from_date).slice(0,4)),b); } catch {}
-  return success(data);
-}
-
-export async function cancelLeave(session: SessionContext, body: Record<string, unknown>) {
-  const requestId = String(body.request_id || "");
-  const reason = String(body.reason || "").trim();
-  if (!requestId) return errorResponse("رقم الطلب مطلوب");
-  if (reason.length < 3) return errorResponse("سبب إلغاء الطلب مطلوب");
-  const { data: request } = await supabase.from("leave_requests").select("request_id,employee_id,status").eq("request_id",requestId).maybeSingle();
-  if (!request) return errorResponse("طلب الإجازة غير موجود",404);
-  if (request.employee_id !== session.user.employee_id && !["SYSTEM_ADMIN","HR_MANAGER"].includes(session.user.role)) {
-    return errorResponse("ليس لديك صلاحية إلغاء هذا الطلب",403);
-  }
-  if (!ACTIVE_PENDING.includes(request.status)) return errorResponse("لا يمكن إلغاء الطلب بعد بدء المراجعة أو انتهاء الإجراء");
-  const { data, error } = await supabase.from("leave_requests").update({
-    status:"CANCELLED", cancellation_reason:reason, cancelled_by:session.user.user_id, cancelled_at:nowISO(), updated_at:nowISO()
-  }).eq("request_id",requestId).in("status", ACTIVE_PENDING).select("*").single();
-  if (error) return errorResponse(error.message,500);
-  await writeAuditLog(session.user.user_id,"cancel_leave","leave_requests",requestId,{reason});
   return success(data);
 }
 

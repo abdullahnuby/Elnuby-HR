@@ -1,0 +1,11 @@
+const fs=require('fs');const path=require('path');
+const root=path.join(__dirname,'..');
+const perf=fs.readFileSync(path.join(root,'src/server/hr/performance.ts'),'utf8');
+const router=fs.readFileSync(path.join(root,'src/server/hr/router.ts'),'utf8');
+const mig=fs.readFileSync(path.join(root,'supabase-migration-20260829_goals_development.sql'),'utf8');
+const ui=fs.readFileSync(path.join(root,'src/components/hr/Performance.tsx'),'utf8');
+for(const x of ['performanceGoals','createPerformanceGoal','updatePerformanceGoal','developmentPlans','createDevelopmentPlan','updateDevelopmentPlan']) if(!perf.includes(`export async function ${x}`)) throw new Error(`missing ${x}`);
+for(const x of ['performance_goals','create_performance_goal','update_performance_goal','development_plans','create_development_plan','update_development_plan']) if(!router.includes(`case "${x}"`)) throw new Error(`missing route ${x}`);
+for(const x of ['performance_goals','development_plans','progress','due_date']) if(!mig.includes(x)) throw new Error(`missing schema ${x}`);
+if(!ui.includes('الأهداف')||!ui.includes('خطة التطوير')) throw new Error('UI missing goals/development');
+console.log('GOALS DEVELOPMENT TESTS: PASS');

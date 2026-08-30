@@ -1,8 +1,8 @@
 import { cookies } from "next/headers";
-import { getSession, errorResponse, writeAuditLog } from "@/server/hr/core";
+import { getSession, errorResponse, writeAudit } from "@/server/hr/core";
 import { handleAction } from "@/server/hr/router";
 import { createLeave } from "@/server/hr/leaves";
-import { SESSION_COOKIE } from "@/server/hr/auth";
+import { SESSION_COOKIE, clearSessionCookie } from "@/server/hr/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,9 +27,10 @@ export async function POST(request: Request) {
       const form = await request.formData();
       body = {};
       form.forEach((value, key) => {
-        if (key !== "medical_document") body[key] = typeof value === "string" ? value : value;
+        if (key !== "document" && key !== "medical_document") body[key] = typeof value === "string" ? value : value;
       });
-      if (form.get("medical_document")) body.__document = form.get("medical_document");
+      if (form.get("document")) body.__document = form.get("document");
+      else if (form.get("medical_document")) body.__document = form.get("medical_document");
     } else {
       body = (await request.json()) as Record<string, unknown>;
     }
@@ -42,24 +43,15 @@ export async function POST(request: Request) {
     const cookieToken = cookieStore.get(SESSION_COOKIE)?.value || "";
 
     if (action !== "login") {
-      try {
-        session = await getSession(cookieToken);
-      } catch (error) {
-        // A database/network failure is NOT an authentication failure.
-        // Returning 503 lets the browser keep the existing authenticated
-        // state/cache instead of logging the user out on refresh.
-        if (action === "session_status") {
-          return errorResponse("تعذر التحقق من الجلسة مؤقتًا", 503);
-        }
-        throw error;
-      }
+      session = await getSession(cookieToken);
 
-      // session_status is a passive probe. It never clears cookies or cache.
+      // session_status is intentionally public and idempotent. It is used by
+      // the browser on first load so an unauthenticated refresh does not
+      // produce a noisy 401 or revive stale client state.
       if (action === "session_status") {
-        return Response.json({
-          ok: true,
-          data: { authenticated: Boolean(session), user: session?.user || null },
-        });
+        // Do not clear a browser cookie during a passive status probe. A
+        // transient session-store/network failure must never become a logout.
+        return Response.json({ ok: true, data: { authenticated: Boolean(session), user: session?.user || null } });
       }
 
       // Logout is intentionally idempotent: even if the server-side session
@@ -85,7 +77,7 @@ if (session && AUDITED_ACTIONS.has(action)) {
     )
   );
 
-  await writeAuditLog(
+  await writeAudit(
     session.user.user_id,
     action,
     "api",
@@ -97,7 +89,7 @@ if (session && AUDITED_ACTIONS.has(action)) {
 
 return response;
   } catch (error) {
-    console.error("النُبي للموارد البشرية API ERROR:", {
+    console.error("ELNUBY HR API ERROR:", {
       action: requestAction || undefined,
       error,
     });

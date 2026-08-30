@@ -1,4 +1,4 @@
-import { apiCacheKey, cacheGet, cacheSet, queueAttendance, setOfflineUserId } from './offline';
+import { apiCacheKey, cacheGet, cacheSet, queueAttendance, clearOfflineCache, setOfflineUserId } from './offline';
 
 export type ApiResponse<T = unknown> = {
   ok: boolean;
@@ -17,17 +17,6 @@ function offlineError() {
 }
 
 export type ApiOptions = { offlineSync?: boolean };
-
-export class ApiRequestError extends Error {
-  status: number;
-  permanent: boolean;
-  constructor(message: string, status = 0) {
-    super(message);
-    this.name = 'ApiRequestError';
-    this.status = status;
-    this.permanent = [400, 403, 409, 422].includes(status);
-  }
-}
 
 export async function api<T = unknown>(
   action: string,
@@ -49,7 +38,7 @@ export async function api<T = unknown>(
   }
 
   try {
-    const requestInit: RequestInit = {
+    const res = await fetch('/api/hr', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -59,16 +48,7 @@ export async function api<T = unknown>(
       credentials: 'include',
       cache: 'no-store',
       body: JSON.stringify({ action, ...payload }),
-    };
-
-    // Absorb a one-off auth race during hydration/refresh. The browser keeps
-    // the HttpOnly cookie; the second request proves whether the session is
-    // actually invalid before the UI falls back to cached state.
-    let res = await fetch('/api/hr', requestInit);
-    if (res.status === 401 && action !== 'login' && action !== 'session_status') {
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      res = await fetch('/api/hr', requestInit);
-    }
+    });
 
     let result: ApiResponse<T>;
     try {
@@ -88,13 +68,11 @@ export async function api<T = unknown>(
 
       // Authentication failure invalidates cached views, but NEVER deletes the
       // offline attendance queue. A later login must be able to resume sync.
-      if (res.status === 401 && action !== 'session_status') {
-        // Keep offline cache until the application has positively established
-        // that the session is truly invalid; a single 401 during refresh must
-        // not destroy the user's offline recovery state.
+      if (res.status === 401 || /الجلسة غير صالحة|انتهت جلسة|Authentication required|Invalid session|Session expired|User inactive/i.test(message)) {
+        await clearOfflineCache();
       }
 
-      throw new ApiRequestError(message, res.status);
+      throw new Error(message);
     }
 
     if (action === 'me' && (result.data as any)?.user?.user_id) {
@@ -113,8 +91,7 @@ export async function api<T = unknown>(
       /الجلسة غير صالحة|انتهت جلسة|Authentication required|Invalid session|Session expired|User inactive|401/i.test(message);
 
     if (authFailure) {
-      // Never destroy offline state while recovering from a transient auth or
-      // network race. Explicit logout owns local cleanup.
+      await clearOfflineCache();
       throw error;
     }
 
@@ -145,9 +122,9 @@ export async function apiFile(action: string, payload: Record<string, unknown>, 
   return result.data;
 }
 
-export async function downloadExcel(action: 'export' | 'template', table: string) {
+export async function downloadExcel(action: 'export' | 'template' | 'monthly_report', table: string) {
   if (typeof navigator !== 'undefined' && !navigator.onLine) throw offlineError();
-  const res = await fetch(`/api/hr/excel?action=${action}&table=${encodeURIComponent(table)}`, { credentials: 'include', cache: 'no-store' });
+  const res = await fetch(`/api/hr/excel?action=${action}&table=${encodeURIComponent(table)}${action==='monthly_report' ? `&month=${encodeURIComponent(table)}` : ''}`, { credentials: 'include', cache: 'no-store' });
   if (!res.ok) {
     const result = await res.json().catch(() => null);
     throw new Error(result?.error || `Server error (${res.status})`);

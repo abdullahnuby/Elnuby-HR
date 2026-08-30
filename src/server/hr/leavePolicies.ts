@@ -1,4 +1,4 @@
-import { supabase, success, errorResponse, generateId, nowISO, appDate, writeAuditLog } from "./core";
+import { supabase, success, errorResponse, generateId, nowISO, appDate, writeAudit } from "./core";
 import type { SessionContext } from "./core";
 
 const RESIDENCY = ["EXPATRIATE", "RESIDENT"];
@@ -100,7 +100,7 @@ export async function createLeavePolicy(session: SessionContext, body: Record<st
     updated_at: nowISO(),
   }).select("*,leave_types(name)").single();
   if (error) return errorResponse(error.message, 500);
-  await writeAuditLog(session.user.user_id, "create_leave_policy", "leave_policies", data.policy_id, data);
+  await writeAudit(session.user.user_id, "create_leave_policy", "leave_policies", data.policy_id, data);
   return success(data, 201);
 }
 
@@ -116,7 +116,7 @@ export async function updateLeavePolicy(session: SessionContext, body: Record<st
   if (changes.accrual_method && !METHODS.includes(String(changes.accrual_method))) return errorResponse("طريقة الاستحقاق غير صحيحة");
   const { data, error } = await supabase.from("leave_policies").update({...changes,updated_at:nowISO()}).eq("policy_id", id).select("*,leave_types(name)").single();
   if (error) return errorResponse(error.message, 500);
-  await writeAuditLog(session.user.user_id, "update_leave_policy", "leave_policies", id, {changes});
+  await writeAudit(session.user.user_id, "update_leave_policy", "leave_policies", id, {changes});
   return success(data);
 }
 

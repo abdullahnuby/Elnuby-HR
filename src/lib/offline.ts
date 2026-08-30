@@ -9,7 +9,6 @@ type QueueItem = {
   createdAt: number;
   attempts: number;
   lastError?: string;
-  state?: 'PENDING' | 'FAILED';
 };
 
 const DB_NAME = 'elnuby-hr-offline';
@@ -54,10 +53,6 @@ function scopedCacheKey(key: string) {
   return userId ? `user:${userId}:${key}` : `anonymous:${key}`;
 }
 
-function legacyAnonymousKey(key: string) {
-  return `anonymous:${key}`;
-}
-
 export async function cacheSet(key: string, value: unknown) {
   try {
     const db = await openDb();
@@ -76,25 +71,9 @@ export async function cacheGet<T = unknown>(key: string): Promise<T | undefined>
     const db = await openDb();
     const value = await new Promise<T | undefined>((resolve, reject) => {
       const tx = db.transaction(CACHE_STORE, 'readonly');
-      const store = tx.objectStore(CACHE_STORE);
-      const primaryReq = store.get(scopedCacheKey(key));
-      primaryReq.onsuccess = () => {
-        if (primaryReq.result?.value !== undefined) {
-          resolve(primaryReq.result.value as T);
-          return;
-        }
-        // One-time compatibility path for installs upgraded from the older
-        // anonymous-cache implementation. This is read-only; callers can
-        // immediately write the value under the authenticated namespace.
-        if (getOfflineUserId()) {
-          const legacyReq = store.get(legacyAnonymousKey(key));
-          legacyReq.onsuccess = () => resolve(legacyReq.result?.value as T | undefined);
-          legacyReq.onerror = () => reject(legacyReq.error);
-        } else {
-          resolve(undefined);
-        }
-      };
-      primaryReq.onerror = () => reject(primaryReq.error);
+      const req = tx.objectStore(CACHE_STORE).get(scopedCacheKey(key));
+      req.onsuccess = () => resolve(req.result?.value as T | undefined);
+      req.onerror = () => reject(req.error);
     });
     db.close();
     return value;
@@ -107,7 +86,7 @@ export async function queueAttendance(action: 'check_in' | 'check_out', payload:
   const userId = getOfflineUserId();
   if (!userId) throw new Error('لا توجد جلسة مستخدم محفوظة لإجراء الحضور دون اتصال. افتح التطبيق مع الإنترنت وسجّل الدخول أولًا.');
   const id = String(payload.client_event_id || crypto.randomUUID());
-  const item: QueueItem = { id, userId, action, payload: { ...payload, client_event_id: id }, createdAt: Date.now(), attempts: 0, state: 'PENDING' }; 
+  const item: QueueItem = { id, userId, action, payload: { ...payload, client_event_id: id }, createdAt: Date.now(), attempts: 0 }; 
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(QUEUE_STORE, 'readwrite');
@@ -126,7 +105,7 @@ export async function getQueuedAttendance(userId?: string | null): Promise<Queue
     const req = tx.objectStore(QUEUE_STORE).getAll();
     req.onsuccess = () => {
         const rows = (req.result || []) as QueueItem[];
-        resolve(rows.filter((row) => (!userId || row.userId === userId)).sort((a, b) => a.createdAt - b.createdAt));
+        resolve(rows.filter((row) => !userId || row.userId === userId).sort((a, b) => a.createdAt - b.createdAt));
       };
     req.onerror = () => reject(req.error);
   });
@@ -146,18 +125,7 @@ async function removeQueueItem(id: string) {
 }
 
 export async function pendingAttendanceCount(userId?: string | null) {
-  const rows = await getQueuedAttendance(userId ?? getOfflineUserId());
-  return rows.filter((row) => row.state !== 'FAILED').length;
-}
-
-export async function failedAttendanceCount(userId?: string | null) {
-  const rows = await getQueuedAttendance(userId ?? getOfflineUserId());
-  return rows.filter((row) => row.state === 'FAILED').length;
-}
-
-export async function lastFailedAttendance(userId?: string | null): Promise<QueueItem | null> {
-  const rows = await getQueuedAttendance(userId ?? getOfflineUserId());
-  return rows.filter((row) => row.state === 'FAILED').sort((a, b) => b.createdAt - a.createdAt)[0] || null;
+  return (await getQueuedAttendance(userId ?? getOfflineUserId())).length;
 }
 
 export async function syncAttendanceQueue(
@@ -165,17 +133,12 @@ export async function syncAttendanceQueue(
   userId = getOfflineUserId(),
 ) {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    return { synced: 0, failed: 0, pending: await pendingAttendanceCount(userId), lastError: null as string | null };
+    return { synced: 0, pending: await pendingAttendanceCount(userId) };
   }
-  if (!userId) return { synced: 0, failed: 0, pending: 0, lastError: null as string | null };
+  if (!userId) return { synced: 0, pending: 0 };
 
-  // Never delete pending attendance because of an expired session.
-  // Never delete pending attendance because of any transient failure.
-  // Permanent business rejections are marked FAILED so the user gets a clear result.
-  const items = (await getQueuedAttendance(userId)).filter((item) => item.state !== 'FAILED');
+  const items = await getQueuedAttendance(userId);
   let synced = 0;
-  let failed = 0;
-  let lastError: string | null = null;
   for (const item of items) {
     try {
       await sender(item.action, item.payload);
@@ -183,24 +146,13 @@ export async function syncAttendanceQueue(
       synced += 1;
     } catch (error: any) {
       const message = String(error?.message || 'تعذر مزامنة العملية');
-      const status = Number(error?.status || 0);
-      const permanent = Boolean(error?.permanent) || [400, 403, 409, 422].includes(status);
-      await updateQueueItem(item.id, {
-        attempts: item.attempts + 1,
-        lastError: message.slice(0, 500),
-        state: permanent ? 'FAILED' : 'PENDING',
-      });
-      lastError = message.slice(0, 500);
-      if (permanent) {
-        failed += 1;
-        // Continue so one rejected old event does not block later valid events.
-        continue;
-      }
-      // Network/auth/transient errors stay pending and stop this sync pass.
+      // Never delete pending attendance because of an expired session.
+      // The user can log back in and retry the exact same idempotent event.
+      await updateQueueItem(item.id, { attempts: item.attempts + 1, lastError: message.slice(0, 500) });
       break;
     }
   }
-  return { synced, failed, pending: await pendingAttendanceCount(userId), lastError };
+  return { synced, pending: await pendingAttendanceCount(userId) };
 }
 
 async function updateQueueItem(id: string, patch: Partial<QueueItem>) {
@@ -233,7 +185,7 @@ export function offlineCacheKey(action: string, payload: Record<string, unknown>
 
 
 /**
- * Clear all locally cached الموارد البشرية data when a user signs out or the server
+ * Clear all locally cached HR data when a user signs out or the server
  * rejects the current session. This prevents data from one account being
  * displayed to another account on the same browser.
  */

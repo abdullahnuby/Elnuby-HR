@@ -67,39 +67,33 @@ export async function getDashboard(
     });
   }
 
-  const [attendanceResult, leaveResult] = await Promise.all([
-    supabase
+  const { data: attendance } =
+    await supabase
       .from("attendance")
-      .select("attendance_id,employee_id,status,check_in,check_out")
+      .select(
+        "attendance_id,employee_id,status,check_in,check_out"
+      )
       .eq("date", today)
-      .in("employee_id", employeeIds),
-    supabase
-      .from("leave_requests")
-      .select("request_id,employee_id,leave_type_id,from_date,to_date,reason")
-      .eq("status", "APPROVED")
-      .in("employee_id", employeeIds)
-      .lte("from_date", today)
-      .gte("to_date", today),
-  ]);
+      .in(
+        "employee_id",
+        employeeIds
+      );
 
-  if (attendanceResult.error || leaveResult.error) {
-    return errorResponse("تعذر تحميل حالة الحضور والإجازات لليوم", 500);
-  }
+  const rows =
+    attendance || [];
 
-  const rows = attendanceResult.data || [];
-  const onLeaveIds = new Set((leaveResult.data || []).map((row:any) => String(row.employee_id)));
   const selfAttendance = session.user.employee_id
-    ? (onLeaveIds.has(String(session.user.employee_id))
-      ? { status: "LEAVE", employee_id: session.user.employee_id, leave_request_id: (leaveResult.data || []).find((x:any)=>String(x.employee_id)===String(session.user.employee_id))?.request_id || null }
-      : rows.find((row: any) => String(row.employee_id) === String(session.user.employee_id)) || null)
+    ? rows.find(
+        (row: any) =>
+          String(row.employee_id) === String(session.user.employee_id)
+      ) || null
     : null;
 
   return success({
     employees: employeeIds.length,
-    present: rows.filter((row:any) => !onLeaveIds.has(String(row.employee_id))).length,
-    late: rows.filter((row: any) => row.status === "LATE" && !onLeaveIds.has(String(row.employee_id))).length,
-    missingCheckout: rows.filter((row: any) => row.check_in && !row.check_out && !onLeaveIds.has(String(row.employee_id))).length,
-    onLeave: onLeaveIds.size,
+    present: rows.length,
+    late: rows.filter((row: any) => row.status === "LATE").length,
+    missingCheckout: rows.filter((row: any) => row.check_in && !row.check_out).length,
     selfAttendance,
     serverTime: nowISO(),
   });

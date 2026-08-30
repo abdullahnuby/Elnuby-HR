@@ -22,7 +22,6 @@ export default function DashboardHome({
   setSection,
 }: any) {
   const attendance = dash?.selfAttendance || null;
-  const onLeave = attendance?.status === 'LEAVE';
   const checkedIn = Boolean(attendance?.check_in);
   const checkedOut = Boolean(attendance?.check_out);
   const workedMinutes = Number(attendance?.worked_minutes || 0);
@@ -59,11 +58,9 @@ export default function DashboardHome({
             <div>
               <span className="employee-kicker">الحضور والانصراف</span>
               <h2>سجّل حضورك من موقع العمل</h2>
-              <p>سيتم التحقق من الموقع الجغرافي ونطاق موقع المشروع قبل اعتماد التسجيل.</p>
+              <p>سيتم التحقق من GPS ونطاق موقع المشروع قبل اعتماد التسجيل.</p>
             </div>
           </div>
-
-          {onLeave ? <div className="employee-leave-banner"><Icon name="calendar" size={18} /> <strong>اليوم إجازة معتمدة</strong><span>لن يتم تسجيل حضور أو انصراف</span></div> : null}
 
           <div className="employee-attendance-times">
             <div><span>وقت الحضور</span><strong>{timeValue(attendance?.check_in)}</strong></div>
@@ -72,23 +69,23 @@ export default function DashboardHome({
           </div>
 
           <div className="employee-attendance-actions">
-            <span className={`employee-status ${onLeave ? 'success' : checkedOut ? 'success' : checkedIn ? 'warning' : 'muted'}`}>
+            <span className={`employee-status ${checkedOut ? 'success' : checkedIn ? 'warning' : 'muted'}`}>
               <Icon name={checkedOut || checkedIn ? 'check' : 'attendance'} size={14} />
-              {onLeave ? 'إجازة معتمدة' : checkedOut ? 'تم إكمال اليوم' : checkedIn ? 'تم تسجيل الحضور' : 'لم يتم تسجيل الحضور'}
+              {checkedOut ? 'تم إكمال اليوم' : checkedIn ? 'تم تسجيل الحضور' : 'لم يتم تسجيل الحضور'}
             </span>
-            {!onLeave && !checkedIn && (
+            {!checkedIn && (
               <button className="employee-primary-action" disabled={busy} onClick={() => locate('check_in')}>
                 <Icon name="check" size={17} />
                 {busy ? 'جاري التحقق...' : 'تسجيل الحضور'}
               </button>
             )}
-            {!onLeave && checkedIn && !checkedOut && (
+            {checkedIn && !checkedOut && (
               <button className="employee-primary-action checkout" disabled={busy} onClick={() => locate('check_out')}>
                 <Icon name="attendance" size={17} />
                 {busy ? 'جاري التحقق...' : 'تسجيل الانصراف'}
               </button>
             )}
-            {!onLeave && checkedOut && (
+            {checkedOut && (
               <button className="employee-secondary-action" onClick={() => setSection('attendance')}>
                 فتح سجل اليوم
                 <Icon name="menu" size={15} />

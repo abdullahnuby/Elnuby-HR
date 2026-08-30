@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { cookies } from "next/headers";
 import {
   supabase,
   publicSupabase,
@@ -12,25 +13,37 @@ import {
   getCurrentEmployeeShift,
   verifyPassword,
   securePasswordHash,
-  writeAuditLog,
-  SESSION_MAX_AGE,
+  writeAudit,
 } from "./core";
 import type { SessionContext } from "./core";
 
 export const SESSION_COOKIE = "elnuby_hr_session";
+export const SESSION_MAX_AGE = 7 * 24 * 60 * 60;
 
-function sessionCookieOptions() {
+async function setSessionCookie(token: string) {
+  const store = await cookies();
   const expires = new Date(Date.now() + SESSION_MAX_AGE * 1000);
-  return {
+  store.set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax" as const,
+    sameSite: "lax",
     path: "/",
     maxAge: SESSION_MAX_AGE,
     expires,
-  };
+  });
 }
 
+export async function clearSessionCookie() {
+  const store = await cookies();
+  store.set(SESSION_COOKIE, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+    expires: new Date(0),
+  });
+}
 
 export async function login(body: Record<string, unknown>) {
   const username = String(body.username || "").trim();
@@ -68,7 +81,7 @@ export async function login(body: Record<string, unknown>) {
       .from("users")
       .update({ failed_attempts: failedAttempts, locked_until: lock, updated_at: nowISO() })
       .eq("id", user.id);
-    await writeAuditLog(String(user.id), "LOGIN_FAILED", "auth", String(user.id), { username }, false);
+    await writeAudit(String(user.id), "LOGIN_FAILED", "auth", String(user.id), { username }, false);
     return errorResponse("اسم المستخدم أو كلمة المرور غير صحيحة", 401);
   }
 
@@ -109,12 +122,10 @@ export async function login(body: Record<string, unknown>) {
     })
     .eq("id", user.id);
 
-  await writeAuditLog(String(user.id), "LOGIN", "auth", String(user.id), { username, role: user.role });
+  await setSessionCookie(token);
+  await writeAudit(String(user.id), "LOGIN", "auth", String(user.id), { username, role: user.role });
 
-  // Set the persistent auth cookie on the actual Login response. This avoids
-  // relying on implicit cookie mutations from a nested helper and makes the
-  // Set-Cookie header observable and reliable on Vercel/Next.js.
-  const response = success({
+  return success({
     authenticated: true,
     user: {
       user_id: String(user.id),
@@ -124,8 +135,6 @@ export async function login(body: Record<string, unknown>) {
       status: user.status,
     },
   });
-  response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
-  return response;
 }
 
 export async function logout(session: SessionContext | null) {
@@ -135,15 +144,10 @@ export async function logout(session: SessionContext | null) {
       .update({ revoked_at: nowISO() })
       .eq("token_hash", sha256(session.token))
       .is("revoked_at", null);
-    await writeAuditLog(session.user.user_id, "LOGOUT", "auth", session.user.user_id);
+    await writeAudit(session.user.user_id, "LOGOUT", "auth", session.user.user_id);
   }
-  const response = success({ logged_out: true });
-  response.cookies.set(SESSION_COOKIE, "", {
-    ...sessionCookieOptions(),
-    maxAge: 0,
-    expires: new Date(0),
-  });
-  return response;
+  await clearSessionCookie();
+  return success({ logged_out: true });
 }
 
 export async function getMe(session: SessionContext) {
@@ -153,28 +157,26 @@ export async function getMe(session: SessionContext) {
   let shift = null;
 
   if (employeeId) {
-    const [employeeResult, assignment] = await Promise.all([
-      supabase
-        .from("employees")
+    const { data } = await supabase
+      .from("employees")
+      .select("*")
+      .eq("employee_id", employeeId)
+      .maybeSingle();
+    employee = data;
+
+    const assignment = await getCurrentAssignment(employeeId);
+    if (assignment) {
+      const { data: projectData } = await supabase
+        .from("projects")
         .select("*")
-        .eq("employee_id", employeeId)
-        .maybeSingle(),
-      getCurrentAssignment(employeeId),
-    ]);
-
-    employee = employeeResult.data;
-
-    if (assignment?.project_id) {
-      const [{ data: projectData }, employeeShift] = await Promise.all([
-        supabase
-          .from("projects")
-          .select("*")
-          .eq("project_id", assignment.project_id)
-          .maybeSingle(),
-        getCurrentEmployeeShift(employeeId, assignment.project_id),
-      ]);
+        .eq("project_id", assignment.project_id)
+        .maybeSingle();
       project = projectData;
-      shift = employeeShift?.shifts || null;
+
+      if (project) {
+        const employeeShift = await getCurrentEmployeeShift(employeeId, project.project_id);
+        shift = employeeShift?.shifts || null;
+      }
     }
   }
 

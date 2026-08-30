@@ -115,7 +115,7 @@ export default function Users({
             </option>
 
             <option value="HR_MANAGER">
-              مدير الموارد البشرية
+              مدير HR
             </option>
 
             <option value="SYSTEM_ADMIN">
@@ -194,7 +194,7 @@ export default function Users({
           {newRole ===
             'HR_MANAGER' && (
             <div className="empty-note">
-              حساب إداري مركزي للموارد البشرية: لا يحتاج
+              حساب HR إداري مركزي: لا يحتاج
               موظفاً مرتبطاً ولا يتم تعيينه على
               مشروع.
             </div>
@@ -213,7 +213,7 @@ export default function Users({
           <div className="empty-note">
             لا توجد سجلات موظفين محملة. اضغط
             «تحديث الموظفين» وتأكد أن الموظف موجود
-            في جدول الموظفين.
+            في جدول EMPLOYEES.
           </div>
         )}
 

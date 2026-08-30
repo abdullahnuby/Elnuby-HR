@@ -18,7 +18,7 @@ export const supabase = createClient(supabaseUrl, serviceRoleKey, {
   },
 }).schema("hr");
 
-// Session storage intentionally remains outside the canonical الموارد البشرية business schema.
+// Session storage intentionally remains outside the canonical HR business schema.
 export const publicSupabase = createClient(supabaseUrl, serviceRoleKey, {
   auth: {
     autoRefreshToken: false,
@@ -145,7 +145,6 @@ export function nowISO() {
 }
 
 export const APP_TIMEZONE = process.env.APP_TIMEZONE || "Africa/Cairo";
-export const SESSION_MAX_AGE = 7 * 24 * 60 * 60;
 
 export function appDate() {
   return new Intl.DateTimeFormat("en-CA", {
@@ -254,12 +253,7 @@ export async function getSession(
     .is("revoked_at", null)
     .maybeSingle();
 
-  if (sessionError) {
-    console.error("session lookup failed:", sessionError);
-    throw new Error("SESSION_STORE_UNAVAILABLE");
-  }
-
-  if (!session) {
+  if (sessionError || !session) {
     return null;
   }
 
@@ -278,12 +272,7 @@ export async function getSession(
     .eq("id", session.user_id)
     .maybeSingle();
 
-  if (userError) {
-    console.error("session user lookup failed:", userError);
-    throw new Error("SESSION_USER_LOOKUP_UNAVAILABLE");
-  }
-
-  if (!user) {
+  if (userError || !user) {
     return null;
   }
 
@@ -293,7 +282,7 @@ export async function getSession(
 
   // Sliding server-side session: refreshing/using the app keeps an active
   // session alive while the browser cookie remains valid.
-  const refreshedExpiry = new Date(Date.now() + SESSION_MAX_AGE * 1000).toISOString();
+  const refreshedExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
   await publicSupabase
     .from("app_sessions")
     .update({
@@ -319,7 +308,7 @@ export function requireAuth(
 ) {
   if (!session) {
     return errorResponse(
-      "Authentication required",
+      "يجب تسجيل الدخول أولاً",
       401
     );
   }
@@ -333,7 +322,7 @@ export function requireRole(
 ) {
   if (!session) {
     return errorResponse(
-      "Authentication required",
+      "يجب تسجيل الدخول أولاً",
       401
     );
   }
@@ -352,7 +341,7 @@ export function requireRole(
    AUDIT
 ========================================================= */
 
-export async function writeAuditLog(
+export async function writeAudit(
   actorUserId: string | null,
   action: string,
   entity = "api",
@@ -374,6 +363,100 @@ export async function writeAuditLog(
   } catch (error) {
     console.error("audit_log:", error);
   }
+}
+
+
+/* =========================================================
+   SCOPE-BASED AUTHORIZATION
+========================================================= */
+
+export async function getEmployeeOrganizationUnit(employeeId: string, onDate = appDate()) {
+  const { data, error } = await supabase
+    .from("employee_organization_history")
+    .select("unit_id,effective_from,effective_to")
+    .eq("employee_id", employeeId)
+    .lte("effective_from", onDate)
+    .or(`effective_to.is.null,effective_to.gte.${onDate}`)
+    .order("effective_from", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.error("getEmployeeOrganizationUnit:", error);
+    return null;
+  }
+  return data?.unit_id ?? null;
+}
+
+export async function getOrganizationAncestors(unitId: string | null): Promise<string[]> {
+  if (!unitId) return [];
+  const result: string[] = [];
+  let current: string | null = unitId;
+  const seen = new Set<string>();
+
+  while (current && !seen.has(current)) {
+    seen.add(current);
+    result.push(current);
+    const { data, error } = await supabase
+      .from("organization_units")
+      .select("parent_unit_id")
+      .eq("unit_id", current)
+      .maybeSingle();
+    if (error || !data?.parent_unit_id) break;
+    current = String(data.parent_unit_id);
+  }
+  return result;
+}
+
+export async function canAccessEmployee(
+  user: CurrentUser,
+  employeeId: string,
+  mode: "view" | "manage" = "view",
+) {
+  if (user.role === "SYSTEM_ADMIN" || user.role === "HR_MANAGER") return true;
+  if (user.employee_id && user.employee_id === employeeId) return mode === "view";
+
+  const { data: assignment } = await supabase
+    .from("project_assignments")
+    .select("project_id,is_current,start_date,end_date")
+    .eq("employee_id", employeeId)
+    .eq("is_current", true)
+    .maybeSingle();
+
+  if (assignment?.project_id && await canManageProject(user, String(assignment.project_id))) {
+    return true;
+  }
+
+  // Sector managers are scoped through the employee's current organization unit.
+  if (user.role === "SECTOR_MANAGER") {
+    const employeeUnit = await getEmployeeOrganizationUnit(employeeId);
+    const userManagedProjects = await getManagedProjectIds(user);
+    if (!employeeUnit || !userManagedProjects.length) return false;
+
+    const ancestors = await getOrganizationAncestors(employeeUnit);
+    const { data: projects } = await supabase
+      .from("projects")
+      .select("project_id,organization_unit_id")
+      .in("project_id", userManagedProjects);
+
+    return (projects || []).some((p: any) =>
+      p.organization_unit_id && ancestors.includes(String(p.organization_unit_id))
+    );
+  }
+
+  return false;
+}
+
+export async function requireEmployeeScope(
+  session: SessionContext | null,
+  employeeId: string,
+  mode: "view" | "manage" = "view",
+) {
+  const auth = requireAuth(session);
+  if (auth) return auth;
+  if (!employeeId || !(await canAccessEmployee(session!.user, employeeId, mode))) {
+    return errorResponse("ليس لديك صلاحية للوصول إلى بيانات هذا الموظف.", 403);
+  }
+  return null;
 }
 
 /* =========================================================
