@@ -396,16 +396,19 @@ export async function getOrganizationAncestors(unitId: string | null): Promise<s
   while (current && !seen.has(current)) {
     seen.add(current);
     result.push(current);
-    const { data: organizationUnit, error: organizationUnitError } =
-      await supabase
-        .from("organization_units")
-        .select("parent_unit_id")
-        .eq("unit_id", current)
-        .maybeSingle();
+    const organizationUnitResult = (await supabase
+      .from("organization_units")
+      .select("parent_unit_id")
+      .eq("unit_id", current)
+      .maybeSingle()) as {
+        data: { parent_unit_id: string | null } | null;
+        error: unknown;
+      };
 
-    if (organizationUnitError) break;
-    if (!organizationUnit?.parent_unit_id) break;
-    current = String(organizationUnit.parent_unit_id);
+    if (organizationUnitResult.error) break;
+    const parentUnitId = organizationUnitResult.data?.parent_unit_id ?? null;
+    if (!parentUnitId) break;
+    current = String(parentUnitId);
   }
   return result;
 }
