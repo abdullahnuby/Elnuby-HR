@@ -12,8 +12,39 @@ export function Metric({label,value,caption,icon,tone='blue',onClick}:{label:str
 export function Filters({children,onReset,onApply}:{children:ReactNode;onReset?:()=>void;onApply?:()=>void}){
  return <div className="ux-filters"><div className="ux-filters-fields">{children}</div><div className="ux-filter-actions">{onReset&&<button className="secondary" onClick={onReset}>مسح</button>}{onApply&&<button className="primary" onClick={onApply}>تطبيق</button>}</div></div>
 }
+function enhanceTableForMobile(children: ReactNode) {
+ const childArray = React.Children.toArray(children);
+ const table = childArray.find((child): child is React.ReactElement => React.isValidElement(child) && child.type === 'table');
+ if (!table) return children;
+ const tableChildren = React.Children.toArray(table.props.children);
+ const thead = tableChildren.find((child): child is React.ReactElement => React.isValidElement(child) && child.type === 'thead');
+ const tbody = tableChildren.find((child): child is React.ReactElement => React.isValidElement(child) && child.type === 'tbody');
+ if (!thead || !tbody) return children;
+ const headerRow = React.Children.toArray(thead.props.children).find((child): child is React.ReactElement => React.isValidElement(child) && child.type === 'tr');
+ const labels = headerRow ? React.Children.toArray(headerRow.props.children).map(cell => React.isValidElement(cell) ? String(cell.props.children ?? '') : '') : [];
+ const bodyRows = React.Children.toArray(tbody.props.children);
+ const enhancedRows = bodyRows.map(row => {
+   if (!React.isValidElement(row) || row.type !== 'tr') return row;
+   const cells = React.Children.toArray(row.props.children);
+   return React.cloneElement(row as React.ReactElement<any>, {
+     children: cells.map((cell, index) => {
+       if (!React.isValidElement(cell) || cell.type !== 'td') return cell;
+       return React.cloneElement(cell as React.ReactElement<any>, {
+         'data-label': labels[index] || '',
+       });
+     }),
+   });
+ });
+ const enhancedTbody = React.cloneElement(tbody as React.ReactElement<any>, { children: enhancedRows });
+ const enhancedTable = React.cloneElement(table as React.ReactElement<any>, {
+   className: `${table.props.className || ''} ux-mobile-card-table`.trim(),
+   children: tableChildren.map(child => child === tbody ? enhancedTbody : child),
+ });
+ return childArray.map(child => child === table ? enhancedTable : child);
+}
+
 export function TableShell({title,count,children,empty}:{title?:string;count?:ReactNode;children:ReactNode;empty?:string}){
- return <section className="ux-table-shell"><div className="ux-table-head">{title&&<div><h3>{title}</h3>{count!==undefined&&<span>{count}</span>}</div>}</div>{empty? <Empty text={empty}/> : <div className="ux-table-scroll">{children}</div>}</section>
+ return <section className="ux-table-shell"><div className="ux-table-head">{title&&<div><h3>{title}</h3>{count!==undefined&&<span>{count}</span>}</div>}</div>{empty? <Empty text={empty}/> : <div className="ux-table-scroll">{enhanceTableForMobile(children)}</div>}</section>
 }
 export function Drawer({open,title,subtitle,children,onClose,footer}:{open:boolean;title:string;subtitle?:string;children:ReactNode;onClose:()=>void;footer?:ReactNode}){
  useEffect(()=>{if(!open)return;const onKey=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose()};document.addEventListener('keydown',onKey);const prev=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{document.removeEventListener('keydown',onKey);document.body.style.overflow=prev}},[open,onClose]);

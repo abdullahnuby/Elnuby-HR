@@ -983,6 +983,37 @@ export default function Home() {
     [me?.user?.role],
   );
 
+  const mobileNav = useMemo(() => {
+    const preferred = ['dashboard','attendance','attendance-calendar','leaves','permissions','approvals','employees','reports'];
+    const available = preferred
+      .map(id => nav.find(n => n.id === id))
+      .filter(Boolean) as typeof nav;
+    return available.slice(0, 5);
+  }, [nav]);
+
+  const mobilePrimaryActions = useMemo(() => {
+    const role = me?.user?.role;
+    if (role === 'SYSTEM_ADMIN' || role === 'HR_MANAGER') {
+      return [
+        { id: 'attendance-calendar', label: 'تقويم الحضور', icon: 'calendar' },
+        { id: 'approvals', label: 'الاعتمادات', icon: 'check' },
+        { id: 'employees', label: 'الموظفون', icon: 'users' },
+      ];
+    }
+    if (role === 'PROJECT_MANAGER' || role === 'SECTOR_MANAGER') {
+      return [
+        { id: 'attendance', label: 'الحضور', icon: 'attendance' },
+        { id: 'approvals', label: 'الاعتمادات', icon: 'check' },
+        { id: 'employees', label: 'فريق العمل', icon: 'users' },
+      ];
+    }
+    return [
+      { id: 'attendance', label: 'الحضور', icon: 'attendance' },
+      { id: 'leaves', label: 'إجازة', icon: 'leaves' },
+      { id: 'permissions', label: 'إذن', icon: 'permissions' },
+    ];
+  }, [me?.user?.role]);
+
   if (!me) {
     return (
       <main
@@ -1201,6 +1232,14 @@ export default function Home() {
         </header>
 
         <div className="content">
+          <div className="mobile-sticky-actions" aria-label="إجراءات سريعة">
+            {mobilePrimaryActions.map(action => (
+              <button key={action.id} type="button" onClick={() => openSection(action.id)}>
+                <Icon name={action.icon} size={17} />
+                <span>{action.label}</span>
+              </button>
+            ))}
+          </div>
           <ClientErrorBoundary>
           {section === 'dashboard' &&
             (['SYSTEM_ADMIN','HR_MANAGER'].includes(me.user?.role) ? (
@@ -1481,6 +1520,21 @@ export default function Home() {
           </ClientErrorBoundary>
         </div>
       </section>
+
+      <nav className="mobile-bottom-nav" aria-label="التنقل السريع">
+        {mobileNav.map(n => (
+          <button
+            key={n.id}
+            type="button"
+            className={section === n.id ? 'active' : ''}
+            onClick={() => openSection(n.id)}
+            aria-current={section === n.id ? 'page' : undefined}
+          >
+            <Icon name={n.icon} size={19} />
+            <span>{n.label}</span>
+          </button>
+        ))}
+      </nav>
     </main>
   );
 }
