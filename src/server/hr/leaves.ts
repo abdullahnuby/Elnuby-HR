@@ -251,8 +251,9 @@ export async function createLeave(session: SessionContext, body: Record<string, 
 
 export async function decideLeaveManager(session: SessionContext, body: Record<string, unknown>) {
   const requestId = String(body.request_id || "");
-  const decision = String(body.decision || "").toUpperCase() as "APPROVE" | "REJECT" | "";
-  if (!requestId || !["APPROVE","REJECT"].includes(decision)) return errorResponse("بيانات القرار غير صحيحة");
+  const rawDecision = String(body.decision || "").toUpperCase();
+  if (!requestId || (rawDecision !== "APPROVE" && rawDecision !== "REJECT")) return errorResponse("بيانات القرار غير صحيحة");
+  const decision: "APPROVE" | "REJECT" = rawDecision === "APPROVE" ? "APPROVE" : "REJECT";
   const { data: request } = await supabase.from("leave_requests").select("*").eq("request_id", requestId).maybeSingle();
   if (!request) return errorResponse("طلب الإجازة غير موجود", 404);
   if (request.status !== "PENDING_MANAGER") return errorResponse("الطلب ليس في انتظار اعتماد مدير المشروع");
@@ -274,8 +275,9 @@ export async function decideLeaveManager(session: SessionContext, body: Record<s
 
 export async function decideLeaveHR(session: SessionContext, body: Record<string, unknown>) {
   const requestId = String(body.request_id || "");
-  const decision = String(body.decision || "").toUpperCase() as "APPROVE" | "REJECT" | "";
-  if (!requestId || !["APPROVE","REJECT"].includes(decision)) return errorResponse("بيانات القرار غير صحيحة");
+  const rawDecision = String(body.decision || "").toUpperCase();
+  if (!requestId || (rawDecision !== "APPROVE" && rawDecision !== "REJECT")) return errorResponse("بيانات القرار غير صحيحة");
+  const decision: "APPROVE" | "REJECT" = rawDecision === "APPROVE" ? "APPROVE" : "REJECT";
   const { data: request } = await supabase.from("leave_requests").select("*").eq("request_id", requestId).maybeSingle();
   if (!request) return errorResponse("طلب الإجازة غير موجود",404);
   if (request.status !== "PENDING_HR") return errorResponse("الطلب ليس في انتظار اعتماد HR");

@@ -197,21 +197,19 @@ export async function decidePermission(
     body.request_id || ""
   );
 
-  const decision =
-    String(
-      body.decision || ""
-    ).toUpperCase();
+  const rawDecision = String(body.decision || "").toUpperCase();
 
   if (
     !requestId ||
-    !["APPROVE", "REJECT"].includes(
-      decision
-    )
+    (rawDecision !== "APPROVE" && rawDecision !== "REJECT")
   ) {
     return errorResponse(
       "بيانات القرار غير صحيحة"
     );
   }
+
+  const decision: "APPROVE" | "REJECT" =
+    rawDecision === "APPROVE" ? "APPROVE" : "REJECT";
 
   const { data: request } =
     await supabase
