@@ -16,16 +16,17 @@ function enhanceTableForMobile(children: ReactNode) {
  const childArray = React.Children.toArray(children);
  const table = childArray.find((child): child is React.ReactElement => React.isValidElement(child) && child.type === 'table');
  if (!table) return children;
- const tableChildren = React.Children.toArray(table.props.children);
+ const tableProps = table.props as { children?: ReactNode; className?: string };
+ const tableChildren = React.Children.toArray(tableProps.children);
  const thead = tableChildren.find((child): child is React.ReactElement => React.isValidElement(child) && child.type === 'thead');
  const tbody = tableChildren.find((child): child is React.ReactElement => React.isValidElement(child) && child.type === 'tbody');
  if (!thead || !tbody) return children;
- const headerRow = React.Children.toArray(thead.props.children).find((child): child is React.ReactElement => React.isValidElement(child) && child.type === 'tr');
- const labels = headerRow ? React.Children.toArray(headerRow.props.children).map(cell => React.isValidElement(cell) ? String(cell.props.children ?? '') : '') : [];
- const bodyRows = React.Children.toArray(tbody.props.children);
+ const headerRow = React.Children.toArray((thead.props as { children?: ReactNode }).children).find((child): child is React.ReactElement => React.isValidElement(child) && child.type === 'tr');
+ const labels = headerRow ? React.Children.toArray((headerRow.props as { children?: ReactNode }).children).map(cell => React.isValidElement(cell) ? String(cell.props.children ?? '') : '') : [];
+ const bodyRows = React.Children.toArray((tbody.props as { children?: ReactNode }).children);
  const enhancedRows = bodyRows.map(row => {
    if (!React.isValidElement(row) || row.type !== 'tr') return row;
-   const cells = React.Children.toArray(row.props.children);
+   const cells = React.Children.toArray((row.props as { children?: ReactNode }).children);
    return React.cloneElement(row as React.ReactElement<any>, {
      children: cells.map((cell, index) => {
        if (!React.isValidElement(cell) || cell.type !== 'td') return cell;
@@ -37,7 +38,7 @@ function enhanceTableForMobile(children: ReactNode) {
  });
  const enhancedTbody = React.cloneElement(tbody as React.ReactElement<any>, { children: enhancedRows });
  const enhancedTable = React.cloneElement(table as React.ReactElement<any>, {
-   className: `${table.props.className || ''} ux-mobile-card-table`.trim(),
+   className: `${tableProps.className || ''} ux-mobile-card-table`.trim(),
    children: tableChildren.map(child => child === tbody ? enhancedTbody : child),
  });
  return childArray.map(child => child === table ? enhancedTable : child);
