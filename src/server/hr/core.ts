@@ -318,7 +318,7 @@ export function requireAuth(
 
 export function requireRole(
   session: SessionContext | null,
-  roles: string[]
+  roles: readonly string[]
 ) {
   if (!session) {
     return errorResponse(
