@@ -22,7 +22,11 @@ function enhanceTableForMobile(children: ReactNode) {
  const tbody = tableChildren.find((child): child is React.ReactElement => React.isValidElement(child) && child.type === 'tbody');
  if (!thead || !tbody) return children;
  const headerRow = React.Children.toArray((thead.props as { children?: ReactNode }).children).find((child): child is React.ReactElement => React.isValidElement(child) && child.type === 'tr');
- const labels = headerRow ? React.Children.toArray((headerRow.props as { children?: ReactNode }).children).map(cell => React.isValidElement(cell) ? String(cell.props.children ?? '') : '') : [];
+ const labels = headerRow ? React.Children.toArray((headerRow.props as { children?: ReactNode }).children).map(cell => {
+    if (!React.isValidElement(cell)) return '';
+    const cellProps = cell.props as { children?: ReactNode };
+    return String(cellProps.children ?? '');
+  }) : [];
  const bodyRows = React.Children.toArray((tbody.props as { children?: ReactNode }).children);
  const enhancedRows = bodyRows.map(row => {
    if (!React.isValidElement(row) || row.type !== 'tr') return row;
