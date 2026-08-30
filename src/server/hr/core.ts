@@ -404,8 +404,8 @@ export async function getOrganizationAncestors(unitId: string | null): Promise<s
         .maybeSingle();
 
     if (organizationUnitError) break;
-    if (organizationUnitQuery.error || !organizationUnitQuery.data?.parent_unit_id) break;
-    current = String(organizationUnitQuery.data.parent_unit_id);
+    if (!organizationUnit?.parent_unit_id) break;
+    current = String(organizationUnit.parent_unit_id);
   }
   return result;
 }
