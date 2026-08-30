@@ -1,15 +1,15 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
-import { Badge } from './common';
+import { Badge, employeeName } from './common';
 import { ConfirmDialog, Detail, Drawer, Filters, Metric, PageHeader, TableShell } from './ui';
 
 const types=[['LT-ANNUAL','سنوية','للرصيد السنوي'],['LT-CASUAL','عارضة','للحالات الطارئة القصيرة'],['LT-SICK','مرضية','تحتاج مستندًا مؤيدًا'],['LT-UNPAID','بدون أجر','وفق موافقة الإدارة']];
 const typeName=(v:string)=>types.find(x=>x[0]===v)?.[1]||v||'غير محدد';
 function daysBetween(a:string,b:string){if(!a||!b)return 0;const d1=new Date(`${a}T00:00:00`),d2=new Date(`${b}T00:00:00`);return d2<d1?0:Math.floor((d2.getTime()-d1.getTime())/86400000)+1}
 export default function LeaveSection({rows,role,employeeMode,leaveType,setLeaveType,leaveFrom,setLeaveFrom,leaveTo,setLeaveTo,leaveReason,setLeaveReason,createLeave,busy}:any){
- const safeRows=Array.isArray(rows)?rows:[]; const [local,setLocal]=useState<any[]>(safeRows);const [medicalDocument,setMedicalDocument]=useState<File|null>(null);const [balances,setBalances]=useState<any[]>([]);const [q,setQ]=useState('');const[status,setStatus]=useState('ALL');const[selected,setSelected]=useState<any>(null);const[reject,setReject]=useState<any>(null);
- useEffect(()=>setLocal(Array.isArray(rows)?rows:[]),[rows]); useEffect(()=>{if(employeeMode)void api<any[]>('leave_balances').then(x=>setBalances(Array.isArray(x)?x:[])).catch(()=>setBalances([]))},[employeeMode]);
+ const safeRows=Array.isArray(rows)?rows:[]; const [local,setLocal]=useState<any[]>(safeRows);const [medicalDocument,setMedicalDocument]=useState<File|null>(null);const [balances,setBalances]=useState<any[]>([]);const [employees,setEmployees]=useState<any[]>([]);const [q,setQ]=useState('');const[status,setStatus]=useState('ALL');const[selected,setSelected]=useState<any>(null);const[reject,setReject]=useState<any>(null);
+ useEffect(()=>setLocal(Array.isArray(rows)?rows:[]),[rows]); useEffect(()=>{let active=true; (async()=>{try{const r=await api<any[]>('employees');if(active)setEmployees(Array.isArray(r)?r:[])}catch{if(active)setEmployees([])}})();return()=>{active=false}},[]); useEffect(()=>{if(employeeMode)void api<any[]>('leave_balances').then(x=>setBalances(Array.isArray(x)?x:[])).catch(()=>setBalances([]))},[employeeMode]);
  const filtered=useMemo(()=>local.filter(r=>(!q||`${r.employee_name||''} ${r.employee_id||''}`.toLowerCase().includes(q.toLowerCase()))&&(status==='ALL'||r.status===status)),[local,q,status]);
  const requestDays=daysBetween(leaveFrom,leaveTo); const balance=balances.find(b=>String(b.leave_type_id)===String(leaveType)); const after=balance?Number(balance.remaining||0)-requestDays:null;
  const decide=async(requestId:string,decision:'APPROVE'|'REJECT',comment?:string)=>{const action=role==='HR_MANAGER'||role==='SYSTEM_ADMIN'?'decide_leave_hr':'decide_leave_manager';try{await api(action,{request_id:requestId,decision,comment});setLocal(prev=>prev.map(r=>r.request_id===requestId?{...r,status:decision==='REJECT'?'REJECTED':action==='decide_leave_hr'?'APPROVED':'PENDING_HR'}:r));setReject(null)}catch(e:any){window.dispatchEvent(new CustomEvent('hr:toast',{detail:{message:e?.message||'تعذر تنفيذ القرار',type:'error'}}))}};
