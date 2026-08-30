@@ -22,6 +22,7 @@ import Performance from '@/components/hr/Performance';
 import AttendanceCalendar from '@/components/hr/AttendanceCalendar';
 import HRExecutiveDashboard from '@/components/hr/HRExecutiveDashboard';
 import ApprovalsCenter from '@/components/hr/ApprovalsCenter';
+import HRAdvanced from '@/components/hr/HRAdvanced';
 
 
 type Employee = {
@@ -1427,6 +1428,7 @@ export default function Home() {
           )}
 
           {section === 'performance' && <Performance employees={employees} role={me.user?.role} />}
+          {section === 'hr-advanced' && <HRAdvanced employees={employees} role={me.user?.role} />}
 
           {section === 'notifications' && (
             <section className="panel-section">

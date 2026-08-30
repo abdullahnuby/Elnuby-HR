@@ -21,5 +21,6 @@ export const navByRole = (role: string) => [
   { id: 'notifications', label: 'تنبيهات الموارد البشرية', icon: 'alert', roles: ['SYSTEM_ADMIN','HR_MANAGER'] },
   { id: 'approvals', label: 'مركز الاعتمادات', icon: 'check', roles: ['SYSTEM_ADMIN','HR_MANAGER','SECTOR_MANAGER','PROJECT_MANAGER'] },
   { id: 'performance', label: 'تقييم الأداء', icon: 'reports', roles: ['SYSTEM_ADMIN','HR_MANAGER','SECTOR_MANAGER','PROJECT_MANAGER'] },
+  { id: 'hr-advanced', label: 'إدارة الموارد البشرية المتقدمة', icon: 'settings', roles: ['SYSTEM_ADMIN','HR_MANAGER'] },
   { id: 'settings', label: 'إعدادات النظام', icon: 'settings', roles: ['SYSTEM_ADMIN','HR_MANAGER'] },
 ].filter(x => !x.roles || x.roles.includes(role));

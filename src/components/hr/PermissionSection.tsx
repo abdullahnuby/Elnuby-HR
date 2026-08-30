@@ -133,7 +133,7 @@ export default function PermissionSection({
                   {r.minutes} دقيقة
                 </td>
 
-                <td>{r.status}</td>
+                <td><Badge status={r.status}/></td>
 
                 <td>
                   {r.reason || '—'}

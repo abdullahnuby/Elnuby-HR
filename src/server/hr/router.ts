@@ -18,6 +18,7 @@ import { performanceList, performanceTemplates, createPerformanceTemplate, creat
 import { employeeDocuments, uploadEmployeeDocument, employeeDocumentUrl, deleteEmployeeDocument } from './documents';
 import { approvalInbox, createApprovalRequest, approvalRequests } from "./governance";
 import { listOrganizationUnits, createOrganizationUnit, updateOrganizationUnit, assignEmployeeOrganization, employeeOrganizationHistory } from "./organization";
+import { disciplinaryCases, createDisciplinaryCase, decideDisciplinaryCase, trainingPrograms, createTrainingProgram, assignTraining, recruitmentData, createPosition, addCandidate, updateCandidate, workforcePlan, createWorkforcePlan, payrollExportPreview } from "./advanced";
 
 export async function handleAction(
   action: string,
@@ -150,6 +151,21 @@ export async function handleAction(
       const auth = requireRole(session, MANAGEMENT_ROLES); if (auth) return auth;
       return updateDevelopmentPlan(session!, body);
     }
+
+    /* HR ADVANCED */
+    case "disciplinary_cases": return disciplinaryCases(session!, body);
+    case "create_disciplinary_case": return createDisciplinaryCase(session!, body);
+    case "decide_disciplinary_case": return decideDisciplinaryCase(session!, body);
+    case "training_programs": return trainingPrograms(session!, body);
+    case "create_training_program": return createTrainingProgram(session!, body);
+    case "assign_training": return assignTraining(session!, body);
+    case "recruitment_data": return recruitmentData(session!, body);
+    case "create_recruitment_position": return createPosition(session!, body);
+    case "add_recruitment_candidate": return addCandidate(session!, body);
+    case "update_recruitment_candidate": return updateCandidate(session!, body);
+    case "workforce_plan": return workforcePlan(session!, body);
+    case "create_workforce_plan": return createWorkforcePlan(session!, body);
+    case "payroll_export_preview": return payrollExportPreview(session!, body);
 
     /* GOVERNANCE & APPROVALS */
     case "approval_inbox": {
